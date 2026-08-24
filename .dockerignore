@@ -1,0 +1,11 @@
+.git
+.gitignore
+.golangci.yml
+.dockerignore
+Dockerfile
+README.md
+CHANGELOG.md
+testdata
+**/*_test.go
+**/dist
+**/bin

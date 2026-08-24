@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{if .RefreshSeconds}}<meta http-equiv="refresh" content="{{.RefreshSeconds}}">{{end}}
+<title>{{.EnvName}} — OCP status</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --pad-x: 1.75rem;
+  --pad-top: 1.5rem;
+  /* Height of the sticky page header. thead sticks to exactly this offset, so the
+     two cannot drift apart. */
+  --hdr-h: 2.85rem;
+  --plane:      #f9f9f7;
+  --surface:    #fcfcfb;
+  --ink:        #0b0b0b;
+  --ink-2:      #52514e;
+  --muted:      #898781;
+  --hair:       #e1e0d9;
+  --ring:       rgba(11,11,11,.10);
+  --ok-bg:#e6f4ea;      --ok-fg:#0a7a29;
+  --deg-bg:#fce8e6;     --deg-fg:#b3261e;
+  --warn-bg:#fef3d0;    --warn-fg:#8a5a00;
+  --prog-bg:#e3edfb;    --prog-fg:#1a5fb4;
+  --drift-bg:#fdeae0;   --drift-fg:#a34a1e;
+  --prune-bg:#eceff1;   --prune-fg:#5f6368;
+  --susp-bg:#e8eaed;    --susp-fg:#3c4043;
+  --gpu-bg:#efe7fb;     --gpu-fg:#5b3ba8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --plane:   #0d0d0d;
+    --surface: #1a1a19;
+    --ink:     #ffffff;
+    --ink-2:   #c3c2b7;
+    --muted:   #898781;
+    --hair:    #2c2c2a;
+    --ring:    rgba(255,255,255,.10);
+    --ok-bg:#0f2e18;    --ok-fg:#5cd07a;
+    --deg-bg:#3a1614;   --deg-fg:#ff9d94;
+    --warn-bg:#33260a;  --warn-fg:#f5c451;
+    --prog-bg:#122740;  --prog-fg:#8ab8f0;
+    --drift-bg:#3a2113; --drift-fg:#f0a077;
+    --prune-bg:#23262a; --prune-fg:#a6adb5;
+    --susp-bg:#222427;  --susp-fg:#9aa0a6;
+    --gpu-bg:#2a2140;   --gpu-fg:#c0a9ee;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: var(--pad-top) var(--pad-x) 3rem;
+  background: var(--plane); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+a:hover { text-decoration: underline; }
+
+header {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem;
+  position: sticky; top: 0; z-index: 30;
+  min-height: var(--hdr-h); box-sizing: border-box;
+  margin: calc(-1 * var(--pad-top)) calc(-1 * var(--pad-x)) 0;
+  padding: .5rem var(--pad-x);
+  background: var(--plane); border-bottom: 1px solid var(--hair);
+}
+h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+.badge {
+  display: inline-block; margin-left: .5rem; padding: .1rem .45rem;
+  border: 1px solid var(--ring); border-radius: 999px;
+  font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+  color: var(--ink-2); vertical-align: .12em;
+}
+.hdr-sub { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: .7; }
+.legend { margin: .5rem 0 .2rem; padding: .6rem .75rem; background: var(--surface);
+          border: 1px solid var(--ring); border-radius: 8px; }
+.legend > summary { cursor: pointer; color: var(--ink-2); font-size: .78rem; font-weight: 600;
+                    letter-spacing: .02em; list-style: none; }
+.legend > summary::-webkit-details-marker { display: none; }
+.legend > summary::before { content: "\25b8 "; color: var(--muted); }
+.legend[open] > summary::before { content: "\25be "; }
+.legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+               gap: .3rem .9rem; margin-top: .55rem; }
+.legend-row { display: flex; align-items: baseline; gap: .45rem; font-size: .78rem;
+              color: var(--ink-2); }
+.legend-row .pill { flex: none; }
+.legend-note { margin-top: .5rem; font-size: .74rem; color: var(--muted); }
+.region { font-weight: 400; color: var(--muted); margin-left: .5rem; font-size: .9rem; }
+.meta { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+
+.sub { color: var(--ink-2); font-size: .85rem; margin-top: .45rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.tiles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.1rem 0 .35rem; }
+.tile {
+  background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
+  padding: .5rem .8rem; min-width: 5.5rem;
+}
+.tile .n { font-size: 1.35rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile .k { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.tile.t-total .n { color: var(--ink); }
+.tile.t-ok        { background: var(--ok-bg);    border-color: transparent; } .tile.t-ok .n,        .tile.t-ok .k        { color: var(--ok-fg); }
+.tile.t-degraded  { background: var(--deg-bg);   border-color: transparent; } .tile.t-degraded .n,  .tile.t-degraded .k  { color: var(--deg-fg); }
+.tile.t-warning   { background: var(--warn-bg);  border-color: transparent; } .tile.t-warning .n,   .tile.t-warning .k   { color: var(--warn-fg); }
+.tile.t-progressing   { background: var(--prog-bg);  border-color: transparent; } .tile.t-progressing .n,   .tile.t-progressing .k   { color: var(--prog-fg); }
+.tile.t-drift     { background: var(--drift-bg); border-color: transparent; } .tile.t-drift .n,     .tile.t-drift .k     { color: var(--drift-fg); }
+.tile.t-prune     { background: var(--prune-bg); border-color: transparent; } .tile.t-prune .n,     .tile.t-prune .k     { color: var(--prune-fg); }
+.tile.t-suspended { background: var(--susp-bg);  border-color: transparent; } .tile.t-suspended .n, .tile.t-suspended .k { color: var(--susp-fg); }
+
+.capacity { margin: .55rem 0 .2rem; padding: .55rem .8rem; background: var(--surface);
+            border: 1px solid var(--ring); border-radius: 8px; }
+.cap-head { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
+            color: var(--muted); font-weight: 600; }
+.cap-head .cap-sub { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: .45rem; }
+.cap-row { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; margin-top: .4rem; }
+.cap-item { display: flex; align-items: baseline; gap: .3rem; }
+.cap-item .cv { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cap-item .ck { font-size: .72rem; color: var(--muted); }
+.cap-item.is-gpu .cv { color: var(--gpu-fg); }
+.cap-note { margin-top: .4rem; font-size: .74rem; color: var(--muted); }
+
+a.tile { display: block; text-decoration: none; color: inherit; }
+a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
+.tile.is-on { box-shadow: 0 0 0 2px var(--ink); }
+.tile.is-on .k::after { content: " \00d7"; font-weight: 700; }
+
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem;
+         margin: .9rem 0 -.2rem; font-size: .78rem; color: var(--ink-2); }
+.chip { display: inline-flex; align-items: center; gap: .1rem; padding: .05rem .25rem .05rem .5rem;
+        background: var(--surface); border: 1px solid var(--ring); border-radius: 999px; }
+.chip a { text-decoration: none; color: var(--muted); font-weight: 700; padding: 0 .25rem; }
+.chip a:hover { color: var(--ink); text-decoration: none; }
+.chips .shown { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.meta .sel { color: var(--ink-2); font-weight: 600; }
+a.cap-item { text-decoration: none; color: inherit; border-radius: 6px;
+             padding: .05rem .3rem; margin: -.05rem -.3rem; }
+a.cap-item:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
+a.cap-item.is-on { box-shadow: 0 0 0 2px var(--ink); }
+
+.banner { padding: .6rem .8rem; border-radius: 6px; margin: .7rem 0; font-size: .85rem; }
+.banner.err   { background: var(--deg-bg);  color: var(--deg-fg); }
+.banner.stale { background: var(--warn-bg); color: var(--warn-fg); }
+
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; margin-top: .9rem; }
+/* separate, not collapse: border-radius is ignored on collapsed table cells, and the
+   rounded corners now come from the cells instead of overflow:hidden on the card. */
+table { border-collapse: separate; border-spacing: 0; width: 100%; }
+thead th:first-child { border-top-left-radius: 10px; }
+thead th:last-child  { border-top-right-radius: 10px; }
+tbody:last-of-type tr:last-child td:first-child { border-bottom-left-radius: 10px; }
+tbody:last-of-type tr:last-child td:last-child  { border-bottom-right-radius: 10px; }
+thead th {
+  position: sticky; top: var(--hdr-h); z-index: 2; background: var(--surface);
+  text-align: left; font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600; padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
+}
+tbody td { padding: .4rem .8rem; border-top: 1px solid var(--hair); vertical-align: top; }
+tbody tr:first-child td { border-top: 0; }
+tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.name { font-weight: 500; }
+.appver, .chartver { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                    white-space: nowrap; }
+.appver { font-size: .8rem; color: var(--ink); font-weight: 600; }
+.gpu { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
+       font-weight: 700; letter-spacing: .05em; background: var(--gpu-bg); color: var(--gpu-fg);
+       vertical-align: .1em; }
+tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
+.chartver { font-size: .74rem; color: var(--muted); }
+.chartver .sha { color: var(--muted); }
+.sync { color: var(--ink-2); font-size: .82rem; }
+.detail { color: var(--ink-2); font-size: .82rem; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .1rem .5rem; border-radius: 999px;
+  font-size: .7rem; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+}
+.pill .g { font-size: .78rem; line-height: 1; }
+.s-ok        { background: var(--ok-bg);    color: var(--ok-fg); }
+.s-degraded  { background: var(--deg-bg);   color: var(--deg-fg); }
+.s-warning   { background: var(--warn-bg);  color: var(--warn-fg); }
+.s-progressing   { background: var(--prog-bg);  color: var(--prog-fg); }
+.s-drift     { background: var(--drift-bg); color: var(--drift-fg); }
+.s-prune     { background: var(--prune-bg); color: var(--prune-fg); }
+.s-suspended { background: var(--susp-bg);  color: var(--susp-fg); }
+
+tr.subrow td { padding: 0 .8rem .55rem 2.1rem; border-top: 0; }
+tr.subrow details { font-size: .8rem; }
+tr.subrow summary { cursor: pointer; color: var(--prog-fg); padding: .15rem 0; width: fit-content; }
+tr.subrow summary:hover { text-decoration: underline; }
+table.components { margin: .35rem 0 .2rem; width: auto; }
+table.components th { position: static; background: none; border: 0; padding: .1rem 1.1rem .1rem 0; font-size: .62rem; }
+table.components td { border: 0; padding: .1rem 1.1rem .1rem 0; color: var(--ink-2); font-size: .78rem; }
+table.components td.k { color: var(--muted); }
+
+footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
+@media (max-width: 720px) {
+  :root { --pad-x: 1rem; --pad-top: 1rem; --hdr-h: 4.5rem; }
+  .hide-sm { display: none; }
+  body { padding: var(--pad-top) var(--pad-x) 3rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>{{.EnvName}}
+    {{- if .ClusterName}}<span class="badge" title="{{if .EnvType}}{{.EnvType}} environment{{else}}cluster{{end}}">{{.ClusterName}}</span>
+    {{- else if .EnvType}}<span class="badge">{{.EnvType}}</span>{{end}}
+    {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
+  <div class="meta">checked {{.AgeSeconds}}s ago &middot; auto-refresh
+    {{- range $i, $o := .RefreshOptions}}{{if $i}} &middot;{{end}}
+    {{- if $o.Active}} <span class="sel">{{$o.Label}}</span>{{else}} <a href="{{$o.Href}}">{{$o.Label}}</a>{{end}}
+    {{- end}}
+  </div>
+</header>
+
+{{with .Snapshot}}
+<div class="sub" title="root health {{.RootHealth}} &middot; root sync {{.RootSync}}">
+  version
+  {{- $tree := repoTree .RepoURL .Version}}
+  {{- if $tree}} <a class="mono" href="{{$tree}}"><strong>{{.Version}}</strong></a>
+  {{- else}} <strong class="mono">{{if .Version}}{{.Version}}{{else}}unknown{{end}}</strong>{{end}}
+  {{- if .Revision}} @
+    {{- $c := repoCommit .RepoURL .Revision}}
+    {{- if $c}} <a class="mono" href="{{$c}}">{{short .Revision}}</a>{{else}} <span class="mono">{{short .Revision}}</span>{{end}}
+  {{- end}}
+  {{- if .LastDeployedAt}} &middot; last deploy {{relTime .LastDeployedAt}}{{if .LastDeployID}} (#{{.LastDeployID}}){{end}}{{end}}
+  {{- if .Phase}} &middot; sync {{.Phase}}{{end}}
+</div>
+{{end}}
+
+{{if .Error}}<div class="banner err">cluster read failed: {{.Error}}</div>{{end}}
+{{if .Stale}}<div class="banner stale">data is {{.AgeSeconds}}s stale</div>{{end}}
+
+{{if .HasData}}
+{{with .Snapshot.Summary}}
+{{/* The tiles keep counting the whole cluster while a filter is on. Do not "fix" this
+     to count only the filtered rows: every other tile would read 0 as soon as one filter
+     is applied and the reader would lose their bearings. Filtering picks rows, not counts. */}}
+<div class="tiles">
+  <a class="tile t-total" href="{{$.ClearHref}}"><div class="n">{{.Total}}</div><div class="k">services</div></a>
+  {{if .Degraded}}<a class="tile t-degraded{{if $.FilterActive "status" "DEGRADED"}} is-on{{end}}" href="{{$.FilterHref "status" "DEGRADED"}}"><div class="n">{{.Degraded}}</div><div class="k">degraded</div></a>{{end}}
+  {{if .Warning}}<a class="tile t-warning{{if $.FilterActive "status" "WARNING"}} is-on{{end}}" href="{{$.FilterHref "status" "WARNING"}}"><div class="n">{{.Warning}}</div><div class="k">warning</div></a>{{end}}
+  {{if .Progressing}}<a class="tile t-progressing{{if $.FilterActive "status" "PROGRESSING"}} is-on{{end}}" href="{{$.FilterHref "status" "PROGRESSING"}}"><div class="n">{{.Progressing}}</div><div class="k">progressing</div></a>{{end}}
+  {{if .Drift}}<a class="tile t-drift{{if $.FilterActive "status" "DRIFT"}} is-on{{end}}" href="{{$.FilterHref "status" "DRIFT"}}"><div class="n">{{.Drift}}</div><div class="k">drift</div></a>{{end}}
+  {{if .Prune}}<a class="tile t-prune{{if $.FilterActive "status" "PRUNE"}} is-on{{end}}" href="{{$.FilterHref "status" "PRUNE"}}"><div class="n">{{.Prune}}</div><div class="k">prune</div></a>{{end}}
+  {{if .Suspended}}<a class="tile t-suspended{{if $.FilterActive "status" "SUSPENDED"}} is-on{{end}}" href="{{$.FilterHref "status" "SUSPENDED"}}"><div class="n">{{.Suspended}}</div><div class="k">suspended</div></a>{{end}}
+  <a class="tile t-ok{{if $.FilterActive "status" "OK"}} is-on{{end}}" href="{{$.FilterHref "status" "OK"}}"><div class="n">{{.OK}}</div><div class="k">ok</div></a>
+  {{if .Hidden}}<div class="tile"><div class="n">{{.Hidden}}</div><div class="k">hidden</div></div>{{end}}
+</div>
+
+<details class="legend">
+  <summary>What these states mean</summary>
+  <div class="legend-grid">
+    <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>OK</span><span>Healthy and matching git.</span></div>
+    <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>DEGRADED</span><span>Genuinely broken &mdash; needs attention.</span></div>
+    <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>WARNING</span><span>ArgoCD cannot determine health.</span></div>
+    <div class="legend-row"><span class="pill s-progressing"><span class="g">&#8635;</span>PROGRESSING</span><span>Rolling out. Not an error.</span></div>
+    <div class="legend-row"><span class="pill s-drift"><span class="g">&#8800;</span>DRIFT</span><span>Pods healthy, config differs from git.</span></div>
+    <div class="legend-row"><span class="pill s-prune"><span class="g">&#8856;</span>PRUNE</span><span>Orphan awaiting cleanup, not an outage.</span></div>
+    <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>SUSPENDED</span><span>Deliberately paused.</span></div>
+    <div class="legend-row"><span class="gpu">GPU</span><span>Runs on GPU nodes.</span></div>
+  </div>
+  <div class="legend-note">
+    <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git &mdash;
+    two independent things, so <em>PROGRESSING</em> beside <em>Synced</em> is normal.
+    Rows are ordered worst-first. Expand a row to see which components are out of sync.
+    Click a tile to filter the list to that status, and click it again to clear it.
+  </div>
+</details>
+{{end}}
+
+{{with .Snapshot.Nodes}}
+<section class="capacity">
+  <div class="cap-head">Cluster capacity<span class="cap-sub">infrastructure, not service health</span></div>
+  <div class="cap-row">
+    {{- if not .Error}}
+    <div class="cap-item"><span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
+    <div class="cap-item"><span class="cv">{{.CPUNodes}}</span><span class="ck">cpu nodes</span></div>
+    <div class="cap-item is-gpu"><span class="cv">{{.GPUNodes}}</span><span class="ck">gpu nodes</span></div>
+    <div class="cap-item is-gpu"><span class="cv">{{.GPUs}}</span><span class="ck">gpus</span></div>
+    {{- if .Arch}}
+    <div class="cap-item"><span class="cv">{{range $i, $a := .Arch}}{{if $i}} / {{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span><span class="ck">architecture</span></div>
+    {{- end}}
+    {{- end}}
+    <a class="cap-item is-gpu{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}"><span class="cv">{{$.Snapshot.Summary.GPU}}</span><span class="ck">gpu services</span></a>
+  </div>
+  {{- if .Error}}
+  <div class="cap-note">
+    {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.
+    {{- else}}node stats unavailable.{{end}} ({{.Error}})
+  </div>
+  {{- end}}
+</section>
+{{end}}
+
+{{if .Filter.Active}}
+<div class="chips">
+  {{- range .Chips}}
+  <span class="chip">{{.Label}}<a href="{{.RemoveHref}}" title="remove this filter">&times;</a></span>
+  {{- end}}
+  {{- if gt (len .Chips) 1}}
+  <a class="clear" href="{{.ClearHref}}">clear all</a>
+  {{- end}}
+  <span class="shown">showing {{.Shown}} of {{.Snapshot.Summary.Total}}</span>
+</div>
+{{end}}
+
+<div class="card">
+<table>
+<thead>
+<tr>
+  <th>Service</th>
+  <th>App version</th>
+  <th class="hide-sm">Chart version</th>
+  <th>Status</th>
+  <th class="hide-sm">Sync<span class="hdr-sub"> vs git</span></th>
+  <th class="hide-sm">Detail</th>
+</tr>
+</thead>
+{{$ui := .ArgoCDUIBase}}
+{{range .Services}}
+<tbody class="svc{{if .GPU}} is-gpu{{end}}">
+<tr>
+  <td class="name">{{if $ui}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}{{if .GPU}}<span class="gpu" title="GPU-backed workload">GPU</span>{{end}}</td>
+  <td class="appver">{{if .AppVersion}}<span title="{{.Image}}">{{clip 28 .AppVersion}}</span>{{end}}</td>
+  <td class="chartver hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">
+    {{- $tree := repoTree .RepoURL .Version}}
+    {{- if $tree}}<a href="{{$tree}}">{{.Version}}</a>{{else}}{{.Version}}{{end}}
+    {{- if .Revision}}
+      {{- $c := repoCommit .RepoURL .Revision}}
+      {{- if $c}} <a class="sha" href="{{$c}}">{{short .Revision}}</a>{{else}} <span class="sha">{{short .Revision}}</span>{{end}}
+    {{- end}}
+  </td>
+  <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
+  <td class="sync hide-sm">{{.Sync}}</td>
+  <td class="detail hide-sm">{{.Detail}}</td>
+</tr>
+{{if .Components}}
+<tr class="subrow">
+  <td colspan="6">
+    <details>
+      <summary>{{len .Components}} out-of-sync component{{if ne (len .Components) 1}}s{{end}}</summary>
+      <table class="components">
+        <tr><th>Kind</th><th>Name</th><th>Namespace</th></tr>
+        {{range .Components}}
+        <tr><td class="k">{{.Kind}}</td><td>{{.Name}}</td><td class="k">{{.Namespace}}</td></tr>
+        {{end}}
+      </table>
+    </details>
+  </td>
+</tr>
+{{end}}
+</tbody>
+{{else}}
+<tbody><tr><td colspan="6" class="detail">{{if $.Filter.Active}}no services match the active filter &mdash; <a href="{{$.ClearHref}}">clear it</a>{{else}}no services reported{{end}}</td></tr></tbody>
+{{end}}
+</table>
+</div>
+{{end}}
+
+<footer>srv-status {{.BuildVersion}}{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</footer>
+</body>
+</html>

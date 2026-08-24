@@ -1,0 +1,61 @@
+{{- if .Values.rbac.create }}
+{{- /* Namespaced Role, not a ClusterRole, and no "watch": the app polls get/list on
+       Applications in one namespace, so that is the entire permission surface. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "srv-status.fullname" . }}
+  namespace: {{ .Values.rbac.argocdNamespace }}
+  labels:
+    {{- include "srv-status.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "srv-status.fullname" . }}
+  namespace: {{ .Values.rbac.argocdNamespace }}
+  labels:
+    {{- include "srv-status.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "srv-status.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "srv-status.fullname" . }}
+{{- end }}
+{{- if .Values.rbac.clusterRole }}
+---
+{{- /* The only cluster-scoped object in this chart, and it exists solely for
+       config.nodeStats: nodes are not namespaced, so they cannot be read by a Role. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "srv-status.fullname" . }}-nodes
+  labels:
+    {{- include "srv-status.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "srv-status.fullname" . }}-nodes
+  labels:
+    {{- include "srv-status.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "srv-status.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "srv-status.fullname" . }}-nodes
+{{- end }}

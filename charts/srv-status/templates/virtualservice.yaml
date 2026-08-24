@@ -1,0 +1,30 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ include "srv-status.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "srv-status.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.istio.gateway }}
+  gateways:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  hosts:
+    {{- if .Values.istio.hosts }}
+    {{- toYaml .Values.istio.hosts | nindent 4 }}
+    {{- else }}
+    - "*"
+    {{- end }}
+  http:
+    - match:
+        - uri:
+            prefix: {{ .Values.config.basePath | quote }}
+      {{- /* No `rewrite:` block: the app serves basePath natively. */}}
+      route:
+        - destination:
+            host: {{ include "srv-status.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+            port:
+              number: {{ .Values.service.port }}
+{{- end }}

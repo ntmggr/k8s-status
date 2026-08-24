@@ -1,0 +1,36 @@
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.host }}
+{{- fail "ingress.enabled is true but ingress.host is empty" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "srv-status.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "srv-status.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          {{- /* Forwarded as-is: the app serves basePath itself, so no rewrite annotation. */}}
+          - path: {{ .Values.config.basePath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "srv-status.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

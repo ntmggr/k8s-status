@@ -1,0 +1,27 @@
+{{ .Chart.Name }} {{ .Chart.Version }} installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+{{- if .Values.ingress.enabled }}
+
+Available at:
+
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}{{ .Values.config.basePath }}/
+{{- else if .Values.istio.enabled }}
+
+Available at:
+{{ range .Values.istio.hosts }}
+  https://{{ . }}{{ $.Values.config.basePath }}/
+{{- else }}
+  https://<istio-gateway-host>{{ .Values.config.basePath }}/
+{{- end }}
+{{- else }}
+
+No ingress is enabled. Reach it with a port-forward:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "srv-status.fullname" . }} 8080:{{ .Values.service.port }}
+
+Then open:
+
+  http://127.0.0.1:8080{{ .Values.config.basePath }}/
+{{- end }}
+
+The pod reads ArgoCD Applications in namespace "{{ .Values.rbac.argocdNamespace }}" with get/list only.
