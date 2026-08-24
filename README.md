@@ -1,13 +1,25 @@
 # srv-status
 
-A read-only, single-page status view of one OCP environment.
+[![ci](https://github.com/ntmggr/srv-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/ci.yml)
+[![release](https://github.com/ntmggr/srv-status/actions/workflows/release.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/release.yml)
+[![Docker Hub](https://img.shields.io/docker/v/ntmggr/srv-status?logo=docker&label=docker%20hub&sort=semver)](https://hub.docker.com/r/ntmggr/srv-status)
+[![Go](https://img.shields.io/github/go-mod/go-version/ntmggr/srv-status)](go.mod)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**One page that answers "what is deployed in this cluster, at what version, and is it healthy?"**
 
 `srv-status` runs inside a Kubernetes cluster, reads ArgoCD `Application` objects from that
-cluster's API server, and renders one HTML page showing the environment's deployed version plus a
-table of every OCP service and whether it is healthy. It reports on its own cluster only — there is
-no peer discovery, no fan-out, and no outbound network call other than to the local Kubernetes API.
+cluster's API server, and renders a single HTML page: every service, its running version, its
+chart version, and its health. It reports on its own cluster only — no peer discovery, no
+fan-out, and no outbound network call other than to the local Kubernetes API.
 
-Standard library only. No client-go, no web framework, no JavaScript, no external assets.
+Standard library only. No client-go, no web framework, no JavaScript, no external assets — the
+whole page is server-rendered HTML with inline CSS.
+
+![srv-status](docs/screenshot.png)
+
+<sub>Screenshot uses synthetic data from `testdata/`. The page also ships a dark theme
+([screenshot](docs/screenshot-dark.png)) that follows `prefers-color-scheme`.</sub>
 
 ## Routes
 
@@ -92,7 +104,7 @@ Everything is read from the environment at startup. Every variable has a default
 | `REGION` | *(empty)* | e.g. `eu-west-1` |
 | `BASE_PATH` | `/srv-status` | Path prefix served natively; normalized to a leading slash with no trailing slash. Empty means root |
 | `ARGOCD_NAMESPACE` | `argocd` | Namespace holding the `Application` objects |
-| `ROOT_APP_NAME` | `ocp-services` | App-of-apps that owns every service |
+| `ROOT_APP_NAME` | `ocp-services` | Name of the ArgoCD app-of-apps that owns every service. Set this to whatever your root Application is called. |
 | `ARGOCD_UI_BASE` | *(empty)* | When set, service names link to `<base>/applications/<name>` |
 | `IGNORE_GLOBS` | *(empty)* | Comma-separated `path.Match` globs; matches are hidden from the table and all counts, and reported as `hidden` |
 | `NODE_STATS` | `false` | Render the cluster capacity section. Needs a ClusterRole for `nodes` — see [Cluster capacity](#cluster-capacity) |
@@ -298,7 +310,7 @@ report a `null` sync revision; that decodes to an empty string and is rendered a
 The kube context is a required argument in `cluster` mode — the script has no built-in default for
 it, nor for `CLUSTER_NAME`, `ARGOCD_UI_BASE`, `REGION` or `ENV_TYPE`. Export any of those to
 override them. Fixture mode sets `ROOT_APP_NAME=root-app` to match the fixture's root application;
-cluster mode uses the real default, `ocp-services`.
+cluster mode uses the configured default (`ROOT_APP_NAME`).
 
 By hand, against a proxied cluster API:
 
@@ -308,7 +320,7 @@ kubectl proxy --port=8001 &
 
 KUBE_API_URL=http://127.0.0.1:8001 \
 ENV_NAME=sample-dev ENV_TYPE=dev REGION=eu-west-1 \
-ARGOCD_NAMESPACE=argocd ROOT_APP_NAME=ocp-services \
+ARGOCD_NAMESPACE=argocd ROOT_APP_NAME=<your-root-application> \
 BASE_PATH=/srv-status PORT=8080 \
 go run ./cmd/srv-status
 ```
@@ -331,23 +343,27 @@ go test ./... -race -cover
 `testdata/applications.json` is a synthetic fixture. Every application name in it is invented and
 every `repoURL` points at a reserved `.invalid` host. It contains no real cluster data.
 
-## Publishing
+## Container hardening
 
-This repository is safe to publish:
+The runtime image is `gcr.io/distroless/static-debian12:nonroot`. It contains no shell, no
+package manager, no busybox and no libc — only CA certificates, timezone data and `/etc/passwd`.
+That is what makes the binary `CGO_ENABLED=0` static: there is nothing in the image to link
+against, and nothing to exec if the process is compromised.
 
-- No credentials, tokens, private keys, account IDs or customer data are committed. The service
-  account token is read from the pod mount at runtime and is never logged.
-- `testdata/applications.json` is synthetic — invented application names, `.invalid` repository
-  hosts, and fabricated revisions.
-- Deployment-specific values (`CLUSTER_NAME`, `ARGOCD_UI_BASE`, `ENV_NAME`, `ENV_TYPE`, `REGION`,
-  `IGNORE_GLOBS`) are supplied at runtime through environment variables. Nothing environment- or
-  cluster-specific is baked into the source, the image or the local test script.
+How that maps to the CIS Docker Benchmark:
 
-The module path is `github.com/ntmggr/srv-status`:
+| Control | How it is met |
+|---|---|
+| Run as a non-root user | `USER 65532:65532`, numeric so kubelet can enforce `runAsNonRoot` without resolving a name |
+| Minimise the image | distroless: no shell, no package manager, no setuid binaries |
+| Do not store secrets in the image | Config is env vars; the ServiceAccount token is mounted at runtime, never baked in |
+| Add image metadata | OCI `org.opencontainers.image.*` labels |
+| Scan images | Trivy (HIGH/CRITICAL, fixable) and Dockle run on every CI build and fail the pipeline |
+| Read-only root filesystem | Set by the chart and `deploy/install.yaml`, not by the image |
+| Drop capabilities | `capabilities.drop: ["ALL"]`, plus `allowPrivilegeEscalation: false` |
 
-```sh
-go get github.com/ntmggr/srv-status
-```
+The last two are runtime settings rather than image settings, which is why they live in the
+manifests. An image cannot enforce them on its own.
 
 ## Build
 
