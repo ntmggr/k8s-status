@@ -1,0 +1,9 @@
+/bin/
+/dist/
+/srv-status
+*.test
+*.out
+coverage.*
+.DS_Store
+.idea/
+.vscode/

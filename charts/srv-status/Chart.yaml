@@ -1,0 +1,13 @@
+apiVersion: v2
+name: srv-status
+description: Read-only per-cluster status page for ArgoCD Application health.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.24.0-0"
+keywords:
+  - argocd
+  - status
+  - dashboard
+  - read-only
+  - platform

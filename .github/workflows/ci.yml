@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt-clean:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./... -race -cover
+
+      - name: build
+        run: go build ./...
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+
+      - name: lint
+        run: helm lint charts/srv-status
+
+      # Render every optional path, so a broken template cannot merge unnoticed.
+      - name: template
+        run: |
+          helm template srv-status charts/srv-status > /dev/null
+          helm template srv-status charts/srv-status \
+            --set ingress.enabled=true --set ingress.host=example.internal > /dev/null
+          helm template srv-status charts/srv-status --set istio.enabled=true > /dev/null
+          helm template srv-status charts/srv-status \
+            --set config.nodeStats=true --set rbac.clusterRole=true > /dev/null
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # Build only — publishing happens in release.yml on a tag.
+      - name: build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          build-args: VERSION=ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

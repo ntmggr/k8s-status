@@ -1,0 +1,97 @@
+name: release
+
+# Versioning is tag-driven: push v1.2.3 and that becomes the image tag and the
+# binary's reported version. The tag is the single source of truth, so the image,
+# the GitHub release and `srv-status --version` can never disagree.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, without the leading v (e.g. 1.2.3)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          # Fail loudly rather than publishing a nonsense tag.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not semver"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Publishing $version"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Never publish an image that does not pass its own tests.
+      - name: Test
+        run: go test ./... -race
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/srv-status' }}
+          tags: |
+            type=raw,value=${{ steps.v.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(steps.v.outputs.version, '-') }}
+
+      # arm64 is not optional: these clusters are predominantly arm64 nodes.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.v.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Chart version matches tag
+        run: |
+          chart="$(grep -E '^version:' charts/srv-status/Chart.yaml | awk '{print $2}')"
+          app="$(grep -E '^appVersion:' charts/srv-status/Chart.yaml | tr -d '"' | awk '{print $2}')"
+          echo "chart version=$chart appVersion=$app tag=${{ steps.v.outputs.version }}"
+          if [ "$app" != "${{ steps.v.outputs.version }}" ]; then
+            echo "::warning::Chart appVersion ($app) does not match the released tag (${{ steps.v.outputs.version }})"
+          fi
+
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          generate_release_notes: true
+          body: |
+            Image: `${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/srv-status' }}:${{ steps.v.outputs.version }}`
+            Platforms: `linux/amd64`, `linux/arm64`

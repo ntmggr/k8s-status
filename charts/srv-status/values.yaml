@@ -1,0 +1,114 @@
+# Number of pods. The page is stateless but there is no reason to run more than one.
+replicaCount: 1
+
+image:
+  # Container image repository.
+  repository: docker.io/ntmggr/srv-status
+  # Image tag. Empty falls back to .Chart.AppVersion.
+  tag: ""
+  # Image pull policy.
+  pullPolicy: IfNotPresent
+
+# Secrets used to pull the image from a private registry.
+imagePullSecrets: []
+
+# Override the chart name used in resource names.
+nameOverride: ""
+# Override the full generated resource name.
+fullnameOverride: ""
+
+serviceAccount:
+  # Create the ServiceAccount. Set false to bring your own.
+  create: true
+  # Name of the ServiceAccount. Empty uses the generated fullname.
+  name: ""
+  # Deliberately empty: srv-status makes zero AWS API calls, so it needs no IRSA
+  # eks.amazonaws.com/role-arn annotation and no cloud credentials of any kind.
+  annotations: {}
+
+rbac:
+  # Create the namespaced Role and RoleBinding granting read access to Applications.
+  create: true
+  # Namespace holding the ArgoCD Application resources; Role and RoleBinding are created here.
+  argocdNamespace: argocd
+  # Create a ClusterRole and ClusterRoleBinding granting get/list on nodes. Only needed
+  # by config.nodeStats; nothing cluster-scoped is rendered while this is false.
+  clusterRole: false
+
+# Application configuration; each key maps 1:1 to an environment variable.
+config:
+  # ENV_NAME - human-readable environment name shown in the page header.
+  envName: unknown
+  # ENV_TYPE - free-form environment class, e.g. dev / stage / prod.
+  envType: ""
+  # REGION - cloud region shown in the page header.
+  region: ""
+  # CLUSTER_NAME - cluster name shown in the page header.
+  clusterName: ""
+  # BASE_PATH - path prefix the app serves natively; no proxy rewrite is required.
+  basePath: /srv-status
+  # ARGOCD_NAMESPACE - namespace the app reads Applications from.
+  argocdNamespace: argocd
+  # ROOT_APP_NAME - app-of-apps Application used to derive pruning orphans.
+  rootAppName: ocp-services
+  # ARGOCD_UI_BASE - base URL of the ArgoCD UI for deep links. Empty disables links.
+  argocdUIBase: ""
+  # IGNORE_GLOBS - comma-separated globs of Application names to hide.
+  ignoreGlobs: ""
+  # CACHE_TTL_SECONDS - how long a rendered snapshot is reused.
+  cacheTTLSeconds: 15
+  # REFRESH_SECONDS - meta-refresh interval of the HTML page.
+  refreshSeconds: 30
+  # NODE_STATS - render the cluster capacity section. Requires rbac.clusterRole.
+  nodeStats: false
+  # PORT - container listen port.
+  port: 8080
+
+service:
+  # Service type.
+  type: ClusterIP
+  # Service port.
+  port: 80
+
+ingress:
+  # Create an Ingress. No path rewrite is used: the app serves config.basePath itself.
+  enabled: false
+  # ingressClassName.
+  className: ""
+  # Extra annotations for the Ingress.
+  annotations: {}
+  # Hostname to serve on. Required when enabled.
+  host: ""
+  # TLS blocks passed straight through to the Ingress spec.
+  tls: []
+
+istio:
+  # Create an Istio VirtualService. No rewrite is used, for the same reason as Ingress.
+  enabled: false
+  # Gateways to attach the VirtualService to.
+  gateway: []
+  # Hosts served by the VirtualService.
+  hosts: []
+
+# Container resource requests and limits. No CPU limit on purpose, to avoid throttling.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+# Node selector for pod scheduling.
+nodeSelector: {}
+
+# Tolerations for pod scheduling.
+tolerations: []
+
+# Affinity rules for pod scheduling.
+affinity: {}
+
+# Extra annotations added to the pod.
+podAnnotations: {}
+
+# Extra labels added to the pod.
+podLabels: {}
