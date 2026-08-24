@@ -1,5 +1,6 @@
 # Build stage. Pinned to a specific Go minor so a toolchain bump is a deliberate commit.
-FROM golang:1.23-bookworm AS build
+# Keep this current: the stdlib CVEs Trivy reports are fixed by the toolchain, not by us.
+FROM golang:1.27-bookworm AS build
 
 ARG VERSION=dev
 WORKDIR /src
