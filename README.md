@@ -1,9 +1,10 @@
 # srv-status
 
 [![ci](https://github.com/ntmggr/srv-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/ci.yml)
+[![tag](https://github.com/ntmggr/srv-status/actions/workflows/tag.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/tag.yml)
 [![release](https://github.com/ntmggr/srv-status/actions/workflows/release.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/release.yml)
-[![Docker Hub](https://img.shields.io/docker/v/ntmggr/srv-status?logo=docker&label=docker%20hub&sort=semver)](https://hub.docker.com/r/ntmggr/srv-status)
-[![Go](https://img.shields.io/github/go-mod/go-version/ntmggr/srv-status)](go.mod)
+[![Docker Hub](https://img.shields.io/docker/v/ntmggr/srv-status?logo=docker&logoColor=white&label=docker&sort=semver)](https://hub.docker.com/r/ntmggr/srv-status)
+[![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **One page that answers "what is deployed in this cluster, at what version, and is it healthy?"**
