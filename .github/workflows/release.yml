@@ -22,6 +22,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # A tag push checks out the tag already. A dispatch lands on the default
+          # branch, so point it at the tag explicitly or goreleaser sees no tag.
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref }}
 
       - name: Resolve version
         id: v
@@ -100,7 +103,6 @@ jobs:
       # manual run only republishes the image.
       - name: Release binaries and GitHub release
         uses: goreleaser/goreleaser-action@v6
-        if: github.event_name == 'push'
         with:
           distribution: goreleaser
           version: "~> v2"
