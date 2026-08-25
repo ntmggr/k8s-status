@@ -3,16 +3,40 @@ package kube
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
 
+// callLog records the paths a test server was asked for. ListFlux fetches the
+// collections concurrently, so the handler runs on several goroutines at once
+// and the recorder has to be safe for that.
+type callLog struct {
+	mu    sync.Mutex
+	paths []string
+}
+
+func (c *callLog) add(p string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.paths = append(c.paths, p)
+}
+
+func (c *callLog) all() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := append([]string(nil), c.paths...)
+	sort.Strings(out)
+	return out
+}
+
 // fluxHandler serves the two Flux collection endpoints from the fixtures, and records
 // which paths were asked for so a test can assert what was and was not called.
-func fluxHandler(t *testing.T, calls *[]string) http.Handler {
+func fluxHandler(t *testing.T, calls *callLog) http.Handler {
 	t.Helper()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*calls = append(*calls, r.URL.Path)
+		calls.add(r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case helmReleasesPath:
@@ -26,7 +50,7 @@ func fluxHandler(t *testing.T, calls *[]string) http.Handler {
 }
 
 func TestListFluxParsesFixtures(t *testing.T) {
-	var calls []string
+	var calls callLog
 	c := newTestClient(t, fluxHandler(t, &calls))
 
 	list, err := c.ListFlux(context.Background())
@@ -46,7 +70,7 @@ func TestListFluxParsesFixtures(t *testing.T) {
 		"/apis/helm.toolkit.fluxcd.io/v2/helmreleases":        false,
 		"/apis/kustomize.toolkit.fluxcd.io/v1/kustomizations": false,
 	}
-	for _, p := range calls {
+	for _, p := range calls.all() {
 		if _, ok := want[p]; !ok {
 			t.Errorf("unexpected request to %q", p)
 			continue
