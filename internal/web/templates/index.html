@@ -107,6 +107,22 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .tile .n { font-size: 1.35rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .tile .k { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .tile.t-total .n { color: var(--ink); }
+.views { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .5rem 0 .1rem; }
+.views-lab { font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: .2rem; }
+.vchip { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .55rem; border-radius: 999px;
+         border: 1px solid var(--ring); background: var(--surface); color: var(--ink-2);
+         font-size: .74rem; text-decoration: none; }
+.vchip:hover { border-color: var(--ink-2); text-decoration: none; }
+.vchip.is-on { outline: 2px solid var(--ink); outline-offset: 2px; color: var(--ink); }
+.vchip.is-on::after { content: " \00d7"; font-weight: 700; }
+.cap-group { display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap; }
+.cap-lead { display: inline-flex; align-items: baseline; gap: .35rem; }
+.cap-lead .cv { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cap-lead .ck { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cap-lead .cv { font-size: 1.05rem; }
+.cap-of { display: flex; gap: .9rem; align-items: baseline; color: var(--ink-2); font-size: .8rem; }
+.cap-of .cap-part { display: inline-flex; align-items: baseline; gap: .3rem; }
+.cap-of .is-gpu { color: var(--gpu-fg); }
 .tile.t-ok        { background: var(--ok-bg);    border-color: transparent; } .tile.t-ok .n,        .tile.t-ok .k        { color: var(--ok-fg); }
 .tile.t-degraded  { background: var(--deg-bg);   border-color: transparent; } .tile.t-degraded .n,  .tile.t-degraded .k  { color: var(--deg-fg); }
 .tile.t-warning   { background: var(--warn-bg);  border-color: transparent; } .tile.t-warning .n,   .tile.t-warning .k   { color: var(--warn-fg); }
@@ -139,6 +155,7 @@ a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
 }
 .tile.is-on { background: var(--surface); }
 .tile.is-on .k::after, a.cap-item.is-on .ck::after { content: " \00d7"; font-weight: 700; }
+.tile.t-total.is-on .k::after { content: none; }
 
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem;
          margin: .9rem 0 -.2rem; font-size: .78rem; color: var(--ink-2); }
@@ -270,7 +287,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
      to count only the filtered rows: every other tile would read 0 as soon as one filter
      is applied and the reader would lose their bearings. Filtering picks rows, not counts. */}}
 <div class="tiles">
-  <a class="tile t-total" href="{{$.ClearHref}}"><div class="n">{{.Total}}</div><div class="k">services</div></a>
+  <a class="tile t-total{{if not $.AnyFilter}} is-on{{end}}" href="{{$.ClearHref}}"><div class="n">{{.Total}}</div><div class="k">services</div></a>
   {{if .Degraded}}<a class="tile t-degraded{{if $.FilterActive "status" "DEGRADED"}} is-on{{end}}" href="{{$.FilterHref "status" "DEGRADED"}}"><div class="n">{{.Degraded}}</div><div class="k">degraded</div></a>{{end}}
   {{if .Warning}}<a class="tile t-warning{{if $.FilterActive "status" "WARNING"}} is-on{{end}}" href="{{$.FilterHref "status" "WARNING"}}"><div class="n">{{.Warning}}</div><div class="k">warning</div></a>{{end}}
   {{if .Progressing}}<a class="tile t-progressing{{if $.FilterActive "status" "PROGRESSING"}} is-on{{end}}" href="{{$.FilterHref "status" "PROGRESSING"}}"><div class="n">{{.Progressing}}</div><div class="k">progressing</div></a>{{end}}
@@ -279,6 +296,13 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{if .Suspended}}<a class="tile t-suspended{{if $.FilterActive "status" "SUSPENDED"}} is-on{{end}}" href="{{$.FilterHref "status" "SUSPENDED"}}"><div class="n">{{.Suspended}}</div><div class="k">suspended</div></a>{{end}}
   <a class="tile t-ok{{if $.FilterActive "status" "OK"}} is-on{{end}}" href="{{$.FilterHref "status" "OK"}}"><div class="n">{{.OK}}</div><div class="k">ok</div></a>
   {{if .Hidden}}<div class="tile"><div class="n">{{.Hidden}}</div><div class="k">hidden</div></div>{{end}}
+</div>
+<div class="views">
+  <span class="views-lab">views</span>
+  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services running on GPU nodes">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on gpu</a>
+  {{- with $.Snapshot.Unmanaged}}
+  <a class="vchip{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}" title="Running in the cluster but outside GitOps">{{icon "unmanaged"}}{{.Count}} not in gitops</a>
+  {{- end}}
 </div>
 
 <details class="legend">
@@ -307,25 +331,20 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 
 {{if or .Snapshot.Nodes .Snapshot.Unmanaged}}
 <section class="capacity">
-  <div class="cap-head">Cluster capacity<span class="cap-sub">infrastructure, not service health</span></div>
-  <div class="cap-row">
-    {{- with .Snapshot.Nodes}}{{if not .Error}}
-    <div class="cap-item">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
-    <div class="cap-item">{{icon "cpu"}}<span class="cv">{{.CPUNodes}}</span><span class="ck">cpu nodes</span>
-      {{- if .Arch}}<span class="cap-split" title="arm64 nodes are Graviton on AWS">
-        {{- range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}
+  <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
+  {{- with .Snapshot.Nodes}}{{if not .Error}}
+  {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
+       rather than as five unrelated numbers sitting in a row. */}}
+  <div class="cap-group">
+    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
+    <div class="cap-of">
+      <span class="cap-part">{{.CPUNodes}} cpu
+        {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
+      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} gpu
+        <span class="cap-split" title="Total GPU cards across those nodes. One node can hold several.">{{.GPUs}} cards</span></span>
     </div>
-    <div class="cap-item is-gpu">{{icon "gpu"}}<span class="cv">{{.GPUNodes}}</span><span class="ck">gpu nodes</span></div>
-    <div class="cap-item is-gpu" title="Total GPU cards across those nodes. A node can hold several.">{{icon "card"}}<span class="cv">{{.GPUs}}</span><span class="ck">gpu cards</span></div>
-    {{- end}}{{end}}
-    <a class="cap-item is-gpu{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}">{{icon "gpu"}}<span class="cv">{{$.Snapshot.Summary.GPU}}</span><span class="ck">gpu services</span></a>
-    {{- with .Snapshot.Unmanaged}}
-    {{/* Not a status tile: these workloads are not ArgoCD Applications at all, so they
-         must not join a row whose counts sum to the service total. */}}
-    <a class="cap-item{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}"
-       title="Workloads running here that ArgoCD does not manage. Click to show only these.">{{icon "unmanaged"}}<span class="cv">{{.Count}}</span><span class="ck">not in gitops</span></a>
-    {{- end}}
   </div>
+  {{- end}}{{end}}
   {{- with .Snapshot.Nodes}}{{if .Error}}
   <div class="cap-note">
     {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.

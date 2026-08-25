@@ -345,3 +345,6 @@ func icon(name string) template.HTML {
 	}
 	return template.HTML(open + body + `</svg>`)
 }
+
+// AnyFilter reports whether the page is narrowed at all, by row filters or by view.
+func (d pageData) AnyFilter() bool { return d.Filter.Active() || d.Filter.View != "" }
