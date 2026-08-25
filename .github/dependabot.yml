@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # The two that actually matter here. Go modules are listed too, but the
+  # binary has no third party dependencies, so that one is a safety net for
+  # if that ever changes.
+
+  # Base images: this is how the Go toolchain CVEs get caught early. The
+  # builder image is what determines the stdlib compiled into the binary.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies]
+    commit-message:
+      prefix: fix          # a base image bump is a fix, so it triggers a release
+
+  # Action versions. Pinned tags go stale and silently stop receiving fixes.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies]
+    groups:
+      actions:
+        patterns: ["*"]    # one PR for all actions, not five
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies]
+    commit-message:
+      prefix: fix
