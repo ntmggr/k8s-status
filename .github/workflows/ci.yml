@@ -64,7 +64,7 @@ jobs:
       # Build only — publishing happens in release.yml on a tag.
       # Loaded into the local daemon so the scanners below can read it.
       - name: build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
