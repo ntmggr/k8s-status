@@ -1,8 +1,7 @@
 # k8s-status
 
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
-[![tag](https://github.com/ntmggr/k8s-status/actions/workflows/tag.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/tag.yml)
-[![release](https://github.com/ntmggr/k8s-status/actions/workflows/release.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/release.yml)
+[![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
 [![Docker Hub](https://img.shields.io/docker/image-size/ntmggr/k8s-status/latest?logo=docker&logoColor=white&label=image)](https://hub.docker.com/r/ntmggr/k8s-status)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
