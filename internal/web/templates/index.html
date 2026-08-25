@@ -60,14 +60,18 @@ a { color: inherit; }
 a:hover { text-decoration: underline; }
 
 header {
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem;
+  /* Height is fixed, not min-height, and it must not wrap: the table header sticks
+     at exactly var(--hdr-h), so any variation here hides the column headers behind
+     this bar. The meta text truncates rather than pushing to a second line. */
+  display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: .75rem;
   position: sticky; top: 0; z-index: 30;
-  min-height: var(--hdr-h); box-sizing: border-box;
+  height: var(--hdr-h); box-sizing: border-box;
   margin: calc(-1 * var(--pad-top)) calc(-1 * var(--pad-x)) 0;
   padding: .5rem var(--pad-x);
   background: var(--plane); border-bottom: 1px solid var(--hair);
 }
-h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
+     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .badge {
   display: inline-block; margin-left: .5rem; padding: .1rem .45rem;
   border: 1px solid var(--ring); border-radius: 999px;
@@ -89,7 +93,8 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
 .legend-row .pill { flex: none; }
 .legend-note { margin-top: .5rem; font-size: .74rem; color: var(--muted); }
 .region { font-weight: 400; color: var(--muted); margin-left: .5rem; font-size: .9rem; }
-.meta { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.meta { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 
 .sub { color: var(--ink-2); font-size: .85rem; margin-top: .45rem; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -128,8 +133,12 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
 
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
-.tile.is-on { box-shadow: 0 0 0 2px var(--ink); }
-.tile.is-on .k::after { content: " \00d7"; font-weight: 700; }
+.tile.is-on, a.cap-item.is-on {
+  outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 8px;
+  position: relative;
+}
+.tile.is-on { background: var(--surface); }
+.tile.is-on .k::after, a.cap-item.is-on .ck::after { content: " \00d7"; font-weight: 700; }
 
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem;
          margin: .9rem 0 -.2rem; font-size: .78rem; color: var(--ink-2); }
@@ -143,7 +152,7 @@ a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
 a.cap-item { text-decoration: none; color: inherit; border-radius: 6px;
              padding: .05rem .3rem; margin: -.05rem -.3rem; }
 a.cap-item:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
-a.cap-item.is-on { box-shadow: 0 0 0 2px var(--ink); }
+
 
 .banner { padding: .6rem .8rem; border-radius: 6px; margin: .7rem 0; font-size: .85rem; }
 .banner.err   { background: var(--deg-bg);  color: var(--deg-fg); }

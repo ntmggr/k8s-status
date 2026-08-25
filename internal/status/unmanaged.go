@@ -112,8 +112,16 @@ func isUnmanaged(w kube.Workload) bool {
 	if _, ok := w.Metadata.Annotations[annTrackingID]; ok {
 		return false
 	}
+	// app.kubernetes.io/instance is a standard Kubernetes label that Helm sets on
+	// everything it installs, so on its own it does not mean ArgoCD owns this.
+	// ArgoCD's default tracking method does use it, so treat it as an ArgoCD marker
+	// only when Helm is not the declared installer. Without this, every Helm release
+	// (istiod, for one) is wrongly reported as GitOps-managed and hidden from the
+	// list whose whole purpose is to surface it.
 	if _, ok := w.Metadata.Labels[labelInstance]; ok {
-		return false
+		if !strings.EqualFold(w.Metadata.Labels[labelManagedBy], "Helm") {
+			return false
+		}
 	}
 	if _, ok := w.Metadata.Labels[labelArgoInstance]; ok {
 		return false
