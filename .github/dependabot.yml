@@ -23,8 +23,12 @@ updates:
       day: monday
     labels: [dependencies]
     groups:
-      actions:
-        patterns: ["*"]    # one PR for all actions, not five
+      # Group only the safe bumps so they can auto-merge as one PR. Majors are
+      # deliberately left ungrouped: one major in a group of ten would block the
+      # other nine from ever merging automatically.
+      actions-minor:
+        patterns: ["*"]
+        update-types: [minor, patch]
     commit-message:
       prefix: ci
 
