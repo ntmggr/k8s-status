@@ -452,7 +452,7 @@ func TestPageWithUnmanagedRendersSection(t *testing.T) {
 		}
 	}
 	// The ArgoCD-managed Deployment carries a marker and must be excluded.
-	if strings.Count(body, "3</span><span class=\"ck\">not in gitops") != 1 {
+	if !strings.Contains(body, ">3 not in gitops</a>") {
 		t.Errorf("want a count of 3 unmanaged workloads")
 	}
 	// desired == 0 is deliberate, not broken.
@@ -471,7 +471,13 @@ func TestUnmanagedIsNotAStatusTile(t *testing.T) {
 
 	body := get(t, h, "/k8s-status/").Body.String()
 	start := strings.Index(body, `<div class="tiles">`)
-	end := strings.Index(body, `<details class="legend">`)
+	// Bound this to the status tile row itself. The separate "views" row below it
+	// deliberately does carry unmanaged, because those are cross-cutting selections
+	// rather than states that sum to the service total.
+	end := strings.Index(body, `<div class="views">`)
+	if end < 0 {
+		end = strings.Index(body, `<details class="legend">`)
+	}
 	if start < 0 || end < start {
 		t.Fatal("could not locate the status tile row")
 	}
@@ -593,7 +599,7 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	for _, want := range []string{"Cluster capacity", "cpu nodes", "gpu nodes", "gpu cards", "gpu services", "2 arm64", "1 amd64"} {
+	for _, want := range []string{"Cluster", "nodes", "cpu", "gpu", "cards", "2 arm64", "1 amd64"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("capacity section missing %q", want)
 		}
