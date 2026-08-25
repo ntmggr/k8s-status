@@ -1,0 +1,40 @@
+name: scorecard
+
+# OpenSSF Scorecard grades the repository's supply chain: are actions pinned, is
+# the branch protected, are releases signed, is there dependency update tooling.
+# publish_results is what makes the public badge resolve; without it the API has
+# no data and the badge reads "invalid repo path".
+on:
+  schedule:
+    - cron: "0 6 * * 1"      # Mondays, same cadence as dependabot
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # upload SARIF to the Security tab
+      id-token: write          # sign the results so they can be published
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload to the Security tab
+        uses: github/codeql-action/upload-sarif@v4.37.8
+        continue-on-error: true
+        with:
+          sarif_file: results.sarif
