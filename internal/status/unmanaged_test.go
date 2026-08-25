@@ -338,3 +338,27 @@ func TestUnmanagedTransportErrorIsNotDenied(t *testing.T) {
 		t.Error("a transport error is not an RBAC denial")
 	}
 }
+
+// Helm sets app.kubernetes.io/instance on everything it installs, so that label
+// alone must not count as ArgoCD ownership. istiod is the real-world case: Helm
+// installed, no ArgoCD marker, and it belongs in the unmanaged list.
+func TestHelmReleaseIsNotMistakenForArgoCD(t *testing.T) {
+	helm := kube.Workload{Kind: "Deployment"}
+	helm.Metadata.Name = "istiod"
+	helm.Metadata.Namespace = "istio-system"
+	helm.Metadata.Labels = map[string]string{
+		"app.kubernetes.io/instance":   "istiod",
+		"app.kubernetes.io/managed-by": "Helm",
+	}
+	if !isUnmanaged(helm) {
+		t.Error("a Helm release with no ArgoCD marker must be reported as unmanaged")
+	}
+
+	// ArgoCD's default tracking method also uses that label. Without managed-by=Helm
+	// it still means ArgoCD, and must stay out of the list.
+	argo := helm
+	argo.Metadata.Labels = map[string]string{"app.kubernetes.io/instance": "some-app"}
+	if isUnmanaged(argo) {
+		t.Error("app.kubernetes.io/instance without Helm should still count as ArgoCD-tracked")
+	}
+}

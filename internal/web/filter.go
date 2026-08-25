@@ -208,4 +208,11 @@ func refreshSeconds(q url.Values, def int) int {
 func (f Filter) ShowServices() bool { return f.View != "unmanaged" }
 
 // ShowUnmanaged reports whether the unmanaged workloads section belongs on the page.
-func (f Filter) ShowUnmanaged() bool { return f.View == "" || f.View == "unmanaged" }
+// It is hidden while a service filter is active: if you asked to see only DEGRADED
+// services, a second table of things that are not services at all is noise.
+func (f Filter) ShowUnmanaged() bool {
+	if f.View == "unmanaged" {
+		return true
+	}
+	return f.View == "" && !f.Active()
+}
