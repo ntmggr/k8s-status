@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install srv-status into a cluster.
+# Install k8s-status into a cluster.
 #
 #   ./scripts/install.sh          <kube-context> <image> [env-name]   # raw manifest
 #   ./scripts/install.sh --helm   <kube-context> <image> [env-name]   # Helm chart
@@ -19,18 +19,18 @@ fi
 CONTEXT="${1:-}"
 IMAGE="${2:-}"
 ENV_NAME="${3:-$CONTEXT}"
-NAMESPACE="srv-status"
-RELEASE="srv-status"
+NAMESPACE="k8s-status"
+RELEASE="k8s-status"
 
 if [[ -z "$CONTEXT" || -z "$IMAGE" ]]; then
   echo "usage: $0 [--helm|--manifest] <kube-context> <image> [env-name]" >&2
-  echo "   eg: $0 k8s-dev registry.example.com/srv-status:0.1.0" >&2
-  echo "   eg: $0 --helm k8s-dev registry.example.com/srv-status:0.1.0 dev" >&2
+  echo "   eg: $0 k8s-dev registry.example.com/k8s-status:0.1.0" >&2
+  echo "   eg: $0 --helm k8s-dev registry.example.com/k8s-status:0.1.0 dev" >&2
   exit 2
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CHART="$ROOT/charts/srv-status"
+CHART="$ROOT/charts/k8s-status"
 
 # Fail early with a clear message rather than a half-applied install.
 kubectl --context "$CONTEXT" get namespace argocd >/dev/null
@@ -43,7 +43,7 @@ if [[ "$MODE" == "helm" ]]; then
   IMAGE_REPO="${IMAGE%:*}"
   IMAGE_TAG="${IMAGE##*:}"
   if [[ "$IMAGE_REPO" == "$IMAGE" ]]; then
-    echo "image must include a tag, eg registry.example.com/srv-status:0.1.0" >&2
+    echo "image must include a tag, eg registry.example.com/k8s-status:0.1.0" >&2
     exit 2
   fi
 
@@ -63,7 +63,7 @@ else
       "$ROOT/deploy/install.yaml" \
     | kubectl --context "$CONTEXT" apply -f -
 
-  kubectl --context "$CONTEXT" -n "$NAMESPACE" rollout status deploy/srv-status --timeout=90s
+  kubectl --context "$CONTEXT" -n "$NAMESPACE" rollout status deploy/k8s-status --timeout=90s
 
   UNINSTALL="kubectl --context ${CONTEXT} delete -f ${ROOT}/deploy/install.yaml --ignore-not-found"
 fi
@@ -72,8 +72,8 @@ cat <<EOF
 
 Installed on '${CONTEXT}' via ${MODE}. To view it:
 
-  kubectl --context ${CONTEXT} -n ${NAMESPACE} port-forward svc/srv-status 8080:80
-  open http://127.0.0.1:8080/srv-status/
+  kubectl --context ${CONTEXT} -n ${NAMESPACE} port-forward svc/k8s-status 8080:80
+  open http://127.0.0.1:8080/k8s-status/
 
 To remove it:
 

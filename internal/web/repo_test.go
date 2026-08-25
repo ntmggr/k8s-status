@@ -4,7 +4,7 @@ import "testing"
 
 func TestRepoWebURL(t *testing.T) {
 	cases := []struct{ name, in, want string }{
-		{"scp style with git-ssh prefix", "git@git-ssh.example.com:devops/k8s/helm-charts/srv-status.git", "https://git.example.com/devops/k8s/helm-charts/srv-status"},
+		{"scp style with git-ssh prefix", "git@git-ssh.example.com:devops/k8s/helm-charts/k8s-status.git", "https://git.example.com/devops/k8s/helm-charts/k8s-status"},
 		{"scp style plain host", "git@example.com:group/proj.git", "https://example.com/group/proj"},
 		{"ssh scheme", "ssh://git@git-ssh.example.com/group/proj.git", "https://git.example.com/group/proj"},
 		{"https passthrough", "https://example.com/group/proj.git", "https://example.com/group/proj"},

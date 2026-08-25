@@ -2,10 +2,10 @@
 apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
-  name: {{ include "srv-status.fullname" . }}
+  name: {{ include "k8s-status.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "srv-status.labels" . | nindent 4 }}
+    {{- include "k8s-status.labels" . | nindent 4 }}
 spec:
   {{- with .Values.istio.gateway }}
   gateways:
@@ -24,7 +24,7 @@ spec:
       {{- /* No `rewrite:` block: the app serves basePath natively. */}}
       route:
         - destination:
-            host: {{ include "srv-status.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+            host: {{ include "k8s-status.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
             port:
               number: {{ .Values.service.port }}
 {{- end }}

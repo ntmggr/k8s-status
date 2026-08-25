@@ -52,7 +52,7 @@ func TestListNodesDecodesOnlyTheFieldsUsed(t *testing.T) {
 func TestListNodesForbiddenIsAStatusError(t *testing.T) {
 	c := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte("nodes is forbidden: User \"system:serviceaccount:srv-status:srv-status\"\ncannot list resource"))
+		_, _ = w.Write([]byte("nodes is forbidden: User \"system:serviceaccount:k8s-status:k8s-status\"\ncannot list resource"))
 	}))
 
 	_, err := c.ListNodes(context.Background())

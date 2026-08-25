@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ntmggr/srv-status/internal/status"
+	"github.com/ntmggr/k8s-status/internal/status"
 )
 
 type Config struct {
@@ -93,7 +93,11 @@ type summaryJSON struct {
 }
 
 type serviceJSON struct {
-	Name       string          `json:"name"`
+	Name string `json:"name"`
+	// Source is always set. Namespace and Kind are only carried by Flux rows.
+	Source     string          `json:"source,omitempty"`
+	Namespace  string          `json:"namespace,omitempty"`
+	Kind       string          `json:"kind,omitempty"`
 	Version    string          `json:"version"`
 	Revision   string          `json:"revision"`
 	RepoURL    string          `json:"repoUrl,omitempty"`
@@ -125,6 +129,36 @@ type nodesJSON struct {
 	Error       string         `json:"error,omitempty"`
 }
 
+// unmanagedJSON is omitted entirely when UNMANAGED is off. These are workloads running
+// outside GitOps, so they are deliberately kept out of summary and services.
+type unmanagedJSON struct {
+	Count   int            `json:"count"`
+	Scanned int            `json:"scanned"`
+	Ignored int            `json:"ignored,omitempty"`
+	Items   []workloadJSON `json:"items"`
+	Error   string         `json:"error,omitempty"`
+}
+
+type workloadJSON struct {
+	Namespace string `json:"namespace"`
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	ManagedBy string `json:"managedBy"`
+	Ready     int    `json:"ready"`
+	Desired   int    `json:"desired"`
+	Version   string `json:"version,omitempty"`
+	Image     string `json:"image,omitempty"`
+	State     string `json:"state"`
+}
+
+// fluxJSON is omitted entirely unless flux is one of SOURCES. Flux rows live in
+// services and summary like any other, so this only reports the read itself.
+type fluxJSON struct {
+	HelmReleases   int    `json:"helmReleases"`
+	Kustomizations int    `json:"kustomizations"`
+	Error          string `json:"error,omitempty"`
+}
+
 // filtersJSON echoes the applied selection so the payload is self-describing.
 // Omitted when no filter is active.
 type filtersJSON struct {
@@ -135,28 +169,31 @@ type filtersJSON struct {
 }
 
 type apiResponse struct {
-	Schema         int           `json:"schema"`
-	Env            string        `json:"env"`
-	EnvType        string        `json:"envType"`
-	Region         string        `json:"region"`
-	ClusterName    string        `json:"clusterName"`
-	ClusterPath    string        `json:"clusterPath"`
-	Version        string        `json:"version"`
-	Revision       string        `json:"revision"`
-	RootHealth     string        `json:"rootHealth"`
-	RootSync       string        `json:"rootSync"`
-	Phase          string        `json:"phase"`
-	Message        string        `json:"message"`
-	LastDeployedAt string        `json:"lastDeployedAt"`
-	LastDeployID   int           `json:"lastDeployId"`
-	Summary        summaryJSON   `json:"summary"`
-	Nodes          *nodesJSON    `json:"nodes,omitempty"`
-	Filters        *filtersJSON  `json:"filters,omitempty"`
-	Services       []serviceJSON `json:"services"`
-	CheckedAt      string        `json:"checkedAt"`
-	AgeSeconds     int           `json:"ageSeconds"`
-	Stale          bool          `json:"stale"`
-	Error          *string       `json:"error"`
+	Schema         int            `json:"schema"`
+	Env            string         `json:"env"`
+	EnvType        string         `json:"envType"`
+	Region         string         `json:"region"`
+	ClusterName    string         `json:"clusterName"`
+	ClusterPath    string         `json:"clusterPath"`
+	Sources        []string       `json:"sources,omitempty"`
+	Version        string         `json:"version"`
+	Revision       string         `json:"revision"`
+	RootHealth     string         `json:"rootHealth"`
+	RootSync       string         `json:"rootSync"`
+	Phase          string         `json:"phase"`
+	Message        string         `json:"message"`
+	LastDeployedAt string         `json:"lastDeployedAt"`
+	LastDeployID   int            `json:"lastDeployId"`
+	Summary        summaryJSON    `json:"summary"`
+	Nodes          *nodesJSON     `json:"nodes,omitempty"`
+	Unmanaged      *unmanagedJSON `json:"unmanaged,omitempty"`
+	Flux           *fluxJSON      `json:"flux,omitempty"`
+	Filters        *filtersJSON   `json:"filters,omitempty"`
+	Services       []serviceJSON  `json:"services"`
+	CheckedAt      string         `json:"checkedAt"`
+	AgeSeconds     int            `json:"ageSeconds"`
+	Stale          bool           `json:"stale"`
+	Error          *string        `json:"error"`
 }
 
 // handleAPI always answers 200 so scrapers can distinguish "app up, cluster read failed"
@@ -203,7 +240,10 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 			Hidden:      snap.Summary.Hidden,
 			GPU:         snap.Summary.GPU,
 		}
+		resp.Sources = sources(snap)
 		resp.Nodes = nodes(snap)
+		resp.Unmanaged = unmanaged(snap)
+		resp.Flux = flux(snap)
 		// summary stays whole-cluster: filtering selects rows, it does not change counts.
 		services := filter.Apply(snap.Services)
 		if filter.Active() {
@@ -217,6 +257,9 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		for _, svc := range services {
 			resp.Services = append(resp.Services, serviceJSON{
 				Name:       svc.Name,
+				Source:     string(svc.Source),
+				Namespace:  svc.Namespace,
+				Kind:       svc.Kind,
 				Version:    svc.Version,
 				Revision:   svc.Revision,
 				RepoURL:    svc.RepoURL,
@@ -256,6 +299,28 @@ func (s *Server) ageSeconds(snap *status.Snapshot) int {
 	return age
 }
 
+func sources(snap *status.Snapshot) []string {
+	if len(snap.Sources) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(snap.Sources))
+	for _, s := range snap.Sources {
+		out = append(out, string(s))
+	}
+	return out
+}
+
+func flux(snap *status.Snapshot) *fluxJSON {
+	if snap.Flux == nil {
+		return nil
+	}
+	return &fluxJSON{
+		HelmReleases:   snap.Flux.HelmReleases,
+		Kustomizations: snap.Flux.Kustomizations,
+		Error:          snap.Flux.Error,
+	}
+}
+
 func nodes(snap *status.Snapshot) *nodesJSON {
 	if snap.Nodes == nil {
 		return nil
@@ -274,6 +339,34 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 		for _, a := range n.Arch {
 			out.Arch[a.Arch] = a.Count
 		}
+	}
+	return out
+}
+
+func unmanaged(snap *status.Snapshot) *unmanagedJSON {
+	if snap.Unmanaged == nil {
+		return nil
+	}
+	u := snap.Unmanaged
+	out := &unmanagedJSON{
+		Count:   u.Count,
+		Scanned: u.Scanned,
+		Ignored: u.Ignored,
+		Items:   make([]workloadJSON, 0, len(u.Items)),
+		Error:   u.Error,
+	}
+	for _, w := range u.Items {
+		out.Items = append(out.Items, workloadJSON{
+			Namespace: w.Namespace,
+			Kind:      w.Kind,
+			Name:      w.Name,
+			ManagedBy: w.ManagedBy,
+			Ready:     w.Ready,
+			Desired:   w.Desired,
+			Version:   w.Version,
+			Image:     w.Image,
+			State:     string(w.State),
+		})
 	}
 	return out
 }

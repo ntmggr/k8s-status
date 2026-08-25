@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ntmggr/srv-status/internal/argocd"
-	"github.com/ntmggr/srv-status/internal/kube"
-	"github.com/ntmggr/srv-status/internal/status"
+	"github.com/ntmggr/k8s-status/internal/argocd"
+	"github.com/ntmggr/k8s-status/internal/kube"
+	"github.com/ntmggr/k8s-status/internal/status"
 )
 
 type fakeProvider struct {
@@ -63,9 +63,9 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 }
 
 func TestHealthzIndependentOfClusterRead(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{err: errors.New("connection refused")})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{err: errors.New("connection refused")})
 
-	rec := get(t, h, "/srv-status/healthz")
+	rec := get(t, h, "/k8s-status/healthz")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -75,10 +75,10 @@ func TestHealthzIndependentOfClusterRead(t *testing.T) {
 }
 
 func TestAPIReturns200WithErrorOnFailure(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status", Region: "eu-west-1", ClusterName: "sample-dev-cluster"},
+	h := newTestServer(t, Config{BasePath: "/k8s-status", Region: "eu-west-1", ClusterName: "sample-dev-cluster"},
 		fakeProvider{err: errors.New("kubernetes api returned 503")})
 
-	rec := get(t, h, "/srv-status/api/status")
+	rec := get(t, h, "/k8s-status/api/status")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -103,10 +103,10 @@ func TestAPIReturns200WithErrorOnFailure(t *testing.T) {
 }
 
 func TestAPISuccessShape(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status", Region: "eu-west-1", ClusterName: "sample-dev-cluster"},
+	h := newTestServer(t, Config{BasePath: "/k8s-status", Region: "eu-west-1", ClusterName: "sample-dev-cluster"},
 		fakeProvider{snap: fixtureSnapshot(t)})
 
-	rec := get(t, h, "/srv-status/api/status")
+	rec := get(t, h, "/k8s-status/api/status")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -160,12 +160,12 @@ func TestAPISuccessShape(t *testing.T) {
 }
 
 func TestBadgeShowsClusterOverEnvType(t *testing.T) {
-	base := Config{BasePath: "/srv-status", EnvName: "local", RefreshSeconds: 30}
+	base := Config{BasePath: "/k8s-status", EnvName: "local", RefreshSeconds: 30}
 
 	withCluster := base
 	withCluster.ClusterName = "k8s-stage"
 	h := newTestServer(t, withCluster, fakeProvider{snap: fixtureSnapshot(t)})
-	body := get(t, h, "/srv-status/").Body.String()
+	body := get(t, h, "/k8s-status/").Body.String()
 	if !strings.Contains(body, `>k8s-stage</span>`) {
 		t.Errorf("badge should show the cluster/context when known")
 	}
@@ -175,14 +175,14 @@ func TestBadgeShowsClusterOverEnvType(t *testing.T) {
 
 	// With no cluster configured the env type is still better than nothing.
 	h = newTestServer(t, base, fakeProvider{snap: fixtureSnapshot(t)})
-	if body := get(t, h, "/srv-status/").Body.String(); !strings.Contains(body, `class="badge">dev<`) {
+	if body := get(t, h, "/k8s-status/").Body.String(); !strings.Contains(body, `class="badge">dev<`) {
 		t.Errorf("badge should fall back to env type when no cluster is set")
 	}
 }
 
 func TestPageRenders(t *testing.T) {
 	h := newTestServer(t, Config{
-		BasePath:       "/srv-status",
+		BasePath:       "/k8s-status",
 		EnvName:        "sample-dev",
 		Region:         "eu-west-1",
 		ArgoCDUIBase:   "https://argocd.example.invalid/",
@@ -190,7 +190,7 @@ func TestPageRenders(t *testing.T) {
 		BuildVersion:   "0.1.0",
 	}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	rec := get(t, h, "/srv-status/")
+	rec := get(t, h, "/k8s-status/")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -206,7 +206,7 @@ func TestPageRenders(t *testing.T) {
 		"s-degraded", "s-warning", "s-drift", "s-prune",
 		"media-encoder", "0/2 replicas available",
 		`href="https://argocd.example.invalid/applications/accounts-api"`,
-		"437a162", "srv-status 0.1.0",
+		"437a162", "k8s-status 0.1.0",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q", want)
@@ -218,8 +218,8 @@ func TestPageRenders(t *testing.T) {
 }
 
 func TestPageWithoutArgoCDUIHasNoServiceLinks(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
-	body := get(t, h, "/srv-status/").Body.String()
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	body := get(t, h, "/k8s-status/").Body.String()
 	if strings.Contains(body, "/applications/accounts-api") {
 		t.Error("services should be plain text when ARGOCD_UI_BASE is unset")
 	}
@@ -232,10 +232,10 @@ func TestPageErrorAndStaleBanners(t *testing.T) {
 	stale := fixtureSnapshot(t)
 	stale.Stale = true
 
-	h := newTestServer(t, Config{BasePath: "/srv-status"},
+	h := newTestServer(t, Config{BasePath: "/k8s-status"},
 		fakeProvider{snap: stale, err: errors.New("kubernetes api returned 503")})
 
-	body := get(t, h, "/srv-status/").Body.String()
+	body := get(t, h, "/k8s-status/").Body.String()
 	if !strings.Contains(body, "cluster read failed") {
 		t.Error("missing error banner")
 	}
@@ -245,9 +245,9 @@ func TestPageErrorAndStaleBanners(t *testing.T) {
 }
 
 func TestPageRendersWhenClusterReadFails(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{err: errors.New("connection refused")})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{err: errors.New("connection refused")})
 
-	rec := get(t, h, "/srv-status/")
+	rec := get(t, h, "/k8s-status/")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -257,14 +257,14 @@ func TestPageRendersWhenClusterReadFails(t *testing.T) {
 }
 
 func TestBasePathRedirect(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	rec := get(t, h, "/srv-status")
+	rec := get(t, h, "/k8s-status")
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status = %d, want 302", rec.Code)
 	}
-	if loc := rec.Header().Get("Location"); loc != "/srv-status/" {
-		t.Errorf("location = %q, want /srv-status/", loc)
+	if loc := rec.Header().Get("Location"); loc != "/k8s-status/" {
+		t.Errorf("location = %q, want /k8s-status/", loc)
 	}
 }
 
@@ -280,8 +280,8 @@ func TestRootBasePath(t *testing.T) {
 	if rec := get(t, h, "/api/status"); rec.Code != http.StatusOK {
 		t.Errorf("GET /api/status = %d, want 200", rec.Code)
 	}
-	if rec := get(t, h, "/srv-status/"); rec.Code != http.StatusNotFound {
-		t.Errorf("GET /srv-status/ = %d, want 404", rec.Code)
+	if rec := get(t, h, "/k8s-status/"); rec.Code != http.StatusNotFound {
+		t.Errorf("GET /k8s-status/ = %d, want 404", rec.Code)
 	}
 }
 
@@ -289,9 +289,9 @@ func TestBasePathNormalization(t *testing.T) {
 	cases := map[string]string{
 		"":             "",
 		"/":            "",
-		"srv-status":   "/srv-status",
-		"/srv-status":  "/srv-status",
-		"/srv-status/": "/srv-status",
+		"k8s-status":   "/k8s-status",
+		"/k8s-status":  "/k8s-status",
+		"/k8s-status/": "/k8s-status",
 		"  /status/  ": "/status",
 	}
 	for in, want := range cases {
@@ -363,10 +363,211 @@ func (s *stubNodeLister) ListNodes(context.Context) (*kube.NodeList, error) {
 	return s.list, s.err
 }
 
-func TestPageWithoutNodeStatsHasNoCapacitySection(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, nodeStatsProvider(t, nil))
+// unmanagedProvider drives the whole chain: a real Collector with a fake workloads
+// client, so the wiring, not just the template, is under test.
+func unmanagedProvider(t *testing.T, workloads status.WorkloadLister) Provider {
+	t.Helper()
+	raw, err := os.ReadFile("../../testdata/applications.json")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var list argocd.ApplicationList
+	if err := json.Unmarshal(raw, &list); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	c := status.NewCollector(staticLister{list: &list}, status.Options{RootAppName: "root-app"}, time.Minute)
+	if workloads != nil {
+		c.WithUnmanaged(workloads)
+	}
+	return c
+}
 
-	rec := get(t, h, "/srv-status/")
+type stubWorkloadLister struct {
+	called int
+	list   *kube.WorkloadList
+	err    error
+}
+
+func (s *stubWorkloadLister) ListWorkloads(context.Context) (*kube.WorkloadList, error) {
+	s.called++
+	return s.list, s.err
+}
+
+func sampleWorkloads() *kube.WorkloadList {
+	return &kube.WorkloadList{Items: []kube.Workload{
+		{Kind: kube.KindDeployment,
+			Metadata: kube.WorkloadMetadata{Name: "csi-controller", Namespace: "kube-system",
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "EKS"}},
+			Spec:   kube.WorkloadSpec{Template: kube.PodTemplate{Spec: kube.PodSpec{Containers: []kube.Container{{Image: "registry.invalid/csi:v1.2.3"}}}}},
+			Status: kube.WorkloadStatus{Replicas: 2, ReadyReplicas: 2}},
+		{Kind: kube.KindDaemonSet,
+			Metadata: kube.WorkloadMetadata{Name: "csi-node-windows", Namespace: "kube-system"},
+			Status:   kube.WorkloadStatus{}},
+		{Kind: kube.KindDaemonSet,
+			Metadata: kube.WorkloadMetadata{Name: "kube-proxy", Namespace: "kube-system"},
+			Status:   kube.WorkloadStatus{DesiredNumberScheduled: 82, NumberReady: 81}},
+		// Managed by ArgoCD, so it must not appear at all.
+		{Kind: kube.KindDeployment,
+			Metadata: kube.WorkloadMetadata{Name: "accounts-api", Namespace: "apps",
+				Labels: map[string]string{"app.kubernetes.io/instance": "accounts-api"}},
+			Status: kube.WorkloadStatus{Replicas: 1, ReadyReplicas: 1}},
+	}}
+}
+
+// UNMANAGED=false must render no section and never call the API.
+func TestPageWithoutUnmanagedHasNoSection(t *testing.T) {
+	workloads := &stubWorkloadLister{list: sampleWorkloads()}
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, nil))
+
+	body := get(t, h, "/k8s-status/").Body.String()
+	if strings.Contains(body, "Not managed by ArgoCD") {
+		t.Error("unmanaged section rendered while UNMANAGED is off")
+	}
+	if strings.Contains(body, "unmanaged workloads") {
+		t.Error("unmanaged count rendered while UNMANAGED is off")
+	}
+	if workloads.called != 0 {
+		t.Errorf("workloads API called %d times, want 0", workloads.called)
+	}
+	if !strings.Contains(body, "accounts-api") {
+		t.Error("service table should still render")
+	}
+}
+
+func TestPageWithUnmanagedRendersSection(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, &stubWorkloadLister{list: sampleWorkloads()}))
+
+	rec := get(t, h, "/k8s-status/")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Not managed by ArgoCD", "unmanaged workloads",
+		"csi-controller", "csi-node-windows", "kube-proxy",
+		"EKS", "unknown", "v1.2.3", "81/82", "0/0",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("unmanaged section missing %q", want)
+		}
+	}
+	// The ArgoCD-managed Deployment carries a marker and must be excluded.
+	if strings.Count(body, "3</span><span class=\"ck\">unmanaged workloads") != 1 {
+		t.Errorf("want a count of 3 unmanaged workloads")
+	}
+	// desired == 0 is deliberate, not broken.
+	if !strings.Contains(body, "s-suspended") {
+		t.Error("a 0/0 workload should render SUSPENDED, not DEGRADED")
+	}
+	if strings.Contains(body, "<script") {
+		t.Error("page must not contain JavaScript")
+	}
+}
+
+// The status tiles are mutually exclusive and sum to the service total; unmanaged
+// workloads are not services and must stay out of that row.
+func TestUnmanagedIsNotAStatusTile(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, &stubWorkloadLister{list: sampleWorkloads()}))
+
+	body := get(t, h, "/k8s-status/").Body.String()
+	start := strings.Index(body, `<div class="tiles">`)
+	end := strings.Index(body, `<details class="legend">`)
+	if start < 0 || end < start {
+		t.Fatal("could not locate the status tile row")
+	}
+	if strings.Contains(body[start:end], "unmanaged") {
+		t.Error("unmanaged must not be rendered as a status tile")
+	}
+}
+
+func TestPageStillRendersWhenWorkloadsForbidden(t *testing.T) {
+	workloads := &stubWorkloadLister{err: &kube.StatusError{Code: http.StatusForbidden, Body: "deployments is forbidden"}}
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, workloads))
+
+	rec := get(t, h, "/k8s-status/")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "ClusterRole") {
+		t.Error("want an inline note explaining the missing ClusterRole")
+	}
+	if strings.Contains(body, "cluster read failed") {
+		t.Error("a denied workloads read must not raise the page-level error banner")
+	}
+	for _, want := range []string{"accounts-api", "media-encoder", "0/2 replicas available"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("application data lost from the page: missing %q", want)
+		}
+	}
+}
+
+func TestAPIUnmanagedObjectOmittedWhenDisabled(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, nil))
+
+	body := get(t, h, "/k8s-status/api/status").Body.String()
+	if strings.Contains(body, `"unmanaged"`) {
+		t.Errorf("unmanaged object should be omitted when the feature is off: %s", body)
+	}
+}
+
+func TestAPIUnmanagedObject(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, &stubWorkloadLister{list: sampleWorkloads()}))
+
+	var resp struct {
+		Unmanaged *struct {
+			Count   int `json:"count"`
+			Scanned int `json:"scanned"`
+			Items   []struct {
+				Namespace string `json:"namespace"`
+				Kind      string `json:"kind"`
+				Name      string `json:"name"`
+				ManagedBy string `json:"managedBy"`
+				Ready     int    `json:"ready"`
+				Desired   int    `json:"desired"`
+				Version   string `json:"version"`
+				State     string `json:"state"`
+			} `json:"items"`
+			Error string `json:"error"`
+		} `json:"unmanaged"`
+		Summary struct {
+			Total int `json:"total"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal(get(t, h, "/k8s-status/api/status").Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Unmanaged == nil {
+		t.Fatal("want an unmanaged object")
+	}
+	if resp.Unmanaged.Count != 3 || resp.Unmanaged.Scanned != 4 {
+		t.Errorf("count = %d, scanned = %d, want 3 and 4", resp.Unmanaged.Count, resp.Unmanaged.Scanned)
+	}
+	if resp.Summary.Total != 14 {
+		t.Errorf("service total = %d, want 14: unmanaged workloads must not join the summary", resp.Summary.Total)
+	}
+	byName := map[string]string{}
+	for _, w := range resp.Unmanaged.Items {
+		byName[w.Name] = w.State
+	}
+	if byName["csi-node-windows"] != "SUSPENDED" {
+		t.Errorf("csi-node-windows = %q, want SUSPENDED", byName["csi-node-windows"])
+	}
+	if byName["kube-proxy"] != "DEGRADED" {
+		t.Errorf("kube-proxy = %q, want DEGRADED", byName["kube-proxy"])
+	}
+	if byName["csi-controller"] != "OK" {
+		t.Errorf("csi-controller = %q, want OK", byName["csi-controller"])
+	}
+	if resp.Unmanaged.Error != "" {
+		t.Errorf("error = %q, want empty", resp.Unmanaged.Error)
+	}
+}
+
+func TestPageWithoutNodeStatsHasNoCapacitySection(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nil))
+
+	rec := get(t, h, "/k8s-status/")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -389,9 +590,9 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
 		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
 	}}}
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, nodeStatsProvider(t, nodes))
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
-	body := get(t, h, "/srv-status/").Body.String()
+	body := get(t, h, "/k8s-status/").Body.String()
 	for _, want := range []string{"Cluster capacity", "cpu nodes", "gpu nodes", "gpus", "architecture", "gpu services", "2 arm64 / 1 amd64"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("capacity section missing %q", want)
@@ -404,9 +605,9 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 
 func TestPageStillRendersWhenNodesForbidden(t *testing.T) {
 	nodes := &stubNodeLister{err: &kube.StatusError{Code: http.StatusForbidden, Body: "nodes is forbidden"}}
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, nodeStatsProvider(t, nodes))
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
-	rec := get(t, h, "/srv-status/")
+	rec := get(t, h, "/k8s-status/")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -425,9 +626,9 @@ func TestPageStillRendersWhenNodesForbidden(t *testing.T) {
 }
 
 func TestAPINodesObjectOmittedWhenDisabled(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, nodeStatsProvider(t, nil))
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nil))
 
-	body := get(t, h, "/srv-status/api/status").Body.String()
+	body := get(t, h, "/k8s-status/api/status").Body.String()
 	if strings.Contains(body, `"nodes"`) {
 		t.Errorf("nodes object should be omitted when the feature is off: %s", body)
 	}
@@ -438,7 +639,7 @@ func TestAPINodesObject(t *testing.T) {
 		{Status: kube.NodeStatus{Capacity: kube.NodeCapacity{NvidiaGPU: "4"}, NodeInfo: kube.NodeInfo{Architecture: "amd64"}}},
 		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
 	}}}
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, nodeStatsProvider(t, nodes))
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
 	var resp struct {
 		Nodes *struct {
@@ -451,7 +652,7 @@ func TestAPINodesObject(t *testing.T) {
 			Error       string         `json:"error"`
 		} `json:"nodes"`
 	}
-	if err := json.Unmarshal(get(t, h, "/srv-status/api/status").Body.Bytes(), &resp); err != nil {
+	if err := json.Unmarshal(get(t, h, "/k8s-status/api/status").Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if resp.Nodes == nil {
@@ -471,14 +672,14 @@ func TestAPINodesObject(t *testing.T) {
 func countRows(body string) int { return strings.Count(body, `<tbody class="svc`) }
 
 func TestPageFiltersRows(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	all := get(t, h, "/srv-status/").Body.String()
+	all := get(t, h, "/k8s-status/").Body.String()
 	if countRows(all) != 14 {
 		t.Fatalf("unfiltered rows = %d, want 14", countRows(all))
 	}
 
-	rec := get(t, h, "/srv-status/?status=DEGRADED")
+	rec := get(t, h, "/k8s-status/?status=DEGRADED")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -499,29 +700,29 @@ func TestPageFiltersRows(t *testing.T) {
 }
 
 func TestPageFilterCombinations(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
 	for _, tc := range []struct{ path string }{
-		{"/srv-status/?status=DEGRADED,DRIFT"},
-		{"/srv-status/?status=DEGRADED&status=DRIFT"},
-		{"/srv-status/?status=degraded,%20drift"},
+		{"/k8s-status/?status=DEGRADED,DRIFT"},
+		{"/k8s-status/?status=DEGRADED&status=DRIFT"},
+		{"/k8s-status/?status=degraded,%20drift"},
 	} {
 		if got := countRows(get(t, h, tc.path).Body.String()); got != 3 {
 			t.Errorf("%s rows = %d, want 3", tc.path, got)
 		}
 	}
-	if got := countRows(get(t, h, "/srv-status/?sync=OutOfSync").Body.String()); got != 4 {
+	if got := countRows(get(t, h, "/k8s-status/?sync=OutOfSync").Body.String()); got != 4 {
 		t.Errorf("sync=OutOfSync rows = %d, want 4", got)
 	}
-	if got := countRows(get(t, h, "/srv-status/?sync=outofsync&status=DRIFT").Body.String()); got != 1 {
+	if got := countRows(get(t, h, "/k8s-status/?sync=outofsync&status=DRIFT").Body.String()); got != 1 {
 		t.Errorf("sync+status rows = %d, want 1", got)
 	}
 }
 
 func TestPageUnknownFilterValueRendersEmptyState(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	rec := get(t, h, "/srv-status/?status=BANANAS")
+	rec := get(t, h, "/k8s-status/?status=BANANAS")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -538,33 +739,33 @@ func TestPageUnknownFilterValueRendersEmptyState(t *testing.T) {
 }
 
 func TestTileLinkTogglesActiveFilter(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	off := get(t, h, "/srv-status/").Body.String()
-	if !strings.Contains(off, `href="/srv-status/?status=DEGRADED"`) {
+	off := get(t, h, "/k8s-status/").Body.String()
+	if !strings.Contains(off, `href="/k8s-status/?status=DEGRADED"`) {
 		t.Error("inactive DEGRADED tile should link to the filtered view")
 	}
 
-	on := get(t, h, "/srv-status/?status=DEGRADED").Body.String()
-	if !strings.Contains(on, `class="tile t-degraded is-on" href="/srv-status/"`) {
+	on := get(t, h, "/k8s-status/?status=DEGRADED").Body.String()
+	if !strings.Contains(on, `class="tile t-degraded is-on" href="/k8s-status/"`) {
 		t.Error("active DEGRADED tile should link back to the cleared view and be marked selected")
 	}
 }
 
 func TestPageRefreshOverride(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status", RefreshSeconds: 30}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status", RefreshSeconds: 30}, fakeProvider{snap: fixtureSnapshot(t)})
 
 	cases := []struct {
 		path string
 		want string
 	}{
-		{"/srv-status/", `<meta http-equiv="refresh" content="30">`},
-		{"/srv-status/?refresh=60", `<meta http-equiv="refresh" content="60">`},
-		{"/srv-status/?refresh=abc", `<meta http-equiv="refresh" content="30">`},
-		{"/srv-status/?refresh=-5", `<meta http-equiv="refresh" content="30">`},
-		{"/srv-status/?refresh=", `<meta http-equiv="refresh" content="30">`},
-		{"/srv-status/?refresh=1", `<meta http-equiv="refresh" content="5">`},
-		{"/srv-status/?refresh=999999", `<meta http-equiv="refresh" content="3600">`},
+		{"/k8s-status/", `<meta http-equiv="refresh" content="30">`},
+		{"/k8s-status/?refresh=60", `<meta http-equiv="refresh" content="60">`},
+		{"/k8s-status/?refresh=abc", `<meta http-equiv="refresh" content="30">`},
+		{"/k8s-status/?refresh=-5", `<meta http-equiv="refresh" content="30">`},
+		{"/k8s-status/?refresh=", `<meta http-equiv="refresh" content="30">`},
+		{"/k8s-status/?refresh=1", `<meta http-equiv="refresh" content="5">`},
+		{"/k8s-status/?refresh=999999", `<meta http-equiv="refresh" content="3600">`},
 	}
 	for _, tc := range cases {
 		body := get(t, h, tc.path).Body.String()
@@ -573,16 +774,16 @@ func TestPageRefreshOverride(t *testing.T) {
 		}
 	}
 
-	off := get(t, h, "/srv-status/?refresh=0").Body.String()
+	off := get(t, h, "/k8s-status/?refresh=0").Body.String()
 	if strings.Contains(off, "http-equiv=\"refresh\"") {
 		t.Error("refresh=0 must omit the meta refresh tag entirely")
 	}
 }
 
 func TestRefreshAndFilterCompose(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status", RefreshSeconds: 30}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status", RefreshSeconds: 30}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	body := get(t, h, "/srv-status/?status=DEGRADED&refresh=60").Body.String()
+	body := get(t, h, "/k8s-status/?status=DEGRADED&refresh=60").Body.String()
 
 	if !strings.Contains(body, `<meta http-equiv="refresh" content="60">`) {
 		t.Error("refresh override lost when a filter is active")
@@ -591,11 +792,11 @@ func TestRefreshAndFilterCompose(t *testing.T) {
 		t.Errorf("rows = %d, want 2 — filter lost when refresh is set", countRows(body))
 	}
 	// The chip's remove link keeps the refresh choice.
-	if !strings.Contains(body, `href="/srv-status/?refresh=60"`) {
+	if !strings.Contains(body, `href="/k8s-status/?refresh=60"`) {
 		t.Error("chip removal link dropped refresh=60")
 	}
 	// The refresh links keep the filter.
-	if !strings.Contains(body, `href="/srv-status/?refresh=10&amp;status=DEGRADED"`) {
+	if !strings.Contains(body, `href="/k8s-status/?refresh=10&amp;status=DEGRADED"`) {
 		t.Error("refresh links dropped status=DEGRADED")
 	}
 	if strings.Contains(body, "<script") {
@@ -604,7 +805,7 @@ func TestRefreshAndFilterCompose(t *testing.T) {
 }
 
 func TestAPIFiltersAndEchoesTheFilter(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
 	var resp struct {
 		Summary struct {
@@ -620,7 +821,7 @@ func TestAPIFiltersAndEchoesTheFilter(t *testing.T) {
 			State string `json:"state"`
 		} `json:"services"`
 	}
-	rec := get(t, h, "/srv-status/api/status?status=DEGRADED,DRIFT&sync=OutOfSync")
+	rec := get(t, h, "/k8s-status/api/status?status=DEGRADED,DRIFT&sync=OutOfSync")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -646,15 +847,15 @@ func TestAPIFiltersAndEchoesTheFilter(t *testing.T) {
 		t.Errorf("summary.total = %d, want 14", resp.Summary.Total)
 	}
 
-	plain := get(t, h, "/srv-status/api/status").Body.String()
+	plain := get(t, h, "/k8s-status/api/status").Body.String()
 	if strings.Contains(plain, `"filters"`) {
 		t.Error("filters object should be omitted when nothing is filtered")
 	}
 }
 
 func TestHealthzIgnoresFilters(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
-	rec := get(t, h, "/srv-status/healthz?status=BANANAS&refresh=0")
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	rec := get(t, h, "/k8s-status/healthz?status=BANANAS&refresh=0")
 	if rec.Code != http.StatusOK || rec.Body.String() != "ok" {
 		t.Errorf("healthz = %d %q", rec.Code, rec.Body.String())
 	}
@@ -663,9 +864,9 @@ func TestHealthzIgnoresFilters(t *testing.T) {
 // A stale colspan is the silent way a column change breaks, so it is asserted
 // against the real header cell count rather than a hard-coded number.
 func TestColspansMatchTheColumnCount(t *testing.T) {
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: fixtureSnapshot(t)})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 
-	for _, path := range []string{"/srv-status/", "/srv-status/?status=BANANAS"} {
+	for _, path := range []string{"/k8s-status/", "/k8s-status/?status=BANANAS"} {
 		body := get(t, h, path).Body.String()
 
 		head := regexp.MustCompile(`(?s)<thead>.*?</thead>`).FindString(body)
@@ -689,9 +890,9 @@ func TestVersionColumnsAreSeparate(t *testing.T) {
 	snap.Services = append(snap.Services, status.Service{
 		Name: "no-image-app", Version: "develop", Revision: "abcdef1234", State: status.StateOK, Sync: "Synced",
 	})
-	h := newTestServer(t, Config{BasePath: "/srv-status"}, fakeProvider{snap: snap})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
 
-	body := get(t, h, "/srv-status/").Body.String()
+	body := get(t, h, "/k8s-status/").Body.String()
 	if !strings.Contains(body, "<th>App version</th>") || !strings.Contains(body, `<th class="hide-sm">Chart version</th>`) {
 		t.Error("want two separate version headers, the chart one droppable on narrow screens")
 	}

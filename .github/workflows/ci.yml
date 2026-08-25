@@ -43,16 +43,16 @@ jobs:
       - uses: azure/setup-helm@v4
 
       - name: lint
-        run: helm lint charts/srv-status
+        run: helm lint charts/k8s-status
 
       # Render every optional path, so a broken template cannot merge unnoticed.
       - name: template
         run: |
-          helm template srv-status charts/srv-status > /dev/null
-          helm template srv-status charts/srv-status \
+          helm template k8s-status charts/k8s-status > /dev/null
+          helm template k8s-status charts/k8s-status \
             --set ingress.enabled=true --set ingress.host=example.internal > /dev/null
-          helm template srv-status charts/srv-status --set istio.enabled=true > /dev/null
-          helm template srv-status charts/srv-status \
+          helm template k8s-status charts/k8s-status --set istio.enabled=true > /dev/null
+          helm template k8s-status charts/k8s-status \
             --set config.nodeStats=true --set rbac.clusterRole=true > /dev/null
 
   image:
@@ -69,7 +69,7 @@ jobs:
           context: .
           push: false
           load: true
-          tags: srv-status:ci
+          tags: k8s-status:ci
           platforms: linux/amd64
           build-args: VERSION=ci
           cache-from: type=gha
@@ -80,7 +80,7 @@ jobs:
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: srv-status:ci
+          image-ref: k8s-status:ci
           format: table
           exit-code: "1"
           severity: HIGH,CRITICAL
@@ -99,6 +99,6 @@ jobs:
       - name: CIS Docker Benchmark (dockle)
         uses: erzz/dockle-action@v1.4.1
         with:
-          image: srv-status:ci
+          image: k8s-status:ci
           exit-code: "1"
           failure-threshold: fatal

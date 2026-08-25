@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Run srv-status locally. Two modes:
+# Run k8s-status locally. Two modes:
 #   ./scripts/local-test.sh fixture             offline, uses testdata/applications.json
 #   ./scripts/local-test.sh cluster <context>   live, via kubectl proxy (kube context is required)
 #
 # Deployment-specific values are not baked in. Override ENV_NAME, ENV_TYPE, REGION,
-# CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS and NODE_STATS in the
-# environment as needed.
+# CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED and
+# UNMANAGED_IGNORE_NS in the environment as needed.
 set -euo pipefail
 
 MODE="${1:-fixture}"
@@ -21,7 +21,7 @@ cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; rm 
 trap cleanup EXIT INT TERM
 
 cd "$ROOT"
-go build -o /tmp/srv-status-local ./cmd/srv-status
+go build -o /tmp/k8s-status-local ./cmd/k8s-status
 
 case "$MODE" in
   fixture)
@@ -32,6 +32,8 @@ case "$MODE" in
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-root-app}"   # the fixture's root app is named root-app
+    NODE_STATS_DEFAULT=false
+    UNMANAGED_DEFAULT=false
     echo "mode: fixture (offline, synthetic data)"
     ;;
   cluster)
@@ -39,11 +41,27 @@ case "$MODE" in
       usage
     fi
     echo "mode: cluster — context '$CONTEXT'"
-    kubectl --context "$CONTEXT" get applications.argoproj.io -n argocd >/dev/null
+    # Only require the ArgoCD CRD when ArgoCD is actually one of the sources;
+    # a Flux-only cluster has no Applications and must still work.
+    case "${SOURCES:-argocd}" in
+      *argocd*|auto)
+        if ! kubectl --context "$CONTEXT" get applications.argoproj.io -n argocd >/dev/null 2>&1; then
+          if [ "${SOURCES:-argocd}" = "auto" ]; then
+            echo "note: no ArgoCD Applications found; relying on auto-detection" >&2
+          else
+            echo "error: no ArgoCD Applications in '$CONTEXT' (set SOURCES=flux for a Flux cluster)" >&2
+            exit 1
+          fi
+        fi
+        ;;
+    esac
     kubectl --context "$CONTEXT" proxy --port="$PROXY_PORT" >/dev/null 2>&1 &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-ocp-services}"
+    # Your kubeconfig can already read nodes and workloads, so show both by default locally.
+    NODE_STATS_DEFAULT=true
+    UNMANAGED_DEFAULT=true
     # Show which cluster you are actually pointed at, not a generic label.
     CLUSTER_NAME="${CLUSTER_NAME:-$CONTEXT}"
     ;;
@@ -55,17 +73,19 @@ KUBE_API_URL="$API" \
 ENV_NAME="${ENV_NAME:-local}" ENV_TYPE="${ENV_TYPE:-}" REGION="${REGION:-}" \
 CLUSTER_NAME="${CLUSTER_NAME:-}" ROOT_APP_NAME="$ROOT_APP" \
 ARGOCD_UI_BASE="${ARGOCD_UI_BASE:-}" \
-IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-false}" PORT="$PORT" \
-/tmp/srv-status-local &
+IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-$NODE_STATS_DEFAULT}" \
+UNMANAGED="${UNMANAGED:-$UNMANAGED_DEFAULT}" UNMANAGED_IGNORE_NS="${UNMANAGED_IGNORE_NS:-}" \
+PORT="$PORT" \
+/tmp/k8s-status-local &
 PIDS+=($!)
 
 sleep 2
 echo
-echo "  page   http://127.0.0.1:$PORT/srv-status/"
-echo "  json   http://127.0.0.1:$PORT/srv-status/api/status"
-echo "  health http://127.0.0.1:$PORT/srv-status/healthz"
+echo "  page   http://127.0.0.1:$PORT/k8s-status/"
+echo "  json   http://127.0.0.1:$PORT/k8s-status/api/status"
+echo "  health http://127.0.0.1:$PORT/k8s-status/healthz"
 echo
-curl -s "http://127.0.0.1:$PORT/srv-status/api/status" \
+curl -s "http://127.0.0.1:$PORT/k8s-status/api/status" \
   | python3 -c 'import json,sys;d=json.load(sys.stdin);print("summary:",d["summary"]);print("error:",d["error"])' || true
 echo
 echo "Ctrl-C to stop."

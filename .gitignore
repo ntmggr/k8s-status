@@ -1,6 +1,6 @@
 /bin/
 /dist/
-/srv-status
+/k8s-status
 *.test
 *.out
 coverage.*

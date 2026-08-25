@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   # Container image repository.
-  repository: docker.io/ntmggr/srv-status
+  repository: docker.io/ntmggr/k8s-status
   # Image tag. Empty falls back to .Chart.AppVersion.
   tag: ""
   # Image pull policy.
@@ -22,7 +22,7 @@ serviceAccount:
   create: true
   # Name of the ServiceAccount. Empty uses the generated fullname.
   name: ""
-  # Deliberately empty: srv-status makes zero AWS API calls, so it needs no IRSA
+  # Deliberately empty: k8s-status makes zero AWS API calls, so it needs no IRSA
   # eks.amazonaws.com/role-arn annotation and no cloud credentials of any kind.
   annotations: {}
 
@@ -31,8 +31,10 @@ rbac:
   create: true
   # Namespace holding the ArgoCD Application resources; Role and RoleBinding are created here.
   argocdNamespace: argocd
-  # Create a ClusterRole and ClusterRoleBinding granting get/list on nodes. Only needed
-  # by config.nodeStats; nothing cluster-scoped is rendered while this is false.
+  # Create a ClusterRole and ClusterRoleBinding for the opt-in sections. Grants get/list
+  # on nodes for config.nodeStats, get/list on deployments, statefulsets and daemonsets
+  # when config.unmanaged is on, and get/list on helmreleases and kustomizations when
+  # config.sources includes flux. Nothing cluster-scoped is rendered while this is false.
   clusterRole: false
 
 # Application configuration; each key maps 1:1 to an environment variable.
@@ -46,7 +48,10 @@ config:
   # CLUSTER_NAME - cluster name shown in the page header.
   clusterName: ""
   # BASE_PATH - path prefix the app serves natively; no proxy rewrite is required.
-  basePath: /srv-status
+  basePath: /k8s-status
+  # SOURCES - comma-separated GitOps controllers to read: argocd, flux, or both. "auto"
+  # detects which CRDs the cluster serves. Flux additionally requires rbac.clusterRole.
+  sources: argocd
   # ARGOCD_NAMESPACE - namespace the app reads Applications from.
   argocdNamespace: argocd
   # ROOT_APP_NAME - app-of-apps Application used to derive pruning orphans.
@@ -61,6 +66,10 @@ config:
   refreshSeconds: 30
   # NODE_STATS - render the cluster capacity section. Requires rbac.clusterRole.
   nodeStats: false
+  # UNMANAGED - list workloads that ArgoCD does not manage. Requires rbac.clusterRole.
+  unmanaged: false
+  # UNMANAGED_IGNORE_NS - comma-separated namespace globs excluded from that list.
+  unmanagedIgnoreNamespaces: ""
   # PORT - container listen port.
   port: 8080
 

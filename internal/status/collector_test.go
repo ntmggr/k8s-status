@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ntmggr/srv-status/internal/argocd"
+	"github.com/ntmggr/k8s-status/internal/argocd"
 )
 
 type fakeLister struct {

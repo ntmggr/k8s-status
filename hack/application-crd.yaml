@@ -1,0 +1,42 @@
+# Minimal stand-in for the ArgoCD Application CRD, for the local demo only.
+#
+# Two deliberate differences from the upstream CRD
+# (https://github.com/argoproj/argo-cd/blob/master/manifests/crds/application-crd.yaml):
+#
+#  1. The schema is open (x-kubernetes-preserve-unknown-fields) instead of the full
+#     ArgoCD spec. k8s-status decodes a handful of fields and ignores the rest, so a
+#     faithful copy of a 40k-line schema buys nothing.
+#  2. There is no `subresources.status` block. With the status subresource enabled,
+#     `kubectl apply` silently drops `status:` and every sample app would render as
+#     WARNING. Leaving it off is what lets the demo objects carry their status in
+#     one plain apply.
+#
+# Do not copy this into a real cluster. It is not the ArgoCD CRD.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: applications.argoproj.io
+spec:
+  group: argoproj.io
+  scope: Namespaced
+  names:
+    kind: Application
+    listKind: ApplicationList
+    plural: applications
+    singular: application
+    shortNames: [app, apps]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+      additionalPrinterColumns:
+        - name: Sync
+          type: string
+          jsonPath: .status.sync.status
+        - name: Health
+          type: string
+          jsonPath: .status.health.status

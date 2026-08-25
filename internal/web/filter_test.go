@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ntmggr/srv-status/internal/status"
+	"github.com/ntmggr/k8s-status/internal/status"
 )
 
 func query(t *testing.T, raw string) url.Values {
@@ -136,19 +136,19 @@ func TestFilterHrefTogglesAndPreserves(t *testing.T) {
 		kind, val  string
 		wantSuffix string
 	}{
-		{name: "adds", raw: "", kind: "status", val: "DEGRADED", wantSuffix: "/srv-status/?status=DEGRADED"},
-		{name: "clears when active", raw: "status=DEGRADED", kind: "status", val: "DEGRADED", wantSuffix: "/srv-status/"},
-		{name: "clears case-insensitively", raw: "status=degraded", kind: "status", val: "DEGRADED", wantSuffix: "/srv-status/"},
-		{name: "keeps siblings", raw: "status=DEGRADED&status=DRIFT", kind: "status", val: "DRIFT", wantSuffix: "/srv-status/?status=DEGRADED"},
-		{name: "keeps refresh", raw: "refresh=60", kind: "status", val: "DEGRADED", wantSuffix: "/srv-status/?refresh=60&status=DEGRADED"},
-		{name: "keeps refresh while clearing", raw: "status=DEGRADED&refresh=60", kind: "status", val: "DEGRADED", wantSuffix: "/srv-status/?refresh=60"},
-		{name: "gpu toggle on", raw: "", kind: "gpu", val: "true", wantSuffix: "/srv-status/?gpu=true"},
-		{name: "gpu toggle off", raw: "gpu=true", kind: "gpu", val: "true", wantSuffix: "/srv-status/"},
+		{name: "adds", raw: "", kind: "status", val: "DEGRADED", wantSuffix: "/k8s-status/?status=DEGRADED"},
+		{name: "clears when active", raw: "status=DEGRADED", kind: "status", val: "DEGRADED", wantSuffix: "/k8s-status/"},
+		{name: "clears case-insensitively", raw: "status=degraded", kind: "status", val: "DEGRADED", wantSuffix: "/k8s-status/"},
+		{name: "keeps siblings", raw: "status=DEGRADED&status=DRIFT", kind: "status", val: "DRIFT", wantSuffix: "/k8s-status/?status=DEGRADED"},
+		{name: "keeps refresh", raw: "refresh=60", kind: "status", val: "DEGRADED", wantSuffix: "/k8s-status/?refresh=60&status=DEGRADED"},
+		{name: "keeps refresh while clearing", raw: "status=DEGRADED&refresh=60", kind: "status", val: "DEGRADED", wantSuffix: "/k8s-status/?refresh=60"},
+		{name: "gpu toggle on", raw: "", kind: "gpu", val: "true", wantSuffix: "/k8s-status/?gpu=true"},
+		{name: "gpu toggle off", raw: "gpu=true", kind: "gpu", val: "true", wantSuffix: "/k8s-status/"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			q := query(t, tc.raw)
-			d := pageData{BasePath: "/srv-status", Query: q, Filter: ParseFilter(q)}
+			d := pageData{BasePath: "/k8s-status", Query: q, Filter: ParseFilter(q)}
 			if got := d.FilterHref(tc.kind, tc.val); got != tc.wantSuffix {
 				t.Errorf("FilterHref(%q, %q) with %q = %q, want %q", tc.kind, tc.val, tc.raw, got, tc.wantSuffix)
 			}
@@ -158,24 +158,24 @@ func TestFilterHrefTogglesAndPreserves(t *testing.T) {
 
 func TestClearHrefKeepsRefresh(t *testing.T) {
 	q := query(t, "status=DEGRADED&sync=OutOfSync&gpu=true&refresh=60")
-	d := pageData{BasePath: "/srv-status", Query: q, Filter: ParseFilter(q)}
-	if got, want := d.ClearHref(), "/srv-status/?refresh=60"; got != want {
+	d := pageData{BasePath: "/k8s-status", Query: q, Filter: ParseFilter(q)}
+	if got, want := d.ClearHref(), "/k8s-status/?refresh=60"; got != want {
 		t.Errorf("ClearHref = %q, want %q", got, want)
 	}
 }
 
 func TestChipsRemoveOneFilterEach(t *testing.T) {
 	q := query(t, "status=DEGRADED,DRIFT&gpu=true")
-	d := pageData{BasePath: "/srv-status", Query: q, Filter: ParseFilter(q)}
+	d := pageData{BasePath: "/k8s-status", Query: q, Filter: ParseFilter(q)}
 
 	chips := d.Chips()
 	if len(chips) != 3 {
 		t.Fatalf("chips = %+v, want 3", chips)
 	}
 	want := []Chip{
-		{Label: "status DEGRADED", RemoveHref: "/srv-status/?gpu=true&status=DRIFT"},
-		{Label: "status DRIFT", RemoveHref: "/srv-status/?gpu=true&status=DEGRADED"},
-		{Label: "gpu true", RemoveHref: "/srv-status/?status=DEGRADED&status=DRIFT"},
+		{Label: "status DEGRADED", RemoveHref: "/k8s-status/?gpu=true&status=DRIFT"},
+		{Label: "status DRIFT", RemoveHref: "/k8s-status/?gpu=true&status=DEGRADED"},
+		{Label: "gpu true", RemoveHref: "/k8s-status/?status=DEGRADED&status=DRIFT"},
 	}
 	if !reflect.DeepEqual(chips, want) {
 		t.Errorf("chips = %+v, want %+v", chips, want)
@@ -184,7 +184,7 @@ func TestChipsRemoveOneFilterEach(t *testing.T) {
 
 func TestRefreshOptionsKeepFilters(t *testing.T) {
 	q := query(t, "status=DEGRADED&refresh=60")
-	d := pageData{BasePath: "/srv-status", Query: q, Filter: ParseFilter(q), RefreshSeconds: 60}
+	d := pageData{BasePath: "/k8s-status", Query: q, Filter: ParseFilter(q), RefreshSeconds: 60}
 
 	opts := d.RefreshOptions()
 	if len(opts) != len(refreshChoices) {

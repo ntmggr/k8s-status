@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ntmggr/srv-status/internal/argocd"
+	"github.com/ntmggr/k8s-status/internal/argocd"
 )
 
 type State string
@@ -41,6 +41,9 @@ var severity = map[State]int{
 
 // Options controls how a raw Application list is folded into a Snapshot.
 type Options struct {
+	// Sources are the enabled GitOps controllers. A source that is absent here is
+	// never queried.
+	Sources     []Source
 	RootAppName string
 	IgnoreGlobs []string
 	// GPUGlobs mark services as GPU-backed. Name-based because it needs no extra
@@ -49,6 +52,9 @@ type Options struct {
 	// SidecarImages are image names that never represent the service itself.
 	// Empty means use the built-in list.
 	SidecarImages []string
+	// UnmanagedIgnoreNS are namespace globs excluded from the unmanaged workload
+	// section. Same path.Match semantics as IgnoreGlobs.
+	UnmanagedIgnoreNS []string
 }
 
 // Component is an individual Kubernetes resource inside a service that is not
@@ -62,7 +68,13 @@ type Component struct {
 }
 
 type Service struct {
-	Name       string
+	Name string
+	// Namespace and Kind are only set for Flux rows: HelmReleases and Kustomizations
+	// are spread across namespaces and two kinds, while ArgoCD Applications are all
+	// Applications in one namespace and need no disambiguation.
+	Namespace  string
+	Kind       string
+	Source     Source
 	Version    string
 	Revision   string
 	RepoURL    string
@@ -90,6 +102,13 @@ type Summary struct {
 }
 
 type Snapshot struct {
+	// Sources are the GitOps controllers this snapshot was read from, in the order
+	// SOURCES named them. The Source column is only rendered when there is more than
+	// one, so a single-source cluster keeps the uncluttered table.
+	Sources []Source
+	// HasRoot reports whether an ArgoCD root Application was found. Everything in the
+	// environment header below comes from it, so a Flux-only cluster has none.
+	HasRoot        bool
 	EnvType        string
 	Version        string
 	Revision       string
@@ -103,7 +122,11 @@ type Snapshot struct {
 	Summary        Summary
 	Services       []Service
 	// Nodes is nil unless NODE_STATS is enabled.
-	Nodes     *NodeStats
+	Nodes *NodeStats
+	// Unmanaged is nil unless UNMANAGED is enabled.
+	Unmanaged *Unmanaged
+	// Flux is nil unless flux is one of SOURCES.
+	Flux      *FluxSection
 	CheckedAt time.Time
 	Stale     bool
 }
@@ -114,7 +137,7 @@ func Build(list *argocd.ApplicationList, opts Options) Snapshot {
 	if len(sidecars) == 0 {
 		sidecars = defaultSidecarImages
 	}
-	snap := Snapshot{Services: []Service{}}
+	snap := Snapshot{Sources: opts.Sources, Services: []Service{}}
 	if list == nil {
 		return snap
 	}
@@ -133,6 +156,7 @@ func Build(list *argocd.ApplicationList, opts Options) Snapshot {
 	prune := map[string]bool{}
 	rootSettled := true
 	if root != nil {
+		snap.HasRoot = true
 		for _, res := range root.Status.Resources {
 			if res.RequiresPruning {
 				prune[res.Name] = true
@@ -166,8 +190,9 @@ func Build(list *argocd.ApplicationList, opts Options) Snapshot {
 		st := classify(name, health, sync, prune, rootSettled)
 
 		img := componentImage(app.Metadata.Name, app.Status.Summary.Images, sidecars)
-		snap.Services = append(snap.Services, Service{
+		snap.addService(Service{
 			Name:       name,
+			Source:     SourceArgoCD,
 			Version:    app.Spec.Source.TargetRevision,
 			RepoURL:    app.Spec.Source.RepoURL,
 			GPU:        matchesAny(app.Metadata.Name, opts.GPUGlobs),
@@ -180,38 +205,55 @@ func Build(list *argocd.ApplicationList, opts Options) Snapshot {
 			Detail:     truncate(detailFor(app, st), maxTextLen),
 			Components: componentsOf(app, st),
 		})
-
-		snap.Summary.Total++
-		if matchesAny(name, opts.GPUGlobs) {
-			snap.Summary.GPU++
-		}
-		switch st {
-		case StateOK:
-			snap.Summary.OK++
-		case StateDegraded:
-			snap.Summary.Degraded++
-		case StateWarning:
-			snap.Summary.Warning++
-		case StateProgressing:
-			snap.Summary.Progressing++
-		case StateDrift:
-			snap.Summary.Drift++
-		case StatePrune:
-			snap.Summary.Prune++
-		case StateSuspended:
-			snap.Summary.Suspended++
-		}
 	}
 
-	sort.Slice(snap.Services, func(i, j int) bool {
-		a, b := snap.Services[i], snap.Services[j]
+	sortServices(snap.Services)
+	return snap
+}
+
+// addService appends one row and folds it into the summary. Every source goes through
+// here so the tiles keep summing to the service total whatever produced the row.
+func (s *Snapshot) addService(svc Service) {
+	s.Services = append(s.Services, svc)
+	s.Summary.Total++
+	if svc.GPU {
+		s.Summary.GPU++
+	}
+	switch svc.State {
+	case StateOK:
+		s.Summary.OK++
+	case StateDegraded:
+		s.Summary.Degraded++
+	case StateWarning:
+		s.Summary.Warning++
+	case StateProgressing:
+		s.Summary.Progressing++
+	case StateDrift:
+		s.Summary.Drift++
+	case StatePrune:
+		s.Summary.Prune++
+	case StateSuspended:
+		s.Summary.Suspended++
+	}
+}
+
+// sortServices orders rows worst-first, then alphabetically. Source and namespace are
+// the last tiebreakers: two sources can each own a row of the same name, and the order
+// has to stay stable between refreshes.
+func sortServices(services []Service) {
+	sort.Slice(services, func(i, j int) bool {
+		a, b := services[i], services[j]
 		if severity[a.State] != severity[b.State] {
 			return severity[a.State] < severity[b.State]
 		}
-		return a.Name < b.Name
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		return a.Namespace < b.Namespace
 	})
-
-	return snap
 }
 
 func classify(name, health, sync string, prune map[string]bool, rootSettled bool) State {

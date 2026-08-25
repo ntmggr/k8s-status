@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "srv-status.fullname" . }}
+  name: {{ include "k8s-status.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "srv-status.labels" . | nindent 4 }}
+    {{- include "k8s-status.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   selector:
-    {{- include "srv-status.selectorLabels" . | nindent 4 }}
+    {{- include "k8s-status.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
       port: {{ .Values.service.port }}

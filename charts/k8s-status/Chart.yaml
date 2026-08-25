@@ -1,5 +1,5 @@
 apiVersion: v2
-name: srv-status
+name: k8s-status
 description: Read-only per-cluster status page for ArgoCD Application health.
 type: application
 version: 0.1.0

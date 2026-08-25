@@ -1,0 +1,80 @@
+{{- $sources := splitList "," (.Values.config.sources | replace " " "") }}
+{{- if and .Values.rbac.create (has "argocd" $sources) }}
+{{- /* Namespaced Role, not a ClusterRole, and no "watch": the app polls get/list on
+       Applications in one namespace, so that is the entire permission surface.
+       A flux-only install never reads Applications, so it does not get this Role. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "k8s-status.fullname" . }}
+  namespace: {{ .Values.rbac.argocdNamespace }}
+  labels:
+    {{- include "k8s-status.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "k8s-status.fullname" . }}
+  namespace: {{ .Values.rbac.argocdNamespace }}
+  labels:
+    {{- include "k8s-status.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-status.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "k8s-status.fullname" . }}
+{{- end }}
+{{- if .Values.rbac.clusterRole }}
+---
+{{- /* The only cluster-scoped object in this chart. It exists solely for the opt-in
+       sections: nodes are not namespaced, and the unmanaged workload list spans every
+       namespace, so neither can be read by a Role. Each rule is gated on the feature
+       that needs it, so enabling one does not grant the other. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "k8s-status.fullname" . }}-nodes
+  labels:
+    {{- include "k8s-status.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+  {{- if .Values.config.unmanaged }}
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list"]
+  {{- end }}
+  {{- if has "flux" $sources }}
+  {{- /* Flux objects live in the namespaces they deploy into rather than in one
+         controller namespace, so these are cluster-wide reads a Role cannot serve. */}}
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: ["helmreleases"]
+    verbs: ["get", "list"]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: ["kustomizations"]
+    verbs: ["get", "list"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "k8s-status.fullname" . }}-nodes
+  labels:
+    {{- include "k8s-status.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-status.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "k8s-status.fullname" . }}-nodes
+{{- end }}

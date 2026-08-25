@@ -13,7 +13,7 @@ COPY internal ./internal
 # CGO off gives a fully static binary, which is what lets the runtime image be
 # distroless-static: no libc, no shell, no package manager.
 ENV CGO_ENABLED=0 GOOS=linux
-RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/srv-status ./cmd/srv-status
+RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/k8s-status ./cmd/k8s-status
 
 # Runtime stage.
 #
@@ -27,16 +27,16 @@ RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/srv-s
 FROM gcr.io/distroless/static-debian12:nonroot
 
 # OCI metadata, so a scanner or registry can attribute the image (CIS 4.11).
-LABEL org.opencontainers.image.title="srv-status" \
+LABEL org.opencontainers.image.title="k8s-status" \
       org.opencontainers.image.description="Read-only per-cluster status page for ArgoCD-managed services" \
-      org.opencontainers.image.source="https://github.com/ntmggr/srv-status" \
+      org.opencontainers.image.source="https://github.com/ntmggr/k8s-status" \
       org.opencontainers.image.licenses="MIT"
 
-COPY --from=build /out/srv-status /srv-status
+COPY --from=build /out/k8s-status /k8s-status
 
 # Numeric UID/GID, not a name: kubelet can enforce runAsNonRoot without resolving
 # /etc/passwd, and it satisfies CIS 4.1 "create a user for the container".
 USER 65532:65532
 
 EXPOSE 8080
-ENTRYPOINT ["/srv-status"]
+ENTRYPOINT ["/k8s-status"]

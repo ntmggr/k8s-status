@@ -17,7 +17,7 @@ Available at:
 
 No ingress is enabled. Reach it with a port-forward:
 
-  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "srv-status.fullname" . }} 8080:{{ .Values.service.port }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "k8s-status.fullname" . }} 8080:{{ .Values.service.port }}
 
 Then open:
 
