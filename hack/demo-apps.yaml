@@ -1,0 +1,395 @@
+# Sample ArgoCD Applications for the local demo. Every value here is invented and
+# every repoURL points at the reserved .invalid TLD, exactly like testdata/.
+#
+# Between them these nine children hit all seven states k8s-status renders. The
+# classification rules are in README "How it works"; the short version is that the
+# first matching rule wins, so `legacy-batch` is PRUNE even though it is also
+# Degraded, and `checkout-web` is PROGRESSING rather than DRIFT.
+#
+# The root app is named ocp-services because that is the ROOT_APP_NAME default.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+---
+# Root app-of-apps. It supplies the environment header (version, revision, deploy
+# history, EnvType) and, via status.resources[].requiresPruning, the only source of
+# prune information. phase Succeeded means "settled", which is what lets rule 6
+# report DRIFT instead of PROGRESSING.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ocp-services
+  namespace: argocd
+  labels:
+    EnvType: dev
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/apps.git
+    path: envs/demo
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+status:
+  health:
+    status: Degraded
+    message: one or more child applications are degraded
+  sync:
+    status: OutOfSync
+    revision: 5f2a1c93d84b7e60a1fc2385bd47e0916cb3d772
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:33Z"
+  history:
+    - id: 41
+      revision: c07be5142ad938f6b0c14e7823da95f6017bb4de
+      deployedAt: "2026-08-22T14:05:02Z"
+    - id: 42
+      revision: 5f2a1c93d84b7e60a1fc2385bd47e0916cb3d772
+      deployedAt: "2026-08-24T09:12:10Z"
+  resources:
+    - group: argoproj.io
+      kind: Application
+      name: payments-api
+      namespace: argocd
+      status: Synced
+    - group: argoproj.io
+      kind: Application
+      name: orders-api
+      namespace: argocd
+      status: Synced
+    - group: argoproj.io
+      kind: Application
+      name: admin-ui
+      namespace: argocd
+      status: Synced
+    - group: argoproj.io
+      kind: Application
+      name: transcode-gpu
+      namespace: argocd
+      status: Synced
+    - group: argoproj.io
+      kind: Application
+      name: search-api
+      namespace: argocd
+      status: OutOfSync
+    - group: argoproj.io
+      kind: Application
+      name: checkout-web
+      namespace: argocd
+      status: OutOfSync
+    - group: argoproj.io
+      kind: Application
+      name: metrics-relay
+      namespace: argocd
+      status: Synced
+    - group: argoproj.io
+      kind: Application
+      name: nightly-report
+      namespace: argocd
+      status: Synced
+    # The one entry Git no longer asks for. This flag is what makes legacy-batch PRUNE.
+    - group: argoproj.io
+      kind: Application
+      name: legacy-batch
+      namespace: argocd
+      status: OutOfSync
+      requiresPruning: true
+---
+# DEGRADED — health Degraded (rule 2).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payments-api
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/payments-api
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payments
+status:
+  health:
+    status: Degraded
+    message: 0/3 replicas available
+  sync:
+    status: Synced
+    revision: 8a41d0c7fe25b93641ac07de5b8213f9046ecb15
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:18Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/payments-api:4.2.0
+      - registry.example.invalid/istio/proxyv2:1.30.1
+---
+# OK — healthy and Synced (rule 7).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orders-api
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/orders-api
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orders
+status:
+  health:
+    status: Healthy
+    message: ""
+  sync:
+    status: Synced
+    revision: 3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:19Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/orders-api:2.4.1
+      - registry.example.invalid/istio/proxyv2:1.30.1
+---
+# OK — a second healthy row, so the OK tile is not a count of one.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: admin-ui
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/admin-ui
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: admin
+status:
+  health:
+    status: Healthy
+    message: ""
+  sync:
+    status: Synced
+    revision: b7f21c8d9e4a60357c1b28ef4d90a5136be7cc02
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:20Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/admin-ui:1.15.0
+---
+# OK, and named to match the default GPU_GLOBS pattern `*-gpu`, so the row also
+# carries the GPU chip and the GPU counter is non-zero.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: transcode-gpu
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/transcode-gpu
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: transcode
+status:
+  health:
+    status: Healthy
+    message: ""
+  sync:
+    status: Synced
+    revision: 1d84f0b6c53ae729184bd0a3fc6721e95a03df48
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:21Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/transcode-gpu:0.9.3
+---
+# DRIFT — Healthy but OutOfSync while the root app has settled (rule 6).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: search-api
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/search-api
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: search
+status:
+  health:
+    status: Healthy
+    message: ""
+  sync:
+    status: OutOfSync
+    revision: 6e0a1f57cb2d4839f70b5ae21c98d3746fb0a2e9
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:22Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/search-api:7.1.2
+  resources:
+    - group: apps
+      version: v1
+      kind: Deployment
+      name: search-api
+      namespace: search
+      status: OutOfSync
+    - group: ""
+      version: v1
+      kind: ConfigMap
+      name: search-api
+      namespace: search
+      status: OutOfSync
+---
+# PROGRESSING — health Progressing (rule 4), which outranks the OutOfSync that
+# would otherwise read as DRIFT.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: checkout-web
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/checkout-web
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: checkout
+status:
+  health:
+    status: Progressing
+    message: "waiting for rollout to finish: 1 of 3 updated replicas are available"
+  sync:
+    status: OutOfSync
+    revision: 9b5c2e10af73d846bc09fe3157a2d0b64e18cc73
+  operationState:
+    phase: Running
+    message: syncing
+    finishedAt: ""
+  summary:
+    images:
+      - registry.example.invalid/platform/checkout-web:3.0.0-rc.4
+      - registry.example.invalid/istio/proxyv2:1.30.1
+---
+# WARNING — ArgoCD cannot determine health (rule 3).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-relay
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/metrics-relay
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+status:
+  health:
+    status: Unknown
+    message: no health check registered for this resource kind
+  sync:
+    status: Synced
+    revision: 2f7ce401b98a3d56704e1cb2fa085d69371ba0cc
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:24Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/metrics-relay:1.4.7
+---
+# SUSPENDED — deliberately paused (rule 5). A suspended CronJob, not an outage.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nightly-report
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/nightly-report
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: reporting
+status:
+  health:
+    status: Suspended
+    message: cronjob suspended
+  sync:
+    status: Synced
+    revision: 4ad9310c7bf25e6081ac3fd7b249e0f5136ac802
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:25Z"
+  summary:
+    images:
+      - registry.example.invalid/platform/nightly-report:2.0.1
+---
+# PRUNE — flagged requiresPruning by the root app (rule 1). Health is Missing, so
+# this row also proves prune is checked before health: it must read PRUNE, not
+# DEGRADED.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: legacy-batch
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.invalid/example/platform/charts.git
+    path: charts/legacy-batch
+    targetRevision: develop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: legacy
+status:
+  health:
+    status: Missing
+    message: Deployment not found
+  sync:
+    status: OutOfSync
+    revision: 0cb7241ae95f3d806b1fe4a37c2059d146bf83e1
+  operationState:
+    phase: Succeeded
+    message: successfully synced (all tasks run)
+    finishedAt: "2026-08-24T09:12:26Z"
+  resources:
+    - group: apps
+      version: v1
+      kind: Deployment
+      name: legacy-batch
+      namespace: legacy
+      status: OutOfSync

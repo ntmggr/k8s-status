@@ -1,0 +1,216 @@
+{
+  "apiVersion": "v1",
+  "kind": "HelmReleaseList",
+  "items": [
+    {
+      "apiVersion": "helm.toolkit.fluxcd.io/v2",
+      "kind": "HelmRelease",
+      "metadata": {
+        "name": "orders-api",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "chart": {
+          "spec": {
+            "chart": "orders-api",
+            "reconcileStrategy": "ChartVersion",
+            "sourceRef": {
+              "kind": "HelmRepository",
+              "name": "orders-api"
+            },
+            "version": "6.5.4"
+          }
+        },
+        "interval": "5m"
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-08-25T09:13:13Z",
+            "message": "Helm install succeeded for release sample-apps/orders-api.v1 with chart orders-api@6.5.4",
+            "observedGeneration": 1,
+            "reason": "InstallSucceeded",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-08-25T09:13:13Z",
+            "message": "Helm install succeeded for release sample-apps/orders-api.v1 with chart orders-api@6.5.4",
+            "observedGeneration": 1,
+            "reason": "InstallSucceeded",
+            "status": "True",
+            "type": "Released"
+          }
+        ],
+        "history": [
+          {
+            "appVersion": "6.5.4",
+            "chartName": "orders-api",
+            "chartVersion": "6.5.4",
+            "lastDeployed": "2026-08-25T09:12:58Z",
+            "status": "deployed",
+            "version": 1
+          }
+        ],
+        "lastAttemptedRevision": "6.5.4",
+        "observedGeneration": 1
+      }
+    },
+    {
+      "apiVersion": "helm.toolkit.fluxcd.io/v2",
+      "kind": "HelmRelease",
+      "metadata": {
+        "name": "billing-worker",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "chart": {
+          "spec": {
+            "chart": "does-not-exist",
+            "reconcileStrategy": "ChartVersion",
+            "sourceRef": {
+              "kind": "HelmRepository",
+              "name": "no-such-repo"
+            },
+            "version": "1.0.0"
+          }
+        },
+        "interval": "1m"
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-08-25T09:11:55Z",
+            "message": "Fulfilling prerequisites",
+            "observedGeneration": 1,
+            "reason": "Progressing",
+            "status": "True",
+            "type": "Reconciling"
+          },
+          {
+            "lastTransitionTime": "2026-08-25T09:13:25Z",
+            "message": "HelmChart 'sample-apps/sample-apps-billing-worker' is not ready: failed to get source: HelmRepository.source.toolkit.fluxcd.io \"no-such-repo\" not found",
+            "observedGeneration": 1,
+            "reason": "SourceNotReady",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "observedGeneration": -1
+      }
+    },
+    {
+      "apiVersion": "helm.toolkit.fluxcd.io/v2",
+      "kind": "HelmRelease",
+      "metadata": {
+        "name": "legacy-exporter",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "chart": {
+          "spec": {
+            "chart": "orders-api",
+            "reconcileStrategy": "ChartVersion",
+            "sourceRef": {
+              "kind": "HelmRepository",
+              "name": "orders-api"
+            },
+            "version": "6.5.3"
+          }
+        },
+        "interval": "5m",
+        "suspend": true
+      },
+      "status": {
+        "observedGeneration": 1
+      }
+    },
+    {
+      "apiVersion": "helm.toolkit.fluxcd.io/v2",
+      "kind": "HelmRelease",
+      "metadata": {
+        "name": "media-encoder",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "chart": {
+          "spec": {
+            "chart": "orders-api",
+            "reconcileStrategy": "ChartVersion",
+            "sourceRef": {
+              "kind": "HelmRepository",
+              "name": "orders-api"
+            },
+            "version": "6.5.4"
+          }
+        },
+        "interval": "5m"
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-08-25T09:15:35Z",
+            "message": "Failed to install after 1 attempt(s)",
+            "observedGeneration": 1,
+            "reason": "RetriesExceeded",
+            "status": "True",
+            "type": "Stalled"
+          },
+          {
+            "lastTransitionTime": "2026-08-25T09:15:35Z",
+            "message": "Helm install failed for release sample-apps/media-encoder with chart orders-api@6.5.4: server-side apply failed for object sample-apps/media-encoder-orders-api sample-apps/v1, Kind=Deployment: failed to convert new object (sample-apps/media-encoder-orders-api; sample-apps/v1, Kind=Deployment) to proper version: unable to convert unstructured object to sample-apps/v1, Kind=Deployment: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'",
+            "observedGeneration": 1,
+            "reason": "InstallFailed",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-08-25T09:15:35Z",
+            "message": "Helm install failed for release sample-apps/media-encoder with chart orders-api@6.5.4: server-side apply failed for object sample-apps/media-encoder-orders-api sample-apps/v1, Kind=Deployment: failed to convert new object (sample-apps/media-encoder-orders-api; sample-apps/v1, Kind=Deployment) to proper version: unable to convert unstructured object to sample-apps/v1, Kind=Deployment: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'",
+            "observedGeneration": 1,
+            "reason": "InstallFailed",
+            "status": "False",
+            "type": "Released"
+          }
+        ],
+        "history": [
+          {
+            "appVersion": "6.5.4",
+            "chartName": "orders-api",
+            "chartVersion": "6.5.4",
+            "lastDeployed": "2026-08-25T09:15:35Z",
+            "status": "failed",
+            "version": 1
+          }
+        ],
+        "lastAttemptedRevision": "6.5.4",
+        "observedGeneration": 1
+      }
+    },
+    {
+      "apiVersion": "helm.toolkit.fluxcd.io/v2",
+      "kind": "HelmRelease",
+      "metadata": {
+        "name": "search-api",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "interval": "5m",
+        "chart": {
+          "spec": {
+            "chart": "search-api",
+            "version": "2.1.0",
+            "reconcileStrategy": "ChartVersion",
+            "sourceRef": {
+              "kind": "HelmRepository",
+              "name": "internal"
+            }
+          }
+        }
+      },
+      "status": {
+        "observedGeneration": -1
+      }
+    }
+  ]
+}

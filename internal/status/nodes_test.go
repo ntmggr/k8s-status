@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ntmggr/srv-status/internal/kube"
+	"github.com/ntmggr/k8s-status/internal/kube"
 )
 
 func decodeNodes(t *testing.T, raw string) *kube.NodeList {

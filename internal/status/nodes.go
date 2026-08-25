@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ntmggr/srv-status/internal/kube"
+	"github.com/ntmggr/k8s-status/internal/kube"
 )
 
 // ArchCount is one entry of the node architecture split.

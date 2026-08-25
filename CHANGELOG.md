@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-25
+
+### Added
+
+- Optional "not managed by ArgoCD" section behind `UNMANAGED` (default `false`): every Deployment,
+  StatefulSet and DaemonSet in the cluster that carries no ArgoCD ownership marker
+  (`argocd.argoproj.io/tracking-id`, `app.kubernetes.io/instance`, `argocd.argoproj.io/instance`)
+  **and** no `metadata.ownerReferences`. Both halves are required — the marker check alone listed
+  292 rows on a live dev cluster because an in-cluster operator spawns per-request Deployments;
+  adding the ownerReferences check leaves 11, all real infrastructure. Each row shows namespace,
+  kind, name, `app.kubernetes.io/managed-by` (empty renders as `unknown`), ready/desired and the
+  first container's image tag. `desired == 0` is `SUSPENDED`, not `DEGRADED`, so a Windows
+  DaemonSet on a cluster with no Windows nodes does not read as broken.
+- `UNMANAGED_IGNORE_NS`: comma-separated `path.Match` namespace globs excluded from that list,
+  using the same matcher as `IGNORE_GLOBS`.
+- `internal/kube`: cluster-wide `ListWorkloads` reading `/apis/apps/v1/{deployments,statefulsets,
+  daemonsets}`. The three kinds are fetched concurrently under one timeout and a kind that fails
+  does not discard the other two — the partial result is rendered with an inline note.
+- Surfaced in `/api/status` under `unmanaged` (count, scanned, items), omitted when the feature is
+  off. The count also appears in the cluster capacity section, deliberately not as a status tile:
+  those are mutually exclusive and must keep summing to the service total.
+- Chart: `config.unmanaged` and `config.unmanagedIgnoreNamespaces`, both off by default. When
+  `config.unmanaged` and `rbac.clusterRole` are both true the existing ClusterRole additionally
+  grants `get`/`list` on `deployments`, `statefulsets` and `daemonsets` in `apps`; the default
+  render still contains no cluster-scoped object. `deploy/install.yaml` ships the same rule
+  commented out.
+
 ## [0.4.0] - 2026-08-24
 
 ### Added
@@ -46,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `charts/srv-status`: a lean, hand-written Helm chart for installing the service as a long-running
+- `charts/k8s-status`: a lean, hand-written Helm chart for installing the service as a long-running
   extra service on any EKS cluster. Templates are limited to ServiceAccount, Role/RoleBinding,
   ConfigMap, Deployment, Service and optional Ingress/Istio VirtualService, both disabled by
   default. `checksum/config` pod annotation rolls the Deployment on config change.
@@ -63,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Module path renamed from the internal GitLab host to `github.com/ntmggr/srv-status`; all imports
+- Module path renamed from the internal GitLab host to `github.com/ntmggr/k8s-status`; all imports
   updated.
 - `testdata/applications.json` application names replaced with generic, obviously synthetic names
   (`orders-api`, `search-api`, `media-encoder`, ...) and the fixture root app renamed to `root-app`.
@@ -77,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release of `srv-status`, a read-only per-cluster status page for the OCP platform.
+- Initial release of `k8s-status`, a read-only per-cluster status page for the OCP platform.
 - In-cluster ArgoCD reader built on the standard library only: service account token re-read per
   request, cluster CA pinned via `x509.CertPool`, 10s request timeout, 16 MiB response cap.
 - State model deriving `OK` / `DEGRADED` / `SYNCING` / `PRUNE` / `SUSPENDED` per service from the

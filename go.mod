@@ -1,3 +1,3 @@
-module github.com/ntmggr/srv-status
+module github.com/ntmggr/k8s-status
 
-go 1.23
+go 1.27

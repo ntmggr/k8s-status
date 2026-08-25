@@ -169,6 +169,9 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
        font-weight: 700; letter-spacing: .05em; background: var(--gpu-bg); color: var(--gpu-fg);
        vertical-align: .1em; }
 tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
+.src { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
+       font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+       background: var(--prune-bg); color: var(--prune-fg); vertical-align: .1em; }
 .chartver { font-size: .74rem; color: var(--muted); }
 .chartver .sha { color: var(--muted); }
 .sync { color: var(--ink-2); font-size: .82rem; }
@@ -197,6 +200,18 @@ table.components th { position: static; background: none; border: 0; padding: .1
 table.components td { border: 0; padding: .1rem 1.1rem .1rem 0; color: var(--ink-2); font-size: .78rem; }
 table.components td.k { color: var(--muted); }
 
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem;
+            margin: 1.9rem 0 -.2rem; font-size: .8rem; font-weight: 600;
+            letter-spacing: .02em; color: var(--ink-2); }
+.sec-head .sec-sub { font-size: .74rem; font-weight: 400; color: var(--muted); }
+.ns { color: var(--ink-2); font-size: .82rem; }
+.kind { color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase;
+        font-weight: 600; }
+.ready { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+         font-size: .8rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.by { color: var(--ink-2); font-size: .8rem; }
+.by.is-unknown { color: var(--muted); }
+
 footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 @media (max-width: 720px) {
   :root { --pad-x: 1rem; --pad-top: 1rem; --hdr-h: 4.5rem; }
@@ -218,7 +233,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   </div>
 </header>
 
-{{with .Snapshot}}
+{{if .ShowRootLine}}{{with .Snapshot}}
 <div class="sub" title="root health {{.RootHealth}} &middot; root sync {{.RootSync}}">
   version
   {{- $tree := repoTree .RepoURL .Version}}
@@ -231,7 +246,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{- if .LastDeployedAt}} &middot; last deploy {{relTime .LastDeployedAt}}{{if .LastDeployID}} (#{{.LastDeployID}}){{end}}{{end}}
   {{- if .Phase}} &middot; sync {{.Phase}}{{end}}
 </div>
-{{end}}
+{{end}}{{end}}
 
 {{if .Error}}<div class="banner err">cluster read failed: {{.Error}}</div>{{end}}
 {{if .Stale}}<div class="banner stale">data is {{.AgeSeconds}}s stale</div>{{end}}
@@ -270,15 +285,18 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     two independent things, so <em>PROGRESSING</em> beside <em>Synced</em> is normal.
     Rows are ordered worst-first. Expand a row to see which components are out of sync.
     Click a tile to filter the list to that status, and click it again to clear it.
+    {{if $.MultiSource}}<br>Flux rows show their controller in the <em>Source</em> column. Flux does not
+    compare running manifests against git the way ArgoCD does, so those rows carry no
+    <strong>Sync</strong> value and never appear as <em>DRIFT</em> or <em>PRUNE</em>.{{end}}
   </div>
 </details>
 {{end}}
 
-{{with .Snapshot.Nodes}}
+{{if or .Snapshot.Nodes .Snapshot.Unmanaged}}
 <section class="capacity">
   <div class="cap-head">Cluster capacity<span class="cap-sub">infrastructure, not service health</span></div>
   <div class="cap-row">
-    {{- if not .Error}}
+    {{- with .Snapshot.Nodes}}{{if not .Error}}
     <div class="cap-item"><span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
     <div class="cap-item"><span class="cv">{{.CPUNodes}}</span><span class="ck">cpu nodes</span></div>
     <div class="cap-item is-gpu"><span class="cv">{{.GPUNodes}}</span><span class="ck">gpu nodes</span></div>
@@ -286,15 +304,20 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- if .Arch}}
     <div class="cap-item"><span class="cv">{{range $i, $a := .Arch}}{{if $i}} / {{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span><span class="ck">architecture</span></div>
     {{- end}}
-    {{- end}}
+    {{- end}}{{end}}
     <a class="cap-item is-gpu{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}"><span class="cv">{{$.Snapshot.Summary.GPU}}</span><span class="ck">gpu services</span></a>
+    {{- with .Snapshot.Unmanaged}}
+    {{/* Not a status tile: these workloads are not ArgoCD Applications at all, so they
+         must not join a row whose counts sum to the service total. */}}
+    <a class="cap-item" href="#unmanaged"><span class="cv">{{.Count}}</span><span class="ck">unmanaged workloads</span></a>
+    {{- end}}
   </div>
-  {{- if .Error}}
+  {{- with .Snapshot.Nodes}}{{if .Error}}
   <div class="cap-note">
     {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.
     {{- else}}node stats unavailable.{{end}} ({{.Error}})
   </div>
-  {{- end}}
+  {{- end}}{{end}}
 </section>
 {{end}}
 
@@ -310,11 +333,13 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 {{end}}
 
+{{$cols := 6}}{{if .MultiSource}}{{$cols = 7}}{{end}}
 <div class="card">
 <table>
 <thead>
 <tr>
   <th>Service</th>
+  {{if .MultiSource}}<th class="hide-sm">Source</th>{{end}}
   <th>App version</th>
   <th class="hide-sm">Chart version</th>
   <th>Status</th>
@@ -323,11 +348,15 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </tr>
 </thead>
 {{$ui := .ArgoCDUIBase}}
+{{$multi := .MultiSource}}
 {{range .Services}}
 <tbody class="svc{{if .GPU}} is-gpu{{end}}">
 <tr>
-  <td class="name">{{if $ui}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}{{if .GPU}}<span class="gpu" title="GPU-backed workload">GPU</span>{{end}}</td>
-  <td class="appver">{{if .AppVersion}}<span title="{{.Image}}">{{clip 28 .AppVersion}}</span>{{end}}</td>
+  <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
+    {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
+    {{- if .GPU}}<span class="gpu" title="GPU-backed workload">GPU</span>{{end}}</td>
+  {{if $multi}}<td class="hide-sm"><span class="src" title="{{if .Kind}}{{.Kind}}{{else}}ArgoCD Application{{end}}">{{.Source}}</span></td>{{end}}
+  <td class="appver">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>
   <td class="chartver hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">
     {{- $tree := repoTree .RepoURL .Version}}
     {{- if $tree}}<a href="{{$tree}}">{{.Version}}</a>{{else}}{{.Version}}{{end}}
@@ -342,7 +371,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </tr>
 {{if .Components}}
 <tr class="subrow">
-  <td colspan="6">
+  <td colspan="{{$cols}}">
     <details>
       <summary>{{len .Components}} out-of-sync component{{if ne (len .Components) 1}}s{{end}}</summary>
       <table class="components">
@@ -357,12 +386,62 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{end}}
 </tbody>
 {{else}}
-<tbody><tr><td colspan="6" class="detail">{{if $.Filter.Active}}no services match the active filter &mdash; <a href="{{$.ClearHref}}">clear it</a>{{else}}no services reported{{end}}</td></tr></tbody>
+<tbody><tr><td colspan="{{$cols}}" class="detail">{{if $.Filter.Active}}no services match the active filter &mdash; <a href="{{$.ClearHref}}">clear it</a>{{else}}no services reported{{end}}</td></tr></tbody>
 {{end}}
 </table>
 </div>
+{{with .Snapshot.Flux}}{{if .Error}}
+<div class="cap-note">
+  {{- if .Denied}}Flux rows need <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">helmreleases.helm.toolkit.fluxcd.io</span> and <span class="mono">kustomizations.kustomize.toolkit.fluxcd.io</span>; the default install grants neither.
+  {{- else if .Missing}}this cluster does not serve the Flux APIs, so no Flux rows are listed.
+  {{- else}}the Flux read did not complete, so this table may be missing rows.{{end}} ({{.Error}})
+</div>
+{{end}}{{end}}
+
+{{with .Snapshot.Unmanaged}}
+<div class="sec-head" id="unmanaged">Not managed by ArgoCD
+  <span class="sec-sub">running in the cluster but outside GitOps &mdash; EKS addons, Terraform-installed
+  components, hand-installed Helm releases. These are not services above and are not in any count there.</span>
+</div>
+<div class="card">
+<table>
+<thead>
+<tr>
+  <th>Namespace</th>
+  <th>Kind</th>
+  <th>Workload</th>
+  <th class="hide-sm">Installed by</th>
+  <th class="hide-sm">Version</th>
+  <th>Ready</th>
+  <th>Status</th>
+</tr>
+</thead>
+<tbody>
+{{range .Items}}
+<tr>
+  <td class="ns">{{.Namespace}}</td>
+  <td class="kind">{{.Kind}}</td>
+  <td class="name">{{.Name}}</td>
+  <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>
+  <td class="appver hide-sm">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
+  <td class="ready">{{.Ready}}/{{.Desired}}</td>
+  <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
+</tr>
+{{else}}
+<tr><td colspan="7" class="detail">{{if .Error}}no workloads read{{else}}every workload in the cluster is managed by ArgoCD{{end}}</td></tr>
+{{end}}
+</tbody>
+</table>
+</div>
+{{if .Error}}
+<div class="cap-note">
+  {{- if .Denied}}unmanaged workloads need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">deployments</span>, <span class="mono">statefulsets</span> and <span class="mono">daemonsets</span>; the default install is namespaced-Role-only.
+  {{- else}}the workload read did not complete, so this list may be incomplete.{{end}} ({{.Error}})
+</div>
+{{end}}
+{{end}}
 {{end}}
 
-<footer>srv-status {{.BuildVersion}}{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</footer>
+<footer>k8s-status {{.BuildVersion}}{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</footer>
 </body>
 </html>

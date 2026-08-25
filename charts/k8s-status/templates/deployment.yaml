@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "srv-status.fullname" . }}
+  name: {{ include "k8s-status.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "srv-status.labels" . | nindent 4 }}
+    {{- include "k8s-status.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "srv-status.selectorLabels" . | nindent 6 }}
+      {{- include "k8s-status.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -18,7 +18,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "srv-status.selectorLabels" . | nindent 8 }}
+        {{- include "k8s-status.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -27,7 +27,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "srv-status.serviceAccountName" . }}
+      serviceAccountName: {{ include "k8s-status.serviceAccountName" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -40,7 +40,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           envFrom:
             - configMapRef:
-                name: {{ include "srv-status.fullname" . }}
+                name: {{ include "k8s-status.fullname" . }}
           ports:
             - name: http
               containerPort: {{ .Values.config.port }}

@@ -1,0 +1,131 @@
+{
+  "apiVersion": "v1",
+  "kind": "KustomizationList",
+  "items": [
+    {
+      "apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+      "kind": "Kustomization",
+      "metadata": {
+        "name": "platform-config",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "interval": "5m",
+        "path": "./kustomize",
+        "prune": true,
+        "sourceRef": {
+          "kind": "GitRepository",
+          "name": "orders-api"
+        },
+        "targetNamespace": "sample-sample-apps"
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-08-25T09:17:57Z",
+            "message": "Applied revision: master@sha1:eec06d1ea459af4cb4e10e806f8be7c7bd58b361",
+            "observedGeneration": 2,
+            "reason": "ReconciliationSucceeded",
+            "status": "True",
+            "type": "Ready"
+          }
+        ],
+        "lastAppliedRevision": "master@sha1:eec06d1ea459af4cb4e10e806f8be7c7bd58b361",
+        "lastAttemptedRevision": "master@sha1:eec06d1ea459af4cb4e10e806f8be7c7bd58b361",
+        "observedGeneration": 2
+      }
+    },
+    {
+      "apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+      "kind": "Kustomization",
+      "metadata": {
+        "name": "edge-proxy",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "interval": "5m",
+        "path": "./kustomize",
+        "prune": true,
+        "sourceRef": {
+          "kind": "GitRepository",
+          "name": "edge-proxy"
+        },
+        "targetNamespace": "sample-apps"
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-08-25T09:17:57Z",
+            "message": "Fetching manifests for revision master@sha1:eec06d1ea459af4cb4e10e806f8be7c7bd58b361 with a timeout of 4m30s",
+            "observedGeneration": 2,
+            "reason": "Progressing",
+            "status": "True",
+            "type": "Reconciling"
+          },
+          {
+            "lastTransitionTime": "2026-08-25T09:17:57Z",
+            "message": "Reconciliation in progress",
+            "observedGeneration": 2,
+            "reason": "Progressing",
+            "status": "Unknown",
+            "type": "Ready"
+          }
+        ],
+        "lastAppliedRevision": "master@sha1:eec06d1ea459af4cb4e10e806f8be7c7bd58b361",
+        "lastAttemptedRevision": "master@sha1:eec06d1ea459af4cb4e10e806f8be7c7bd58b361",
+        "observedGeneration": 2
+      }
+    },
+    {
+      "apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+      "kind": "Kustomization",
+      "metadata": {
+        "name": "tenant-config",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "interval": "1m",
+        "path": "./nope",
+        "prune": true,
+        "sourceRef": {
+          "kind": "GitRepository",
+          "name": "no-such-git"
+        }
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-08-25T09:12:41Z",
+            "message": "GitRepository.source.toolkit.fluxcd.io \"no-such-git\" not found",
+            "observedGeneration": 1,
+            "reason": "ArtifactFailed",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "observedGeneration": -1
+      }
+    },
+    {
+      "apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+      "kind": "Kustomization",
+      "metadata": {
+        "name": "archive-sync",
+        "namespace": "sample-apps"
+      },
+      "spec": {
+        "interval": "5m",
+        "path": "./kustomize",
+        "prune": true,
+        "sourceRef": {
+          "kind": "GitRepository",
+          "name": "orders-api"
+        },
+        "suspend": true
+      },
+      "status": {
+        "observedGeneration": -1
+      }
+    }
+  ]
+}

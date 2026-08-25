@@ -1,33 +1,34 @@
-# srv-status — self-contained install.
+# k8s-status — self-contained install.
 #
 #   kubectl apply -f deploy/install.yaml
 #
 # Replace __IMAGE__ first (scripts/install.sh does this for you).
-# Read-only: the ServiceAccount can only get/list ArgoCD Applications in one namespace.
+# Read-only: as shipped, the ServiceAccount can only get/list ArgoCD Applications in one
+# namespace. Everything beyond that is an optional block below that must be uncommented.
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: srv-status
+  name: k8s-status
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: srv-status
-  namespace: srv-status
+  name: k8s-status
+  namespace: k8s-status
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 ---
 # Namespaced Role, not a ClusterRole: the blast radius is provably one namespace.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: srv-status
+  name: k8s-status
   namespace: argocd
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 rules:
   - apiGroups: ["argoproj.io"]
     resources: ["applications"]
@@ -36,60 +37,78 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: srv-status
+  name: k8s-status
   namespace: argocd
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 subjects:
   - kind: ServiceAccount
-    name: srv-status
-    namespace: srv-status
+    name: k8s-status
+    namespace: k8s-status
 roleRef:
   kind: Role
-  name: srv-status
+  name: k8s-status
   apiGroup: rbac.authorization.k8s.io
 ---
 # Optional: uncomment this ClusterRole and ClusterRoleBinding when setting NODE_STATS: "true"
-# below. Nodes are cluster-scoped, so the capacity section cannot be served by a Role.
+# or UNMANAGED: "true" below, or when adding flux to SOURCES. Nodes are cluster-scoped, the
+# unmanaged workload list spans every namespace, and Flux objects live in the namespaces
+# they deploy into, so none of the three can be served by a Role.
+# Keep only the rule for the feature you turned on.
 # apiVersion: rbac.authorization.k8s.io/v1
 # kind: ClusterRole
 # metadata:
-#   name: srv-status-nodes
+#   name: k8s-status-nodes
 #   labels:
-#     app.kubernetes.io/name: srv-status
+#     app.kubernetes.io/name: k8s-status
 # rules:
+#   # for NODE_STATS
 #   - apiGroups: [""]
 #     resources: ["nodes"]
+#     verbs: ["get", "list"]
+#   # for UNMANAGED
+#   - apiGroups: ["apps"]
+#     resources: ["deployments", "statefulsets", "daemonsets"]
+#     verbs: ["get", "list"]
+#   # for SOURCES containing flux
+#   - apiGroups: ["helm.toolkit.fluxcd.io"]
+#     resources: ["helmreleases"]
+#     verbs: ["get", "list"]
+#   - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+#     resources: ["kustomizations"]
 #     verbs: ["get", "list"]
 # ---
 # apiVersion: rbac.authorization.k8s.io/v1
 # kind: ClusterRoleBinding
 # metadata:
-#   name: srv-status-nodes
+#   name: k8s-status-nodes
 #   labels:
-#     app.kubernetes.io/name: srv-status
+#     app.kubernetes.io/name: k8s-status
 # subjects:
 #   - kind: ServiceAccount
-#     name: srv-status
-#     namespace: srv-status
+#     name: k8s-status
+#     namespace: k8s-status
 # roleRef:
 #   kind: ClusterRole
-#   name: srv-status-nodes
+#   name: k8s-status-nodes
 #   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: srv-status
-  namespace: srv-status
+  name: k8s-status
+  namespace: k8s-status
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 data:
   ENV_NAME: "__ENV_NAME__"
   CLUSTER_NAME: "__CLUSTER_NAME__"
   ENV_TYPE: ""
   REGION: ""
-  BASE_PATH: "/srv-status"
+  BASE_PATH: "/k8s-status"
+  # "argocd", "flux", "argocd,flux" or "auto". Anything including flux also requires the
+  # ClusterRole above to be uncommented, with its two fluxcd.io rules.
+  SOURCES: "argocd"
   ARGOCD_NAMESPACE: "argocd"
   ROOT_APP_NAME: "ocp-services"
   ARGOCD_UI_BASE: ""
@@ -98,26 +117,29 @@ data:
   REFRESH_SECONDS: "30"
   # "true" also requires the ClusterRole above to be uncommented.
   NODE_STATS: "false"
+  # "true" also requires the ClusterRole above to be uncommented, with its apps rule.
+  UNMANAGED: "false"
+  UNMANAGED_IGNORE_NS: ""
   PORT: "8080"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: srv-status
-  namespace: srv-status
+  name: k8s-status
+  namespace: k8s-status
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: srv-status
+      app.kubernetes.io/name: k8s-status
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: srv-status
+        app.kubernetes.io/name: k8s-status
     spec:
-      serviceAccountName: srv-status
+      serviceAccountName: k8s-status
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -125,11 +147,11 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: srv-status
+        - name: k8s-status
           image: __IMAGE__
           envFrom:
             - configMapRef:
-                name: srv-status
+                name: k8s-status
           ports:
             - name: http
               containerPort: 8080
@@ -145,25 +167,25 @@ spec:
             capabilities:
               drop: ["ALL"]
           livenessProbe:
-            httpGet: { path: /srv-status/healthz, port: http }
+            httpGet: { path: /k8s-status/healthz, port: http }
             initialDelaySeconds: 5
             periodSeconds: 30
           readinessProbe:
-            httpGet: { path: /srv-status/healthz, port: http }
+            httpGet: { path: /k8s-status/healthz, port: http }
             initialDelaySeconds: 3
             periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: srv-status
-  namespace: srv-status
+  name: k8s-status
+  namespace: k8s-status
   labels:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: srv-status
+    app.kubernetes.io/name: k8s-status
   ports:
     - name: http
       port: 80

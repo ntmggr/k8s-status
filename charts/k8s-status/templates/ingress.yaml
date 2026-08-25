@@ -5,10 +5,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "srv-status.fullname" . }}
+  name: {{ include "k8s-status.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "srv-status.labels" . | nindent 4 }}
+    {{- include "k8s-status.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -30,7 +30,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "srv-status.fullname" . }}
+                name: {{ include "k8s-status.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
 {{- end }}

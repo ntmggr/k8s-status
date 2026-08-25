@@ -1,0 +1,85 @@
+# goreleaser builds the cross-platform binaries, the archives and checksums.txt,
+# and owns the GitHub release itself.
+#
+# It deliberately does NOT build a container image: release.yml already builds and
+# pushes the multi-arch image with buildx, and a `dockers:` block here would publish
+# the same tag twice. See docs/releasing.md.
+version: 2
+
+project_name: k8s-status
+
+builds:
+  - id: k8s-status
+    main: ./cmd/k8s-status
+    binary: k8s-status
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # Must stay identical to the Dockerfile's -ldflags, so `k8s-status` from an
+    # archive and from the image report the same version.
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: k8s-status
+    ids: [k8s-status]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+# The repo uses Conventional Commits, so the release notes are derived from the
+# subjects and the non-user-facing prefixes are dropped.
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs(\(.+\))?!?:'
+      - '^ci(\(.+\))?!?:'
+      - '^chore(\(.+\))?!?:'
+      - '^test(\(.+\))?!?:'
+      - '^Merge '
+  groups:
+    - title: Breaking changes
+      regexp: '(?i)^.*?[a-z]+(\(.+\))?!:.+$'
+      order: 0
+    - title: Features
+      regexp: '(?i)^.*?feat(\(.+\))?!?:.+$'
+      order: 1
+    - title: Fixes
+      regexp: '(?i)^.*?fix(\(.+\))?!?:.+$'
+      order: 2
+    - title: Performance
+      regexp: '(?i)^.*?perf(\(.+\))?!?:.+$'
+      order: 3
+    - title: Other
+      order: 99
+
+release:
+  draft: false
+  # Any tag with a pre-release suffix (v1.2.3-rc.1) is marked pre-release, which
+  # matches release.yml withholding the `latest` image tag from the same tags.
+  prerelease: auto
+  # IMAGE_REPO is exported by release.yml so the notes point at the image the same
+  # run pushed.
+  header: |
+    Image: `{{ .Env.IMAGE_REPO }}:{{ .Version }}`
+    Platforms: `linux/amd64`, `linux/arm64`
+  footer: |
+    Verify a download with `sha256sum -c checksums.txt`.

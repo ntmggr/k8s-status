@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ntmggr/srv-status/internal/status"
+	"github.com/ntmggr/k8s-status/internal/status"
 )
 
 const (

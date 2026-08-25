@@ -2,7 +2,7 @@ name: release
 
 # Versioning is tag-driven: push v1.2.3 and that becomes the image tag and the
 # binary's reported version. The tag is the single source of truth, so the image,
-# the GitHub release and `srv-status --version` can never disagree.
+# the GitHub release and `k8s-status --version` can never disagree.
 on:
   push:
     tags: ["v*.*.*"]
@@ -60,7 +60,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/srv-status' }}
+          images: ${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/k8s-status' }}
           tags: |
             type=raw,value=${{ steps.v.outputs.version }}
             type=raw,value=latest,enable=${{ !contains(steps.v.outputs.version, '-') }}
@@ -80,18 +80,31 @@ jobs:
 
       - name: Chart version matches tag
         run: |
-          chart="$(grep -E '^version:' charts/srv-status/Chart.yaml | awk '{print $2}')"
-          app="$(grep -E '^appVersion:' charts/srv-status/Chart.yaml | tr -d '"' | awk '{print $2}')"
+          chart="$(grep -E '^version:' charts/k8s-status/Chart.yaml | awk '{print $2}')"
+          app="$(grep -E '^appVersion:' charts/k8s-status/Chart.yaml | tr -d '"' | awk '{print $2}')"
           echo "chart version=$chart appVersion=$app tag=${{ steps.v.outputs.version }}"
           if [ "$app" != "${{ steps.v.outputs.version }}" ]; then
             echo "::warning::Chart appVersion ($app) does not match the released tag (${{ steps.v.outputs.version }})"
           fi
 
-      - name: GitHub release
-        uses: softprops/action-gh-release@v2
+      # One job must own the GitHub release, otherwise two steps race to create the
+      # same tag's release. goreleaser owns it, because it is the only one with
+      # artifacts to attach: the cross-platform archives and checksums.txt.
+      # softprops/action-gh-release previously did this and has been removed.
+      #
+      # The image is built and pushed above, not here — .goreleaser.yaml configures
+      # no `dockers:` block on purpose. IMAGE_REPO is passed through so the release
+      # notes name the image this same run pushed.
+      #
+      # Skipped on workflow_dispatch: goreleaser needs a tag to release, and a
+      # manual run only republishes the image.
+      - name: Release binaries and GitHub release
+        uses: goreleaser/goreleaser-action@v6
         if: github.event_name == 'push'
         with:
-          generate_release_notes: true
-          body: |
-            Image: `${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/srv-status' }}:${{ steps.v.outputs.version }}`
-            Platforms: `linux/amd64`, `linux/arm64`
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REPO: ${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/k8s-status' }}

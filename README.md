@@ -1,231 +1,373 @@
-# srv-status
+# k8s-status
 
-[![ci](https://github.com/ntmggr/srv-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/ci.yml)
-[![tag](https://github.com/ntmggr/srv-status/actions/workflows/tag.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/tag.yml)
-[![release](https://github.com/ntmggr/srv-status/actions/workflows/release.yml/badge.svg)](https://github.com/ntmggr/srv-status/actions/workflows/release.yml)
-[![Docker Hub](https://img.shields.io/docker/v/ntmggr/srv-status?logo=docker&logoColor=white&label=docker&sort=semver)](https://hub.docker.com/r/ntmggr/srv-status)
+[![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
+[![tag](https://github.com/ntmggr/k8s-status/actions/workflows/tag.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/tag.yml)
+[![release](https://github.com/ntmggr/k8s-status/actions/workflows/release.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/release.yml)
+[![Docker Hub](https://img.shields.io/docker/v/ntmggr/k8s-status?logo=docker&logoColor=white&label=docker&sort=semver)](https://hub.docker.com/r/ntmggr/k8s-status)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**One page that answers "what is deployed in this cluster, at what version, and is it healthy?"**
+## What is this?
 
-`srv-status` runs inside a Kubernetes cluster, reads ArgoCD `Application` objects from that
-cluster's API server, and renders a single HTML page: every service, its running version, its
-chart version, and its health. It reports on its own cluster only — no peer discovery, no
-fan-out, and no outbound network call other than to the local Kubernetes API.
+One web page that tells you what is running in a Kubernetes cluster, which version of it,
+and whether it is healthy.
 
-Standard library only. No client-go, no web framework, no JavaScript, no external assets — the
-whole page is server-rendered HTML with inline CSS.
+It runs inside the cluster and reads that cluster only. It makes no outbound calls. There
+is no JavaScript, no database and no login. You open a URL and read a table.
 
-![srv-status](docs/screenshot.png)
+It gets its information from the cluster's GitOps controller. If that name is new to
+you: a GitOps controller is a tool that installs software into a cluster by copying what
+is written in a Git repository.
 
-<sub>Screenshot uses synthetic data from `testdata/`. The page also ships a dark theme
-([screenshot](docs/screenshot-dark.png)) that follows `prefers-color-scheme`.</sub>
+Two are supported. **ArgoCD** describes every piece of software it looks after with an
+object called an `Application`. **Flux** uses two objects instead, a `HelmRelease` and a
+`Kustomization`. `k8s-status` lists whichever of those the cluster has and reports on
+each one. ArgoCD alone is the default; see [`SOURCES`](#choosing-the-source).
 
-## Routes
+## What it looks like
 
-All routes are served under `BASE_PATH` (default `/srv-status`).
+![k8s-status](docs/screenshot.png)
 
-| Route | Response |
-|---|---|
-| `GET <base>/` | HTML status page; accepts the [filter and refresh parameters](#filtering-and-refresh) |
-| `GET <base>/api/status` | JSON, **always HTTP 200** — see below; accepts the same filter parameters |
-| `GET <base>/healthz` | `200 ok` |
-| `GET <base>` | `302` to `<base>/` |
-
-`/api/status` always returns 200 so a scraper can tell "the app is up but the cluster read failed"
-(`"error"` non-null, `"services": []`) apart from "the app is down" (connection refused / 5xx).
-
-`/healthz` is the liveness probe and deliberately does **not** touch the Kubernetes API. A broken
-ArgoCD or a revoked token must not get the pod restarted — restarting fixes neither.
-
-### JSON shape
-
-```json
-{"schema":1,"env":"sample-dev","envType":"dev","region":"eu-west-1",
- "clusterName":"sample-dev-cluster","clusterPath":"sample-dev-cluster",
- "version":"develop","revision":"437a162...","rootHealth":"Degraded","rootSync":"OutOfSync",
- "phase":"Succeeded","message":"successfully synced (all tasks run)",
- "lastDeployedAt":"2026-08-21T11:30:57Z","lastDeployId":1048,
- "summary":{"total":151,"ok":143,"degraded":3,"progressing":2,"prune":9,"suspended":0,"hidden":0},
- "services":[{"name":"accounts-api","version":"develop","revision":"3c9646b...",
-              "state":"DEGRADED","sync":"OutOfSync","health":"Degraded",
-              "detail":"0/2 replicas available"}],
- "checkedAt":"2026-08-24T09:10:11Z","ageSeconds":4,"stale":false,"error":null}
-```
-
-`detail` and `message` are truncated to 200 characters.
-
-The `nodes` object is present only when `NODE_STATS=true`:
-
-```json
-{"nodes":{"total":82,"cpuNodes":74,"gpuNodes":8,"gpus":14,"gpuServices":47,
-          "arch":{"amd64":16,"arm64":66}}}
-```
+<sub>Screenshot uses made-up data from `testdata/`. There is also a dark theme
+([screenshot](docs/screenshot-dark.png)) that follows your system setting.</sub>
 
 ## Quick start
 
-Install on any cluster that runs ArgoCD. Read-only throughout — the ServiceAccount can only
-`get`/`list` ArgoCD `Application` objects in a single namespace, and there is no ClusterRole.
+The fastest way to see it work needs no cluster and no ArgoCD. It serves a bundled
+fixture file instead.
 
-```bash
-./scripts/install.sh <kube-context> <image> [env-name]
+```sh
+./scripts/local-test.sh fixture
 ```
 
-Then view it without needing DNS, an ingress or a load balancer:
+That builds the binary, serves `testdata/applications.json` over a local port, starts the
+app, and prints:
 
-```bash
-kubectl --context <kube-context> -n srv-status port-forward svc/srv-status 8080:80
-open http://127.0.0.1:8080/srv-status/
+```
+mode: fixture (offline, synthetic data)
+
+  page   http://127.0.0.1:8080/k8s-status/
+  json   http://127.0.0.1:8080/k8s-status/api/status
+  health http://127.0.0.1:8080/k8s-status/healthz
 ```
 
-Uninstall is one command:
+Open the first URL. Press Ctrl-C to stop.
 
-```bash
-kubectl --context <kube-context> delete -f deploy/install.yaml --ignore-not-found
+To point it at a real cluster instead, give it a kube context name:
+
+```sh
+./scripts/local-test.sh cluster <your-context>
 ```
 
-`deploy/install.yaml` is a single self-contained manifest (Namespace, ServiceAccount, Role,
-RoleBinding, ConfigMap, Deployment, Service). No Helm, no ArgoCD and no cluster-scoped
-permissions are required to run it — the script only substitutes the image, environment name
-and cluster name before applying. Tune behaviour afterwards by editing the `srv-status`
-ConfigMap and restarting the deployment; every key is listed in [Configuration](#configuration).
+That mode uses `kubectl proxy`, so it authenticates as **you**. No token or in-cluster
+install is needed. Your own kubeconfig permissions decide what it can read.
 
-To try it with no cluster at all, see [Running locally](#running-locally).
+## What the states mean
 
-## Configuration
+Every row gets exactly one state. The states are checked in order and the first one that
+fits wins.
 
-Everything is read from the environment at startup. Every variable has a default.
+| # | State | Colour | It means | Do you act? |
+|---|---|---|---|---|
+| 1 | `PRUNE` | grey | ArgoCD wants to delete this but is not allowed to | No. Cleanup backlog. |
+| 2 | `DEGRADED` | red | Genuinely broken | **Yes.** |
+| 3 | `WARNING` | yellow | The controller cannot tell whether it is healthy | Have a look. |
+| 4 | `PROGRESSING` | blue | Currently rolling out | No. Wait. |
+| 5 | `SUSPENDED` | grey | Deliberately paused | No. |
+| 6 | `DRIFT` | orange | Pods are healthy, but the config no longer matches Git | Not urgent. |
+| 7 | `OK` | green | Healthy and matching Git | No. |
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `ENV_NAME` | `unknown` | Display name, e.g. `sample-dev` |
-| `ENV_TYPE` | *(empty)* | `dev` / `stage` / `prod`; falls back to the root app's `EnvType` label |
-| `CLUSTER_NAME` | *(empty)* | Cluster identifier shown in the footer and JSON |
-| `REGION` | *(empty)* | e.g. `eu-west-1` |
-| `BASE_PATH` | `/srv-status` | Path prefix served natively; normalized to a leading slash with no trailing slash. Empty means root |
-| `ARGOCD_NAMESPACE` | `argocd` | Namespace holding the `Application` objects |
-| `ROOT_APP_NAME` | `ocp-services` | Name of the ArgoCD app-of-apps that owns every service. Set this to whatever your root Application is called. |
-| `ARGOCD_UI_BASE` | *(empty)* | When set, service names link to `<base>/applications/<name>` |
-| `IGNORE_GLOBS` | *(empty)* | Comma-separated `path.Match` globs; matches are hidden from the table and all counts, and reported as `hidden` |
-| `NODE_STATS` | `false` | Render the cluster capacity section. Needs a ClusterRole for `nodes` — see [Cluster capacity](#cluster-capacity) |
-| `CACHE_TTL_SECONDS` | `15` | Snapshot cache lifetime |
-| `REFRESH_SECONDS` | `30` | Default `<meta http-equiv="refresh">` interval; a viewer can override it per request with `?refresh=` |
-| `PORT` | `8080` | Listen port |
-| `KUBERNETES_SERVICE_HOST` | *(injected)* | Used to build the API server URL |
-| `KUBERNETES_SERVICE_PORT` | `443` | Used to build the API server URL |
-| `KUBE_API_URL` | *(empty)* | Local development only — overrides the in-cluster API URL (see below) |
-| `KUBE_TOKEN_FILE` | `/dev/null` | Local development only — token file used with `KUBE_API_URL` |
+`DRIFT` and `PRUNE` are ArgoCD-only. Flux rows never appear in either — see
+[What Flux support does not cover](#what-flux-support-does-not-cover).
 
-Nothing is read from a config file, and the service account token is never logged.
+A few words used above:
 
-## State rules
+- **Sync** — whether what is running matches what is written in Git. `Synced` means yes,
+  `OutOfSync` means no.
+- **Drift** — running fine, but out of sync. Somebody changed something by hand, or a
+  commit has not been applied yet.
+- **Prune** — ArgoCD still tracks the object, but nothing in Git asks for it any more. It
+  will not delete it unless automatic pruning is switched on, so it sits there reporting
+  `OutOfSync` forever.
+- **Health** — the controller's own verdict on whether the pods are working.
 
-Applications are split into the root app (`metadata.name == ROOT_APP_NAME`) and its children.
-The root's `status.resources[]` entries carry a `requiresPruning` flag; that map, keyed by resource
-name, is the only source of prune information. `rootSettled` means the root's
-`status.operationState.phase` is not `Running`. An empty `health.status` is normalized to `Unknown`.
+Rows are sorted worst first — `DEGRADED`, `WARNING`, `PROGRESSING`, `DRIFT`, `PRUNE`,
+`SUSPENDED`, `OK` — then alphabetically inside each group. The ordering is stable between
+refreshes and the things that need attention are always at the top.
 
-Each child is evaluated against the rules below, **first match wins**:
+Every state also has its own symbol next to the word, so the page still reads correctly if
+you cannot distinguish the colours.
 
-| # | Condition (first match wins) | State |
-|---|---|---|
-| 1 | Marked `requiresPruning` by the root app | `PRUNE` |
-| 2 | Health is `Degraded` or `Missing` | `DEGRADED` |
-| 3 | Health is `Unknown` (or empty) | `WARNING` |
-| 4 | Health is `Progressing`, **or** the root sync is still running and the child is `OutOfSync` | `PROGRESSING` |
-| 5 | Health is `Suspended` | `SUSPENDED` |
-| 6 | Child is `OutOfSync` and the root sync has settled | `DRIFT` |
-| 7 | Otherwise | `OK` |
+The exact rules, and why `DRIFT` and `PRUNE` are separate states rather than red, are in
+[How it works](#how-it-works).
 
-The two states that exist purely to stop the page crying wolf:
+## Choosing the source
 
-**`DRIFT`** — the workload is `Healthy` (its pods pass their readiness and liveness checks) but
-the manifests no longer match git. On a live dev cluster this was 28 of 33 rows that an earlier
-version painted red. Folding drift into `DEGRADED` makes the page permanently alarming and it
-gets ignored within a week, so it is reported separately and the row says so in plain words.
+`SOURCES` decides which controllers are read. It defaults to `argocd`, so an existing
+install behaves exactly as it always has and never calls a Flux API.
 
-**`PRUNE`** — ArgoCD wants to delete the resource but will not without `prune: true`, so it is
-reported `OutOfSync` forever. On the same cluster that was 9 of 12 `OutOfSync` children. It is a
-cleanup backlog, not an outage.
-
-Note that rule 4 sits **above** rule 6 deliberately. During a normal sync children legitimately
-go `OutOfSync` while `Progressing`; flagging that would alarm on every commit. Rule 6 therefore
-only fires on *settled* drift — ArgoCD has finished and the cluster still does not match git.
-
-The root app's own `status.health` is **not** used. It aggregates its children and goes stale:
-on one cluster it read `Degraded` with a `lastTransitionTime` a year older than the most recent
-successful sync. It is shown in a tooltip for reference and carries no weight.
-
-Rows are sorted by severity — `DEGRADED`, `PROGRESSING`, `PRUNE`, `SUSPENDED`, `OK` — then
-alphabetically by name inside each group, so the ordering is stable between refreshes and the
-things that need attention are always at the top.
-
-### Why prune orphans are their own state
-
-An Application flagged `requiresPruning` is one that ArgoCD still tracks but that the desired state
-no longer declares — usually a service that was removed from the environment's values but whose
-Application object was never pruned, because automated pruning is off. Such an app is expected to
-look wrong: its source path may be gone, its workloads may be scaled to zero, and its health will
-often read `Degraded` or `Missing`.
-
-Folding those into `DEGRADED` would mean a permanent block of red on the page for things nobody
-intends to fix, which trains people to ignore red. Prune is therefore checked before health,
-so an orphan is reported as an orphan even when it is also unhealthy. `PRUNE` is a housekeeping
-signal — "delete this Application" — not an outage signal.
-
-### Why the root app's own health is not trusted
-
-The root app-of-apps aggregates its children, so its health degrades whenever *any* child is
-unhealthy, and its sync status goes `OutOfSync` whenever any child's manifest has drifted. In a
-large environment that means the root is red almost permanently, and its single health string
-cannot tell you whether one non-critical worker is restarting or the whole environment is down.
-
-The root is therefore used only for facts it alone knows: the deployed `targetRevision` and
-revision, the `EnvType` label, the sync phase and message, the deploy history, and the prune flags.
-Every per-service verdict comes from the child Application itself. Root health and root sync are
-still surfaced, but only as a tooltip on the version line — context, not a verdict.
-
-The one place the root's phase does matter is rule 3: while the root is mid-sync, an `OutOfSync`
-child is simply one ArgoCD has not reached yet, which is `PROGRESSING`, not a problem. Once the root
-has settled, the same child being `OutOfSync` means the sync finished and left it behind, which is
-`DEGRADED`.
-
-## Filtering and refresh
-
-Both are query parameters on the page, so they need no JavaScript: the page has no
-`<script>` tag at all, and `<meta http-equiv="refresh">` re-requests the current URL
-including its query string, so a filter survives every auto-refresh.
-
-| Parameter | Meaning |
+| `SOURCES` | What it reads |
 |---|---|
-| `?status=DEGRADED` | Show only that state. Repeatable (`?status=DEGRADED&status=DRIFT`) and comma-separated (`?status=DEGRADED,DRIFT`) |
-| `?sync=OutOfSync` | Same semantics; `Synced` / `OutOfSync` / `Unknown` |
-| `?gpu=true` / `?gpu=false` | GPU services only / non-GPU only. Omitted means no GPU filtering |
-| `?refresh=<seconds>` | Override `REFRESH_SECONDS` for this view. `0` turns auto-refresh off |
+| `argocd` *(default)* | ArgoCD `Application` objects in `ARGOCD_NAMESPACE` |
+| `flux` | Flux `HelmRelease` and `Kustomization` objects, cluster-wide |
+| `argocd,flux` | Both, in one table |
+| `auto` | Whichever of the two the cluster actually serves |
 
-Values within one parameter are OR, parameters are ANDed together, so
-`?status=DEGRADED,DRIFT&gpu=true` means "(DEGRADED or DRIFT) and GPU". Matching is
-case-insensitive and tolerates surrounding whitespace. A value that matches no state —
-`?status=BANANAS` — renders an empty table with the active-filter chips still shown, rather
-than a 500 or a silent full listing.
+Rules:
 
-`?refresh=` is clamped: anything non-numeric or negative falls back to `REFRESH_SECONDS`,
-non-zero values are held between 5 and 3600 seconds. The snapshot cache already absorbs
-most of the load, but nothing should be able to ask for a one-second page loop.
+- **A source that is not listed is never called.** No request is made to its API at all,
+  so it needs no permission and cannot fail.
+- `auto` asks the API server which CRDs it serves. It reads the *discovery* endpoints
+  (`/apis/argoproj.io/v1alpha1`, `/apis/helm.toolkit.fluxcd.io/v2`,
+  `/apis/kustomize.toolkit.fluxcd.io/v1`), which any authenticated client may read, so
+  detection needs **no** permission on `customresourcedefinitions`. If detection finds
+  nothing, or fails, it falls back to `argocd`.
+- An unrecognised value is logged and ignored. `SOURCES=helmfile` starts normally on
+  ArgoCD rather than refusing to boot.
+- The **Source** column only appears when more than one source is active, so a
+  single-source cluster keeps the uncluttered table it has now.
 
-The status tiles are links. Clicking one applies that filter, clicking the active one
-clears it, and every link is built from the current query so filters and `?refresh=`
-compose in both directions. Active filters appear as chips above the table with an `x`
-that removes just that one, plus a `showing N of M` count.
+### What Flux support covers
 
-**The tiles keep counting the whole cluster while a filter is active.** Filtering selects
-rows, it does not change counts — if the tiles counted only the filtered rows, clicking
-`DEGRADED` would make every other tile read `0` and the reader would lose their bearings.
-The same holds for `summary` in the JSON; `filters.matched` carries the filtered count.
+| Flux field | Where it lands |
+|---|---|
+| `metadata.name`, `metadata.namespace` | Row name; namespace shows in the name's tooltip |
+| `spec.suspend` | `SUSPENDED` |
+| `status.conditions` | The state, the health word and the detail text |
+| **HelmRelease** `spec.chart.spec.version` | Chart version column |
+| **HelmRelease** `status.history[0].appVersion` | App version column |
+| **Kustomization** `status.lastAppliedRevision` | Chart version column (the branch) and the commit beside it |
 
-`/api/status` applies the same filters and echoes them back in a `filters` object, omitted
-when nothing is filtered:
+Conditions map like this, first match wins:
+
+| # | Condition | State |
+|---|---|---|
+| 1 | `spec.suspend` is true | `SUSPENDED` |
+| 2 | `Ready=False` | `DEGRADED` |
+| 3 | `Stalled=True` on its own | `WARNING` |
+| 4 | `Reconciling=True` | `PROGRESSING` |
+| 5 | `Ready=True` | `OK` |
+| 6 | No `Ready` condition, or `Ready=Unknown` | `WARNING` |
+
+Three of those orderings are not obvious and are all driven by what Flux actually writes:
+
+- **Suspend is read from the spec, not inferred from the status.** A suspended object
+  keeps whatever conditions it had when it was paused — and a freshly suspended one has
+  no conditions at all. Reading the conditions would report stale news as current.
+- **`Ready=False` outranks `Reconciling=True`,** because helm-controller leaves
+  `Reconciling=True` in place next to a failed `Ready` while it retries. The failure is
+  the news.
+- **`Reconciling=True` is checked before `Ready=True`.** While kustomize-controller
+  reconciles it sets `Ready` to `Unknown` and helm-controller leaves the previous
+  `Ready=True` standing, so checking `Ready` first would mislabel both.
+
+`Stalled=True` means Flux has given up retrying. It is almost always reported alongside
+`Ready=False`, in which case the row is `DEGRADED` and the detail says
+`stalled, no further retries`. On its own it is `WARNING` — something to look at, not
+proof of an outage.
+
+### What Flux support does not cover
+
+- **No `DRIFT`.** ArgoCD continuously compares the running manifests against Git and
+  publishes the verdict as `Synced` / `OutOfSync`. Flux has no equivalent field: it
+  applies and reports whether the apply worked. A Flux row therefore has an empty
+  **Sync** column and can never be `DRIFT`. Faking one would be a guess presented as a
+  fact.
+- **No `PRUNE`.** That comes from the ArgoCD root app's `requiresPruning` flags. Flux
+  prunes automatically when `spec.prune` is on, so there is no orphan backlog to report.
+- **No environment header.** Version, revision, last deploy and sync phase all come from
+  the ArgoCD root Application. On a Flux-only cluster there is none, so the line is
+  omitted rather than rendered as a row of blanks.
+- **`?sync=Unknown`** is how you select Flux rows in the filter, since they carry no sync
+  value.
+
+## Install it on a cluster
+
+Three ways. Pick one. All three are read-only: as shipped, the pod can list ArgoCD
+Applications in one namespace and nothing else.
+
+Before you start you need:
+
+- a cluster that already runs ArgoCD or Flux,
+- for ArgoCD, the name of the **root Application** — the one Application that owns all
+  the others. ArgoCD people call this pattern *app-of-apps*. The default here is
+  `ocp-services`; set `ROOT_APP_NAME` to whatever yours is called,
+- for Flux, `SOURCES` set to include `flux` and the extra permission described in
+  [Optional extras](#optional-extras).
+
+### 1. Plain manifest (no Helm needed)
+
+`deploy/install.yaml` is one self-contained file: Namespace, ServiceAccount, Role,
+RoleBinding, ConfigMap, Deployment, Service. Nothing cluster-wide.
+
+```sh
+./scripts/install.sh <your-context> <registry>/k8s-status:<tag> [env-name]
+```
+
+The script substitutes the image, environment name and cluster name, applies the file, and
+waits for the rollout. Remove it with:
+
+```sh
+kubectl --context <your-context> delete -f deploy/install.yaml --ignore-not-found
+```
+
+To change settings afterwards, edit the `k8s-status` ConfigMap and restart the Deployment.
+Every key is in [Settings](#settings).
+
+### 2. Helm chart
+
+The chart lives in `charts/k8s-status/` and has its own
+[README](charts/k8s-status/README.md) with a full values table.
+
+```sh
+helm upgrade --install k8s-status charts/k8s-status \
+  --namespace k8s-status --create-namespace \
+  --set image.repository=<registry>/k8s-status \
+  --set image.tag=<tag> \
+  --set config.envName=<env> \
+  --set config.clusterName=<cluster>
+```
+
+Or let the install script do it:
+
+```sh
+./scripts/install.sh --helm <your-context> <registry>/k8s-status:<tag> [env-name]
+```
+
+Remove it with `helm uninstall k8s-status --namespace k8s-status`.
+
+### 3. Let ArgoCD install it
+
+Point an ArgoCD Application at the chart. Per-cluster settings go under `helm.values`.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-status
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: <this-repo-url>
+    targetRevision: main
+    path: charts/k8s-status
+    helm:
+      values: |
+        image:
+          repository: <registry>/k8s-status
+          tag: "<tag>"
+        config:
+          envName: <env>
+          clusterName: <cluster>
+          region: <region>
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: k8s-status
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+Note: the Role and RoleBinding are created in the ArgoCD namespace, not in the destination
+namespace. If your ArgoCD project restricts namespaces, allow both.
+
+## How to reach it
+
+### Port-forward (nothing to set up)
+
+Works immediately, needs no DNS, no ingress and no load balancer.
+
+```sh
+kubectl --context <your-context> -n k8s-status port-forward svc/k8s-status 8080:80
+open http://127.0.0.1:8080/k8s-status/
+```
+
+### Ingress or Istio
+
+Both are off by default in the chart. Turn on the one your cluster uses.
+
+```sh
+# Ingress
+helm upgrade --install k8s-status charts/k8s-status \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set ingress.host=status.example.internal
+```
+
+```sh
+# Istio VirtualService
+helm upgrade --install k8s-status charts/k8s-status \
+  --set istio.enabled=true \
+  --set 'istio.gateway={my-gateway}' \
+  --set 'istio.hosts={status.example.internal}'
+```
+
+**Do not add a path-rewrite rule.** The app already serves everything under `BASE_PATH`
+(`/k8s-status` by default) itself. Neither the chart's Ingress nor its VirtualService
+rewrites the path, on purpose. If you strip the prefix in a proxy, the app will 404.
+
+That same design is what lets you hang it off a subpath of an existing hostname without
+touching anything else.
+
+### Routes
+
+Everything below is relative to `BASE_PATH`.
+
+| Route | What you get |
+|---|---|
+| `GET <base>/` | The HTML page |
+| `GET <base>/api/status` | JSON, always HTTP 200 |
+| `GET <base>/healthz` | `200 ok` |
+| `GET <base>` | `302` redirect to `<base>/` |
+
+`/api/status` always returns 200 on purpose. That lets a monitoring script tell two things
+apart:
+
+- app is up, but the cluster read failed → 200, `"error"` is set, `"services": []`
+- app is down → connection refused or a 5xx
+
+`/healthz` never touches the Kubernetes API. If ArgoCD breaks or the token is revoked, the
+pod must **not** be restarted — restarting fixes neither.
+
+## Filtering the table
+
+All filtering is done with query parameters, so it needs no JavaScript. The page has no
+`<script>` tag at all. Auto-refresh re-requests the current URL including its query string,
+so your filter survives every refresh.
+
+| Parameter | Example | Meaning |
+|---|---|---|
+| `?status=` | `?status=DEGRADED` | Show only that state |
+| `?sync=` | `?sync=OutOfSync` | `Synced` / `OutOfSync` / `Unknown` |
+| `?gpu=` | `?gpu=true` | GPU services only, or `false` for non-GPU only |
+| `?refresh=` | `?refresh=60` | Override the refresh interval. `0` turns it off |
+
+Rules:
+
+- Repeat a parameter or comma-separate it: `?status=DEGRADED&status=DRIFT` and
+  `?status=DEGRADED,DRIFT` do the same thing.
+- Values inside one parameter are OR. Different parameters are AND. So
+  `?status=DEGRADED,DRIFT&gpu=true` means "(DEGRADED or DRIFT) **and** GPU".
+- Matching ignores case and surrounding spaces.
+- A value that matches nothing (`?status=BANANAS`) shows an empty table with the filter
+  chips still visible. It does not 500 and it does not silently show everything.
+- `?refresh=` is clamped. Anything non-numeric or negative falls back to
+  `REFRESH_SECONDS`. Non-zero values are held between 5 and 3600 seconds.
+
+The status tiles at the top are links. Click one to filter, click the active one to clear
+it. Active filters appear as chips with an `x` to remove just that one, plus a
+`showing N of M` count.
+
+**The tiles keep counting the whole cluster while a filter is on.** That is deliberate. If
+they counted only the filtered rows, clicking `DEGRADED` would make every other tile read
+`0` and you would lose your bearings. The same holds for `summary` in the JSON;
+`filters.matched` carries the filtered count.
+
+`/api/status` accepts the same parameters and echoes them back:
 
 ```json
 {"filters":{"status":["DEGRADED","DRIFT"],"gpu":"true","matched":16}}
@@ -233,125 +375,324 @@ when nothing is filtered:
 
 `/healthz` ignores all of it.
 
-## Cluster capacity
+## Settings
 
-The status tiles are mutually exclusive and sum to the total. GPU is not a status — a GPU
-service is already counted in `OK` or `DEGRADED` — so it is not a tile. It is reported in a
-separate **cluster capacity** section together with the node counts, which is about
-infrastructure rather than service health. The per-row `GPU` chip and the row edge accent
-are unaffected.
+Everything is read from environment variables at startup. Every one has a default, so you
+can run it with none of them set.
 
-The section is off by default. With `NODE_STATS=true` the service also reads
-`/api/v1/nodes` and reports total nodes, CPU nodes, GPU nodes, total GPUs, GPU services and
-the architecture split from `.status.nodeInfo.architecture`.
+| Variable | Default | What it does |
+|---|---|---|
+| `ENV_NAME` | `unknown` | Name shown in the page header, e.g. `sample-dev` |
+| `ENV_TYPE` | *(empty)* | `dev` / `stage` / `prod`. If empty, taken from the root app's `EnvType` label |
+| `CLUSTER_NAME` | *(empty)* | Cluster name shown in the header and footer |
+| `REGION` | *(empty)* | Region shown in the header, e.g. `eu-west-1` |
+| `BASE_PATH` | `/k8s-status` | Path prefix the app serves. Normalized to a leading slash with no trailing slash. Empty means serve at `/` |
+| `ARGOCD_NAMESPACE` | `argocd` | Namespace that holds the ArgoCD `Application` objects |
+| `ROOT_APP_NAME` | `ocp-services` | Name of the root Application that owns all the others. **Set this to yours.** |
+| `ARGOCD_UI_BASE` | *(empty)* | If set, service names link to `<base>/applications/<name>` in the ArgoCD UI |
+| `IGNORE_GLOBS` | *(empty)* | Comma-separated name patterns to hide. Matches are removed from the table and from every count, and reported as `hidden` |
+| `GPU_GLOBS` | *(see below)* | Comma-separated name patterns marking a service as GPU-backed. Set it to a single space to switch the marker off |
+| `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
+| `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
+| `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
+| `CACHE_TTL_SECONDS` | `15` | How long a fetched snapshot is reused |
+| `REFRESH_SECONDS` | `30` | Default page auto-refresh interval. A viewer can override it with `?refresh=` |
+| `PORT` | `8080` | Port to listen on |
+| `KUBERNETES_SERVICE_HOST` | *(injected by Kubernetes)* | Used to build the API server URL |
+| `KUBERNETES_SERVICE_PORT` | `443` | Used to build the API server URL |
+| `KUBE_API_URL` | *(empty)* | Local development only. Overrides the in-cluster API URL |
+| `KUBE_TOKEN_FILE` | `/dev/null` | Local development only. Token file used with `KUBE_API_URL` |
 
-A node counts as a GPU node when `.status.capacity["nvidia.com/gpu"]` parses to a value
-above zero. That key is the standard NVIDIA device-plugin resource, so it works on any
-cluster; a nodegroup label would not. An absent or unparseable value counts as zero rather
-than failing the read. Only `metadata.name`, `status.capacity["nvidia.com/gpu"]` and
-`status.nodeInfo.architecture` are decoded.
+Patterns use Go's `path.Match` syntax: `*` matches any run of characters except `/`, `?`
+matches one character, `[abc]` matches a character class. So `kube-*` matches `kube-system`
+and `payments-*` matches `payments-api`.
 
-Node data has its own cache with the same TTL as the application snapshot, so a node list
-that changes slowly is not refetched per request. A failed read is cached too, so an
-operator who enabled the flag without the ClusterRole does not hammer the API server.
+The `GPU_GLOBS` default is a list of inference-workload name patterns:
+`*-gpu,*triton*,tts-engine-*,parakeet-*,nvidia-*,s2s-*,resemble-*,*-vllm,deepasr*,hybrid-turn-*,logos-*,*-medium,*-large`.
+Matching is on the Application name only, so it needs no extra cluster permissions.
 
-### Why it is opt-in
+Nothing is read from a config file. The service account token is never logged.
 
-The default install holds a namespaced `Role` and deliberately no ClusterRole: the blast
-radius is provably one namespace. Nodes are cluster-scoped, so reading them is impossible
-without a ClusterRole. Rather than widen the default permissions for a nice-to-have panel,
-node stats are opt-in:
+### JSON output
 
-- `NODE_STATS` defaults to `false`. The nodes API is then never called and the section is
-  not rendered. Default behaviour and default RBAC are unchanged.
-- Turning it on requires `rbac.clusterRole=true` in the chart, or uncommenting the
-  ClusterRole block in `deploy/install.yaml`. It grants `get`/`list` on `nodes` and nothing
-  else.
-- If the flag is on and the ClusterRole is missing, the read is denied and the page still
-  renders: the capacity section shows a one-line note saying a ClusterRole is needed. An
-  optional feature that is denied degrades, it never breaks the page.
+```json
+{"schema":1,"env":"sample-dev","envType":"dev","region":"eu-west-1",
+ "clusterName":"sample-dev-cluster","clusterPath":"sample-dev-cluster",
+ "version":"develop","revision":"437a162...","rootHealth":"Degraded","rootSync":"OutOfSync",
+ "phase":"Succeeded","message":"successfully synced (all tasks run)",
+ "lastDeployedAt":"2026-08-21T11:30:57Z","lastDeployId":1048,
+ "summary":{"total":151,"ok":137,"degraded":3,"warning":0,"progressing":2,
+            "drift":0,"prune":9,"suspended":0,"hidden":0,"gpu":47},
+ "services":[{"name":"accounts-api","version":"develop","revision":"3c9646b...",
+              "state":"DEGRADED","sync":"OutOfSync","health":"Degraded",
+              "detail":"0/2 replicas available"}],
+ "checkedAt":"2026-08-24T09:10:11Z","ageSeconds":4,"stale":false,"error":null}
+```
 
-## Caching
+`detail` and `message` are cut off at 200 characters.
 
-One snapshot is cached for `CACHE_TTL_SECONDS`. There is no background refresh goroutine — the
-first request after expiry does the work. The cache mutex is deliberately held across the upstream
-fetch, so a burst of concurrent requests collapses into exactly one call to the Kubernetes API.
+Two objects appear only when their feature is on:
 
-If a refresh fails and a previous snapshot exists, that snapshot keeps being served, marked stale,
-and the page shows both a stale banner and the error. A transient API outage degrades the page
-gracefully instead of blanking it.
+```json
+{"nodes":{"total":82,"cpuNodes":74,"gpuNodes":8,"gpus":14,"gpuServices":47,
+          "arch":{"amd64":16,"arm64":66}}}
+```
 
-## Kubernetes access
+```json
+{"unmanaged":{"count":11,"scanned":503,
+              "items":[{"namespace":"kube-system","kind":"DaemonSet","name":"kube-proxy",
+                        "managedBy":"unknown","ready":81,"desired":82,
+                        "version":"v1.35.3-eksbuild.19","state":"DEGRADED"}]}}
+```
+
+## Optional extras
+
+Both extras below are **off by default**, and for the same reason.
+
+The normal install has a namespaced `Role`. It can read ArgoCD Applications in one
+namespace and nothing else. That is the whole permission surface, and you can check it by
+reading eight lines of YAML.
+
+Both extras read things that live outside any single namespace, which a `Role` cannot do.
+That needs a **ClusterRole** — a permission that applies cluster-wide. So each extra needs
+two switches flipped: the feature, and the permission.
+
+If you turn the feature on but not the permission, nothing breaks. The read is denied, that
+one section shows a short note explaining what is missing, and the rest of the page renders
+normally. An optional feature that is denied degrades — it never breaks the page.
+
+| Feature | Env var | Chart value | Extra permission |
+|---|---|---|---|
+| Cluster capacity | `NODE_STATS=true` | `config.nodeStats=true` | `get`/`list` on `nodes` |
+| Unmanaged workloads | `UNMANAGED=true` | `config.unmanaged=true` | `get`/`list` on `deployments`, `statefulsets`, `daemonsets` in `apps` |
+
+With Helm, add `--set rbac.clusterRole=true`. With `deploy/install.yaml`, uncomment the
+ClusterRole and ClusterRoleBinding block near the top. Each rule is gated on its own
+feature, so turning one on does not grant the other.
+
+Check for yourself that the default render is clean:
+
+```sh
+helm template k8s-status charts/k8s-status | grep -c "kind: ClusterRole"   # 0
+```
+
+### Cluster capacity
+
+Shows total nodes, CPU nodes, GPU nodes, total GPUs, GPU services and the CPU architecture
+split.
+
+- A node counts as a GPU node when `.status.capacity["nvidia.com/gpu"]` is above zero.
+  That key comes from the standard NVIDIA device plugin, so it works on any cluster; a
+  node-group label would not.
+- A missing or unreadable value counts as zero rather than failing the read.
+- Only three fields are decoded: `metadata.name`,
+  `status.capacity["nvidia.com/gpu"]` and `status.nodeInfo.architecture`.
+
+GPU is reported here rather than as a status tile. The status tiles are mutually exclusive
+and add up to the service total, and a GPU service is already counted in `OK` or
+`DEGRADED`. Putting it in the tile row would break the arithmetic. The per-row `GPU` chip
+and the coloured row edge are unaffected.
+
+### Workloads that ArgoCD does not manage
+
+Shows what is running in the cluster **outside** of Git: EKS addons, components installed
+by Terraform, Helm releases somebody installed by hand. Nobody is watching these for you,
+so this is where undetected drift lives.
+
+It reads every `Deployment`, `StatefulSet` and `DaemonSet` in the cluster. A workload is
+listed when **both** of these are true:
+
+1. It has no ArgoCD ownership marker. ArgoCD stamps everything it owns with at least one
+   of: the `argocd.argoproj.io/tracking-id` annotation, the `app.kubernetes.io/instance`
+   label, or the `argocd.argoproj.io/instance` label.
+2. It has no `metadata.ownerReferences` — nothing in the cluster created it.
+
+Each row shows:
+
+| Column | Where it comes from |
+|---|---|
+| Namespace, kind, name | `metadata` |
+| Installed by | The `app.kubernetes.io/managed-by` label. Observed values are `Helm`, `EKS` and `terraform`. Empty shows as `unknown` |
+| Ready / desired | `status.readyReplicas` / `status.replicas` for Deployment and StatefulSet; `status.numberReady` / `status.desiredNumberScheduled` for DaemonSet. A missing field counts as 0 |
+| Version | The tag of the first container's image |
+| Status | `OK` when ready equals desired and desired is above 0; `DEGRADED` when ready is below desired; `SUSPENDED` when desired is 0 |
+
+`SUSPENDED` for a 0/0 workload is not a fudge. A Windows DaemonSet on a cluster with no
+Windows nodes is legitimately 0/0 and must not show as broken. Conversely, `81/82` on a
+DaemonSet is a real signal — one node is not covered — so the comparison is exact, never
+approximate.
+
+Use `UNMANAGED_IGNORE_NS` to hide namespaces you have already accepted, for example
+`UNMANAGED_IGNORE_NS=kube-system,gpu-*`.
+
+**The `ownerReferences` check is the important one, and it is not obvious.** On a live dev
+cluster the marker check alone listed 292 workloads. Almost all of them were `autoc-<uuid>`
+Deployments created on demand by an operator running inside the cluster; they inherit no
+ArgoCD label, so they look unmanaged. Adding the `ownerReferences` check removes every one
+of them, because a workload with an owner was created by something already in the cluster
+rather than installed into it. The list drops to 11, and all 11 are real infrastructure. Do
+not remove that check to simplify the code — the list becomes unreadable.
+
+The count also appears in the cluster capacity section, not in the status tiles, for the
+same arithmetic reason as GPU.
+
+## How it works
+
+### Where the numbers come from
+
+Applications are split into the root app (`metadata.name == ROOT_APP_NAME`) and its
+children. The root's `status.resources[]` entries carry a `requiresPruning` flag, keyed by
+resource name; that map is the only source of prune information. `rootSettled` means the
+root's `status.operationState.phase` is not `Running`. An empty `health.status` becomes
+`Unknown`.
+
+Each child is then matched against these rules, first match wins:
+
+| # | Condition | State |
+|---|---|---|
+| 1 | Marked `requiresPruning` by the root app | `PRUNE` |
+| 2 | Health is `Degraded` or `Missing` | `DEGRADED` |
+| 3 | Health is `Unknown` or empty | `WARNING` |
+| 4 | Health is `Progressing`, **or** the root sync is still running and the child is `OutOfSync` | `PROGRESSING` |
+| 5 | Health is `Suspended` | `SUSPENDED` |
+| 6 | Child is `OutOfSync` and the root sync has finished | `DRIFT` |
+| 7 | Anything else | `OK` |
+
+Rule 4 sits **above** rule 6 on purpose. During a normal sync, children go `OutOfSync`
+while they are `Progressing`. Flagging that would set off an alarm on every commit. Rule 6
+therefore only fires on settled drift: ArgoCD has finished and the cluster still does not
+match Git.
+
+### Why DRIFT is not red
+
+A `DRIFT` service is healthy. Its pods pass their readiness and liveness checks. Only the
+manifests differ from Git.
+
+On a live dev cluster that was 28 of 33 rows that an earlier version painted red. A page
+that is permanently alarming gets ignored within a week. So drift is reported separately
+and the row says so in plain words.
+
+### Why PRUNE is not red either
+
+An Application flagged `requiresPruning` is one ArgoCD still tracks but that Git no longer
+asks for. Usually it is a service removed from the environment's values whose Application
+object was never cleaned up, because automatic pruning is off.
+
+Such an app is *expected* to look wrong: its source path may be gone, its workloads may be
+scaled to zero, and its health often reads `Degraded` or `Missing`. On one cluster that was
+9 of 12 `OutOfSync` children.
+
+Prune is therefore checked **before** health, so an orphan is reported as an orphan even
+when it is also unhealthy. It is a housekeeping signal — "delete this Application" — not an
+outage.
+
+### Why the root app's own health is ignored
+
+The root app aggregates its children. Its health goes bad whenever *any* child is unhealthy.
+Its sync goes `OutOfSync` whenever *any* child's manifest has drifted.
+
+In a large environment that means the root is red almost permanently. One health string
+also cannot tell you whether one non-critical worker is restarting or the whole environment
+is down.
+
+On one cluster the root read `Degraded` with a `lastTransitionTime` a year older than the
+most recent successful sync.
+
+So the root is used only for the facts it alone knows:
+
+- the deployed `targetRevision` and revision,
+- the `EnvType` label,
+- the sync phase and message,
+- the deploy history,
+- the prune flags.
+
+Every per-service verdict comes from the child Application itself. Root health and root sync
+are still shown, but only as a tooltip on the version line — context, not a verdict.
+
+The one place the root's phase does matter is rule 4 above.
+
+### Caching
+
+One snapshot is cached for `CACHE_TTL_SECONDS`. There is no background refresh goroutine —
+the first request after the cache expires does the work.
+
+The cache mutex is held across the upstream fetch on purpose, so a burst of concurrent
+requests collapses into exactly one call to the Kubernetes API.
+
+If a refresh fails and an older snapshot exists, that snapshot keeps being served, marked
+stale, and the page shows both a stale banner and the error. A brief API outage degrades
+the page instead of blanking it.
+
+Node data and unmanaged-workload data each have their own cache with the same TTL. A failed
+read is cached too, so someone who turned a flag on without the ClusterRole does not hammer
+the API server with denied requests.
+
+### Kubernetes access
 
 The client is built from the standard service account mount:
 
-- **Token**: read from `/var/run/secrets/kubernetes.io/serviceaccount/token` on **every** request.
-  Projected tokens rotate, so caching the value at startup breaks the app roughly an hour in.
-- **CA**: read once from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` into an
+- **Token** — read from `/var/run/secrets/kubernetes.io/serviceaccount/token` on **every**
+  request. Projected tokens rotate, so caching the value at startup breaks the app about an
+  hour in.
+- **CA** — read once from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` into an
   `x509.CertPool` used as `tls.Config.RootCAs`.
-- **URL**: `https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/apis/argoproj.io/v1alpha1/namespaces/<ns>/applications`
-- One shared `http.Client` with a 10s request timeout; response bodies are capped at 16 MiB.
+- **URL** — `https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT`.
+- One shared `http.Client`, 10 second request timeout, response bodies capped at 16 MiB.
 
-The pod needs `get`/`list` on `applications.argoproj.io` in `ARGOCD_NAMESPACE` and nothing else,
-unless `NODE_STATS` is enabled, which adds `get`/`list` on `nodes` cluster-wide.
-The RBAC and the Deployment live in the chart, not in this repo.
+Endpoints read, and what each needs:
 
-Only the fields actually rendered are decoded (`internal/argocd/types.go`). Some Applications
-report a `null` sync revision; that decodes to an empty string and is rendered as no revision.
+| Endpoint | When | Permission |
+|---|---|---|
+| `/apis/argoproj.io/v1alpha1/namespaces/<ns>/applications` | always | Role in `ARGOCD_NAMESPACE` |
+| `/api/v1/nodes` | `NODE_STATS=true` | ClusterRole |
+| `/apis/apps/v1/{deployments,statefulsets,daemonsets}` | `UNMANAGED=true` | ClusterRole |
 
-## Running locally
+The three workload kinds are fetched at the same time under one shared timeout. If one of
+them fails, the other two are still shown, with a note.
 
-`scripts/local-test.sh` builds the binary and wires it up for you:
+Only the fields actually rendered are decoded — see `internal/argocd/types.go` and
+`internal/kube/`. Some Applications report a `null` sync revision; that decodes to an empty
+string and renders as no revision.
 
-```sh
-./scripts/local-test.sh fixture              # offline, serves testdata/applications.json
-./scripts/local-test.sh cluster <context>    # live, via kubectl proxy
-```
+## Troubleshooting
 
-The kube context is a required argument in `cluster` mode — the script has no built-in default for
-it, nor for `CLUSTER_NAME`, `ARGOCD_UI_BASE`, `REGION` or `ENV_TYPE`. Export any of those to
-override them. Fixture mode sets `ROOT_APP_NAME=root-app` to match the fixture's root application;
-cluster mode uses the configured default (`ROOT_APP_NAME`).
+| What you see | Why | Fix |
+|---|---|---|
+| `cluster read failed: ... 403` banner | The ServiceAccount cannot read Applications | Check the Role and RoleBinding are in `ARGOCD_NAMESPACE`, and that `ARGOCD_NAMESPACE` is right |
+| Version reads `unknown`, no deploy time, and the root app appears as a normal row | `ROOT_APP_NAME` matches no Application, so nothing was recognised as the root | `kubectl -n argocd get applications`, then set `ROOT_APP_NAME` to the app-of-apps |
+| Table says `no services reported` | The Applications list came back empty | Check `ARGOCD_NAMESPACE` points at the namespace that actually holds them |
+| Lots of rows read `PROGRESSING` at once | The root app is mid-sync, so every `OutOfSync` child hits rule 4 | Wait for the sync to finish |
+| Capacity section says a ClusterRole is needed | `NODE_STATS=true` without `rbac.clusterRole=true` | Set both, or turn the feature off |
+| Unmanaged section says a ClusterRole is needed | `UNMANAGED=true` without `rbac.clusterRole=true` | Set both, or turn the feature off |
+| Unmanaged list is enormous (hundreds of rows) | An operator in the cluster spawns owned workloads and something dropped the `ownerReferences` check | See [the section above](#workloads-that-argocd-does-not-manage) |
+| 404 behind an ingress | A rewrite rule strips `BASE_PATH` | Remove the rewrite. The app serves the prefix itself |
+| `data is Ns stale` banner | The last refresh failed; you are seeing the previous snapshot | Look at the error banner beside it |
+| Pod restarts in a loop | Should not happen from a cluster read — `/healthz` never touches the API | Check the pod logs and the image |
 
-By hand, against a proxied cluster API:
+## Security
 
-```sh
-kubectl config use-context <your-context>
-kubectl proxy --port=8001 &
+**There is no authentication.** Anyone who can reach the URL sees the page.
 
-KUBE_API_URL=http://127.0.0.1:8001 \
-ENV_NAME=sample-dev ENV_TYPE=dev REGION=eu-west-1 \
-ARGOCD_NAMESPACE=argocd ROOT_APP_NAME=<your-root-application> \
-BASE_PATH=/srv-status PORT=8080 \
-go run ./cmd/srv-status
-```
+Put it behind a VPN, an internal load balancer, or your existing SSO proxy. Do not expose
+it to the internet.
 
-Then open <http://localhost:8080/srv-status/>.
+What it does show: service names, chart and image versions, health, sync state, node counts,
+and — if you turn the extra on — infrastructure workload names. What it never shows:
+secrets, environment variables, pod logs, or the ServiceAccount token.
 
-`kubectl proxy` authenticates on your behalf, so no token is needed; `KUBE_TOKEN_FILE` defaults to
-`/dev/null` and an empty bearer token is sent. `KUBE_API_URL` exists purely for this workflow — in
-a cluster it is unset and the in-cluster mount is used.
-
-Tests and checks:
-
-```sh
-gofmt -l .
-go vet ./...
-go build ./...
-go test ./... -race -cover
-```
-
-`testdata/applications.json` is a synthetic fixture. Every application name in it is invented and
-every `repoURL` points at a reserved `.invalid` host. It contains no real cluster data.
+Everything it does is read-only. It cannot change anything in the cluster, because the
+permissions it holds are only `get` and `list`.
 
 ## Container hardening
 
-The runtime image is `gcr.io/distroless/static-debian12:nonroot`. It contains no shell, no
-package manager, no busybox and no libc — only CA certificates, timezone data and `/etc/passwd`.
-That is what makes the binary `CGO_ENABLED=0` static: there is nothing in the image to link
-against, and nothing to exec if the process is compromised.
+The runtime image is `gcr.io/distroless/static-debian12:nonroot`. It has no shell, no
+package manager, no busybox and no libc — only CA certificates, timezone data and
+`/etc/passwd`.
 
-How that maps to the CIS Docker Benchmark:
+That is what makes the static `CGO_ENABLED=0` build possible: there is nothing in the image
+to link against, and nothing to execute if the process is ever compromised.
+
+Against the CIS Docker Benchmark:
 
 | Control | How it is met |
 |---|---|
@@ -361,29 +702,84 @@ How that maps to the CIS Docker Benchmark:
 | Add image metadata | OCI `org.opencontainers.image.*` labels |
 | Scan images | Trivy (HIGH/CRITICAL, fixable) and Dockle run on every CI build and fail the pipeline |
 | Read-only root filesystem | Set by the chart and `deploy/install.yaml`, not by the image |
-| Drop capabilities | `capabilities.drop: ["ALL"]`, plus `allowPrivilegeEscalation: false` |
+| Drop capabilities | `capabilities.drop: ["ALL"]` plus `allowPrivilegeEscalation: false` |
 
-The last two are runtime settings rather than image settings, which is why they live in the
+The last two are runtime settings, not image settings, which is why they live in the
 manifests. An image cannot enforce them on its own.
 
-## Build
+## Development
+
+### Run it by hand against a cluster
+
+`scripts/local-test.sh cluster <context>` does this for you, but here it is in full:
 
 ```sh
-docker build --build-arg VERSION=0.1.0 -t srv-status:0.1.0 .
+kubectl config use-context <your-context>
+kubectl proxy --port=8001 &
+
+KUBE_API_URL=http://127.0.0.1:8001 \
+ENV_NAME=sample-dev ENV_TYPE=dev REGION=eu-west-1 \
+ARGOCD_NAMESPACE=argocd ROOT_APP_NAME=<your-root-application> \
+BASE_PATH=/k8s-status PORT=8080 \
+go run ./cmd/k8s-status
 ```
 
-Two stages: a `golang:1.23-bookworm` builder producing a static `CGO_ENABLED=0` binary, and a
-`gcr.io/distroless/static-debian12:nonroot` runtime. The image runs as uid 65532 with a read-only
-root filesystem and needs no writable volume.
+Then open <http://localhost:8080/k8s-status/>.
+
+`kubectl proxy` authenticates on your behalf, so no token is needed. `KUBE_TOKEN_FILE`
+defaults to `/dev/null` and an empty bearer token is sent. `KUBE_API_URL` exists purely for
+this workflow; in a cluster it is unset and the in-cluster mount is used.
+
+The kube context is a required argument in `cluster` mode. The script has no built-in
+default for it, nor for `CLUSTER_NAME`, `ARGOCD_UI_BASE`, `REGION` or `ENV_TYPE`. Export
+any of those to override them. `NODE_STATS` and `UNMANAGED` default to `true` in cluster
+mode, since your own kubeconfig can usually read nodes and workloads, and to `false` in
+fixture mode. Fixture mode also sets `ROOT_APP_NAME=root-app` to match the fixture.
+
+### Checks
+
+```sh
+gofmt -l .
+go vet ./...
+go build ./...
+go test ./... -race -cover
+```
+
+For the chart:
+
+```sh
+helm lint charts/k8s-status
+helm template k8s-status charts/k8s-status
+helm template k8s-status charts/k8s-status | kubectl apply --dry-run=client --validate=strict -f -
+```
+
+`testdata/applications.json` is entirely made up. Every application name is invented and
+every `repoURL` points at a reserved `.invalid` host. It contains no real cluster data.
+
+### Build the image
+
+```sh
+docker build --build-arg VERSION=0.1.0 -t k8s-status:0.1.0 .
+```
+
+Two stages: a `golang:1.27-bookworm` builder producing a static `CGO_ENABLED=0` binary, and
+a `gcr.io/distroless/static-debian12:nonroot` runtime. The image runs as uid 65532 with a
+read-only root filesystem and needs no writable volume.
 
 `main.version` is stamped via `-ldflags -X` and shown in the page footer.
 
-## Deployment
+### Layout
 
-Deployed per cluster by ArgoCD from the platform chart repository, as one Application per
-environment. The chart owns the Deployment, Service, ServiceAccount, RBAC, Ingress and the
-environment-specific values (`ENV_NAME`, `ENV_TYPE`, `REGION`, `CLUSTER_NAME`, `BASE_PATH`,
-`ARGOCD_UI_BASE`, `IGNORE_GLOBS`). This repository ships the binary and the image only.
+| Path | What is in it |
+|---|---|
+| `cmd/k8s-status/` | Entry point, environment parsing, wiring |
+| `internal/argocd/` | Reading ArgoCD `Application` objects |
+| `internal/kube/` | Standard-library Kubernetes client; nodes and workloads |
+| `internal/status/` | Turning raw objects into states, summaries and sections |
+| `internal/web/` | HTTP handlers, filtering, the HTML template |
+| `charts/k8s-status/` | Helm chart |
+| `deploy/install.yaml` | Single-file install, no Helm |
+| `scripts/` | `install.sh`, `local-test.sh` |
 
-Because the app serves everything under `BASE_PATH`, it can be exposed at a subpath of an existing
-host without a rewrite rule on the ingress.
+Standard library only. No client-go, no web framework, no JavaScript, no external assets —
+the whole page is server-rendered HTML with inline CSS.

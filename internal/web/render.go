@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ntmggr/srv-status/internal/status"
+	"github.com/ntmggr/k8s-status/internal/status"
 )
 
 //go:embed templates/*
@@ -83,15 +83,22 @@ type pageData struct {
 	RefreshSeconds int
 	BuildVersion   string
 
-	Snapshot   *status.Snapshot
-	Services   []status.Service
-	Filter     Filter
-	Query      url.Values
-	Shown      int
-	AgeSeconds int
-	Stale      bool
-	Error      string
-	HasData    bool
+	Snapshot *status.Snapshot
+	// MultiSource is true when more than one GitOps controller is enabled. The Source
+	// column only appears then, so a single-source cluster keeps the current table.
+	MultiSource bool
+	// ShowRootLine gates the environment header, every field of which comes from the
+	// ArgoCD root Application. A Flux-only cluster has no root app, so the line is
+	// omitted rather than rendered as a row of blanks.
+	ShowRootLine bool
+	Services     []status.Service
+	Filter       Filter
+	Query        url.Values
+	Shown        int
+	AgeSeconds   int
+	Stale        bool
+	Error        string
+	HasData      bool
 }
 
 // Chip is one active filter, with the link that removes just that one.
@@ -245,6 +252,11 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		if data.EnvType == "" {
 			data.EnvType = snap.EnvType
 		}
+		data.MultiSource = len(snap.Sources) > 1
+		// An ArgoCD deployment whose ROOT_APP_NAME matches nothing keeps showing the
+		// line reading "unknown": that is the documented symptom of a misconfigured
+		// ROOT_APP_NAME and hiding it would hide the diagnosis.
+		data.ShowRootLine = snap.HasRoot || hasSource(snap.Sources, status.SourceArgoCD)
 		data.Services = data.Filter.Apply(snap.Services)
 		data.Shown = len(data.Services)
 		data.AgeSeconds = s.ageSeconds(snap)
@@ -264,6 +276,15 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	if _, wErr := buf.WriteTo(w); wErr != nil {
 		log.Printf("write page: %v", wErr)
 	}
+}
+
+func hasSource(sources []status.Source, want status.Source) bool {
+	for _, s := range sources {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
 
 // stateGlyph pairs every state with a shape so the pill never relies on color
