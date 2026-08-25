@@ -12,6 +12,7 @@ const (
 	filterStatus = "status"
 	filterSync   = "sync"
 	filterGPU    = "gpu"
+	filterView   = "view"
 )
 
 // Filter is the row selection parsed from the query string. Values are kept as the
@@ -22,6 +23,9 @@ type Filter struct {
 	Status []string
 	Sync   []string
 	GPU    string
+	// View narrows the page to one section rather than filtering rows.
+	// "unmanaged" shows only workloads ArgoCD does not manage.
+	View string
 }
 
 // ParseFilter accepts both repeated parameters and comma-separated values.
@@ -30,6 +34,7 @@ func ParseFilter(q url.Values) Filter {
 		Status: parseFilterList(q[filterStatus]),
 		Sync:   parseFilterList(q[filterSync]),
 		GPU:    strings.TrimSpace(q.Get(filterGPU)),
+		View:   strings.ToLower(strings.TrimSpace(q.Get(filterView))),
 	}
 }
 
@@ -198,3 +203,9 @@ func refreshSeconds(q url.Values, def int) int {
 		return n
 	}
 }
+
+// ShowServices reports whether the ArgoCD/Flux services table belongs on the page.
+func (f Filter) ShowServices() bool { return f.View != "unmanaged" }
+
+// ShowUnmanaged reports whether the unmanaged workloads section belongs on the page.
+func (f Filter) ShowUnmanaged() bool { return f.View == "" || f.View == "unmanaged" }
