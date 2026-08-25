@@ -443,7 +443,7 @@ func TestPageWithUnmanagedRendersSection(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		"Not managed by ArgoCD", "unmanaged workloads",
+		"Not managed by ArgoCD", "not in gitops",
 		"csi-controller", "csi-node-windows", "kube-proxy",
 		"EKS", "unknown", "v1.2.3", "81/82", "0/0",
 	} {
@@ -452,7 +452,7 @@ func TestPageWithUnmanagedRendersSection(t *testing.T) {
 		}
 	}
 	// The ArgoCD-managed Deployment carries a marker and must be excluded.
-	if strings.Count(body, "3</span><span class=\"ck\">unmanaged workloads") != 1 {
+	if strings.Count(body, "3</span><span class=\"ck\">not in gitops") != 1 {
 		t.Errorf("want a count of 3 unmanaged workloads")
 	}
 	// desired == 0 is deliberate, not broken.
@@ -593,7 +593,7 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	for _, want := range []string{"Cluster capacity", "cpu nodes", "gpu nodes", "gpus", "architecture", "gpu services", "2 arm64 / 1 amd64"} {
+	for _, want := range []string{"Cluster capacity", "cpu nodes", "gpu nodes", "gpu cards", "gpu services", "2 arm64", "1 amd64"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("capacity section missing %q", want)
 		}

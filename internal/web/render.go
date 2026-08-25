@@ -33,6 +33,7 @@ func templateFuncs() template.FuncMap {
 		"repoCommit": repoCommitURL,
 		"glyph":      stateGlyph,
 		"clip":       clip,
+		"icon":       icon,
 	}
 }
 
@@ -154,11 +155,11 @@ func setList(q url.Values, key string, values []string) {
 // inactive one adds it. Everything else in the query, refresh included, is preserved.
 func (d pageData) FilterHref(kind, value string) string {
 	q := d.query()
-	if kind == filterGPU {
-		if strings.EqualFold(q.Get(filterGPU), value) {
-			q.Del(filterGPU)
+	if kind == filterGPU || kind == filterView {
+		if strings.EqualFold(q.Get(kind), value) {
+			q.Del(kind)
 		} else {
-			q.Set(filterGPU, value)
+			q.Set(kind, value)
 		}
 		return d.href(q)
 	}
@@ -316,4 +317,31 @@ func clip(n int, v string) string {
 		return v
 	}
 	return v[:n-1] + "\u2026"
+}
+
+// icon returns a small inline SVG. Inline keeps the page a single self-contained
+// file with no external requests, which is the whole point of this UI. Icons are
+// decorative: every one sits beside a text label, so nothing depends on reading them.
+func icon(name string) template.HTML {
+	const open = `<svg class="ic" viewBox="0 0 16 16" width="13" height="13" fill="none" ` +
+		`stroke="currentColor" stroke-width="1.5" stroke-linecap="round" ` +
+		`stroke-linejoin="round" aria-hidden="true" focusable="false">`
+	var body string
+	switch name {
+	case "node": // stacked servers
+		body = `<rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.75h.01M4.5 11.25h.01"/>`
+	case "cpu": // chip with pins
+		body = `<rect x="4.5" y="4.5" width="7" height="7" rx="1"/><path d="M6.5 2v2.5M9.5 2v2.5M6.5 11.5V14M9.5 11.5V14M2 6.5h2.5M2 9.5h2.5M11.5 6.5H14M11.5 9.5H14"/>`
+	case "gpu": // chip with a bolt: a compute card
+		body = `<rect x="2" y="4" width="12" height="8" rx="1"/><path d="M8.5 6L6.8 8.4h2L7.4 10.6"/><path d="M4.5 12v1.5M11.5 12v1.5"/>`
+	case "card": // stacked cards, for a count of physical GPUs
+		body = `<rect x="2" y="5.5" width="9" height="6" rx="1"/><path d="M5 3.5h9a1 1 0 0 1 1 1v6"/>`
+	case "arch": // two blocks, for the architecture split
+		body = `<rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/>`
+	case "unmanaged": // broken link: running, but outside gitops
+		body = `<path d="M6.5 9.5L4.8 11.2a2.4 2.4 0 0 1-3.4-3.4L3.1 6.1"/><path d="M9.5 6.5l1.7-1.7a2.4 2.4 0 0 1 3.4 3.4l-1.7 1.7"/><path d="M6 10L10 6"/>`
+	default:
+		return ""
+	}
+	return template.HTML(open + body + `</svg>`)
 }

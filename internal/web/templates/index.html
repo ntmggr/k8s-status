@@ -117,6 +117,10 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
 .cap-head .cap-sub { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: .45rem; }
 .cap-row { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; margin-top: .4rem; }
 .cap-item { display: flex; align-items: baseline; gap: .3rem; }
+.ic { flex: none; opacity: .6; margin-right: .1rem; vertical-align: -1px; }
+.cap-item.is-on .ic, a.cap-item:hover .ic { opacity: 1; }
+.cap-split { color: var(--muted); font-size: .7rem; margin-left: .45rem; white-space: nowrap; }
+.cap-split i { font-style: normal; opacity: .5; margin: 0 .25rem; }
 .cap-item .cv { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .cap-item .ck { font-size: .72rem; color: var(--muted); }
 .cap-item.is-gpu .cv { color: var(--gpu-fg); }
@@ -297,19 +301,20 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   <div class="cap-head">Cluster capacity<span class="cap-sub">infrastructure, not service health</span></div>
   <div class="cap-row">
     {{- with .Snapshot.Nodes}}{{if not .Error}}
-    <div class="cap-item"><span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
-    <div class="cap-item"><span class="cv">{{.CPUNodes}}</span><span class="ck">cpu nodes</span></div>
-    <div class="cap-item is-gpu"><span class="cv">{{.GPUNodes}}</span><span class="ck">gpu nodes</span></div>
-    <div class="cap-item is-gpu"><span class="cv">{{.GPUs}}</span><span class="ck">gpus</span></div>
-    {{- if .Arch}}
-    <div class="cap-item"><span class="cv">{{range $i, $a := .Arch}}{{if $i}} / {{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span><span class="ck">architecture</span></div>
-    {{- end}}
+    <div class="cap-item">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
+    <div class="cap-item">{{icon "cpu"}}<span class="cv">{{.CPUNodes}}</span><span class="ck">cpu nodes</span>
+      {{- if .Arch}}<span class="cap-split" title="arm64 nodes are Graviton on AWS">
+        {{- range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}
+    </div>
+    <div class="cap-item is-gpu">{{icon "gpu"}}<span class="cv">{{.GPUNodes}}</span><span class="ck">gpu nodes</span></div>
+    <div class="cap-item is-gpu" title="Total GPU cards across those nodes. A node can hold several.">{{icon "card"}}<span class="cv">{{.GPUs}}</span><span class="ck">gpu cards</span></div>
     {{- end}}{{end}}
-    <a class="cap-item is-gpu{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}"><span class="cv">{{$.Snapshot.Summary.GPU}}</span><span class="ck">gpu services</span></a>
+    <a class="cap-item is-gpu{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}">{{icon "gpu"}}<span class="cv">{{$.Snapshot.Summary.GPU}}</span><span class="ck">gpu services</span></a>
     {{- with .Snapshot.Unmanaged}}
     {{/* Not a status tile: these workloads are not ArgoCD Applications at all, so they
          must not join a row whose counts sum to the service total. */}}
-    <a class="cap-item" href="#unmanaged"><span class="cv">{{.Count}}</span><span class="ck">unmanaged workloads</span></a>
+    <a class="cap-item{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}"
+       title="Workloads running here that ArgoCD does not manage. Click to show only these.">{{icon "unmanaged"}}<span class="cv">{{.Count}}</span><span class="ck">not in gitops</span></a>
     {{- end}}
   </div>
   {{- with .Snapshot.Nodes}}{{if .Error}}
@@ -334,6 +339,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{end}}
 
 {{$cols := 6}}{{if .MultiSource}}{{$cols = 7}}{{end}}
+{{if .Filter.ShowServices}}
 <div class="card">
 <table>
 <thead>
@@ -397,8 +403,9 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{- else}}the Flux read did not complete, so this table may be missing rows.{{end}} ({{.Error}})
 </div>
 {{end}}{{end}}
+{{end}}
 
-{{with .Snapshot.Unmanaged}}
+{{if .Filter.ShowUnmanaged}}{{with .Snapshot.Unmanaged}}
 <div class="sec-head" id="unmanaged">Not managed by ArgoCD
   <span class="sec-sub">running in the cluster but outside GitOps &mdash; EKS addons, Terraform-installed
   components, hand-installed Helm releases. These are not services above and are not in any count there.</span>
@@ -438,6 +445,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{- if .Denied}}unmanaged workloads need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">deployments</span>, <span class="mono">statefulsets</span> and <span class="mono">daemonsets</span>; the default install is namespaced-Role-only.
   {{- else}}the workload read did not complete, so this list may be incomplete.{{end}} ({{.Error}})
 </div>
+{{end}}
 {{end}}
 {{end}}
 {{end}}
