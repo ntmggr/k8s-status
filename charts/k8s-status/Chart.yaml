@@ -2,8 +2,8 @@ apiVersion: v2
 name: k8s-status
 description: Read-only per-cluster status page for ArgoCD Application health.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: "0.2.0"
 kubeVersion: ">=1.24.0-0"
 keywords:
   - argocd

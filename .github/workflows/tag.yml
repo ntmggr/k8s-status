@@ -36,6 +36,18 @@ jobs:
           release_branches: main
           tag_prefix: v
 
+      # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows -- GitHub
+      # blocks that to prevent recursion. So dispatch the release explicitly,
+      # otherwise the tag is created and nothing is ever published.
+      - name: Trigger release
+        if: steps.tag.outputs.new_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.tag.outputs.new_tag }}"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" -f version="${version#v}"
+          echo "Dispatched release for ${version}"
+
       - name: Summary
         run: |
           if [ -z "${{ steps.tag.outputs.new_tag }}" ]; then
