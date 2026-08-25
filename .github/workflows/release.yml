@@ -99,8 +99,6 @@ jobs:
       # no `dockers:` block on purpose. IMAGE_REPO is passed through so the release
       # notes name the image this same run pushed.
       #
-      # Skipped on workflow_dispatch: goreleaser needs a tag to release, and a
-      # manual run only republishes the image.
       - name: Release binaries and GitHub release
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -110,3 +108,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_REPO: ${{ vars.DOCKERHUB_REPOSITORY || 'ntmggr/k8s-status' }}
+          # Pin goreleaser to the version this run resolved. Left to its own
+          # devices it uses `git describe`, which can pick a different tag and
+          # publish a release whose number disagrees with the image just pushed.
+          GORELEASER_CURRENT_TAG: v${{ steps.v.outputs.version }}
