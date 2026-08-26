@@ -170,6 +170,8 @@ func (c *Collector) attachUnmanaged(ctx context.Context, snap *Snapshot) {
 		c.workloadList = list
 	}
 	snap.Unmanaged = c.unmanaged
-	// The same workload list also recovers app versions ArgoCD did not report.
+	// The same workload list also recovers app versions ArgoCD did not report, and
+	// tells us which services actually ask for a GPU.
 	FillMissingVersions(snap, c.workloadList)
+	FillGPU(snap, c.workloadList)
 }

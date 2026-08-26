@@ -64,6 +64,16 @@ type PodSpec struct {
 
 type Container struct {
 	Image string `json:"image"`
+
+	// Resources carries only what GPU detection needs. Quantities are always
+	// serialised as JSON strings, so a string map decodes them without pulling in
+	// apimachinery just to parse "1".
+	Resources ResourceRequirements `json:"resources"`
+}
+
+type ResourceRequirements struct {
+	Limits   map[string]string `json:"limits"`
+	Requests map[string]string `json:"requests"`
 }
 
 // WorkloadStatus carries the readiness counters of all three kinds. Deployment and
