@@ -24,6 +24,8 @@ type Node struct {
 
 type NodeMetadata struct {
 	Name string `json:"name"`
+	// Labels are needed to work out which nodes a workload can be scheduled onto.
+	Labels map[string]string `json:"labels"`
 }
 
 type NodeStatus struct {
