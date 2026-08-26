@@ -29,12 +29,11 @@ type NodeMetadata struct {
 }
 
 type NodeStatus struct {
-	Capacity NodeCapacity `json:"capacity"`
-	NodeInfo NodeInfo     `json:"nodeInfo"`
-}
-
-type NodeCapacity struct {
-	NvidiaGPU Quantity `json:"nvidia.com/gpu"`
+	// Capacity is decoded whole rather than field by field. Which accelerator a
+	// cluster advertises is not knowable in advance: NVIDIA full cards, NVIDIA MIG
+	// slices, AMD, Intel, AWS Neuron and TPUs all use different resource names.
+	Capacity map[string]Quantity `json:"capacity"`
+	NodeInfo NodeInfo            `json:"nodeInfo"`
 }
 
 type NodeInfo struct {

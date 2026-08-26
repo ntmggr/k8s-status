@@ -593,7 +593,7 @@ func TestPageWithoutNodeStatsHasNoCapacitySection(t *testing.T) {
 
 func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	nodes := &stubNodeLister{list: &kube.NodeList{Items: []kube.Node{
-		{Status: kube.NodeStatus{Capacity: kube.NodeCapacity{NvidiaGPU: "2"}, NodeInfo: kube.NodeInfo{Architecture: "amd64"}}},
+		{Status: kube.NodeStatus{Capacity: map[string]kube.Quantity{"nvidia.com/gpu": "2"}, NodeInfo: kube.NodeInfo{Architecture: "amd64"}}},
 		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
 		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
 	}}}
@@ -643,7 +643,7 @@ func TestAPINodesObjectOmittedWhenDisabled(t *testing.T) {
 
 func TestAPINodesObject(t *testing.T) {
 	nodes := &stubNodeLister{list: &kube.NodeList{Items: []kube.Node{
-		{Status: kube.NodeStatus{Capacity: kube.NodeCapacity{NvidiaGPU: "4"}, NodeInfo: kube.NodeInfo{Architecture: "amd64"}}},
+		{Status: kube.NodeStatus{Capacity: map[string]kube.Quantity{"nvidia.com/gpu": "4"}, NodeInfo: kube.NodeInfo{Architecture: "amd64"}}},
 		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
 	}}}
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))

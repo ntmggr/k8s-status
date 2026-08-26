@@ -144,7 +144,7 @@ func (c *Collector) attachNodes(ctx context.Context, snap *Snapshot) {
 		if err != nil {
 			stats = nodeStatsError(err)
 		} else {
-			stats = BuildNodeStats(list)
+			stats = BuildNodeStats(list, DiscoverAccelerators(list, c.opts.AcceleratorResources))
 		}
 		c.nodeStats = &stats
 		c.nodesAt = c.now()
@@ -175,5 +175,5 @@ func (c *Collector) attachUnmanaged(ctx context.Context, snap *Snapshot) {
 	// The same workload list also recovers app versions ArgoCD did not report, and
 	// tells us which services actually ask for a GPU.
 	FillMissingVersions(snap, c.workloadList)
-	FillGPU(snap, c.workloadList, c.nodeList)
+	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 }
