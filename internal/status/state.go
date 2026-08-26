@@ -49,6 +49,10 @@ type Options struct {
 	// GPUGlobs mark services as GPU-backed. Name-based because it needs no extra
 	// cluster permissions and stays portable across clusters.
 	GPUGlobs []string
+	// AcceleratorResources overrides which resources count as accelerators. Empty
+	// discovers them from what the nodes advertise, which is right on every cluster
+	// seen so far and needs no per-vendor knowledge.
+	AcceleratorResources []string
 	// SidecarImages are image names that never represent the service itself.
 	// Empty means use the built-in list.
 	SidecarImages []string

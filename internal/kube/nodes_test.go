@@ -44,7 +44,7 @@ func TestListNodesDecodesOnlyTheFieldsUsed(t *testing.T) {
 		t.Fatalf("items = %d, want 1", len(list.Items))
 	}
 	n := list.Items[0]
-	if n.Metadata.Name != "n1" || n.Status.NodeInfo.Architecture != "arm64" || n.Status.Capacity.NvidiaGPU != "4" {
+	if n.Metadata.Name != "n1" || n.Status.NodeInfo.Architecture != "arm64" || n.Status.Capacity["nvidia.com/gpu"] != "4" {
 		t.Errorf("node = %+v", n)
 	}
 }

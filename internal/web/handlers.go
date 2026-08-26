@@ -125,13 +125,16 @@ type componentJSON struct {
 
 // nodesJSON is omitted entirely when NODE_STATS is off.
 type nodesJSON struct {
-	Total       int            `json:"total"`
-	CPUNodes    int            `json:"cpuNodes"`
-	GPUNodes    int            `json:"gpuNodes"`
-	GPUs        int            `json:"gpus"`
-	GPUServices int            `json:"gpuServices"`
-	Arch        map[string]int `json:"arch,omitempty"`
-	Error       string         `json:"error,omitempty"`
+	Total       int `json:"total"`
+	CPUNodes    int `json:"cpuNodes"`
+	GPUNodes    int `json:"gpuNodes"`
+	GPUs        int `json:"gpus"`
+	GPUServices int `json:"gpuServices"`
+	// Accelerators breaks gpus down by resource name, so a consumer can tell NVIDIA
+	// cards from MIG slices or another vendor. Omitted when nothing was found.
+	Accelerators map[string]int `json:"accelerators,omitempty"`
+	Arch         map[string]int `json:"arch,omitempty"`
+	Error        string         `json:"error,omitempty"`
 }
 
 // unmanagedJSON is omitted entirely when UNMANAGED is off. These are workloads running
@@ -339,6 +342,12 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 		GPUs:        n.GPUs,
 		GPUServices: snap.Summary.GPU,
 		Error:       n.Error,
+	}
+	if len(n.Accelerators) > 0 {
+		out.Accelerators = make(map[string]int, len(n.Accelerators))
+		for _, a := range n.Accelerators {
+			out.Accelerators[a.Resource] = a.Count
+		}
 	}
 	if len(n.Arch) > 0 {
 		out.Arch = make(map[string]int, len(n.Arch))

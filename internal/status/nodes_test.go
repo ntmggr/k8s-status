@@ -11,6 +11,11 @@ import (
 	"github.com/ntmggr/k8s-status/internal/kube"
 )
 
+// buildStats mirrors production, where the accelerator list comes from discovery.
+func buildStats(list *kube.NodeList) NodeStats {
+	return BuildNodeStats(list, DiscoverAccelerators(list, nil))
+}
+
 func decodeNodes(t *testing.T, raw string) *kube.NodeList {
 	t.Helper()
 	var list kube.NodeList
@@ -31,7 +36,7 @@ const nodeFixture = `{"items":[
 ]}`
 
 func TestBuildNodeStatsClassifiesAndSums(t *testing.T) {
-	got := BuildNodeStats(decodeNodes(t, nodeFixture))
+	got := buildStats(decodeNodes(t, nodeFixture))
 
 	if got.Total != 7 {
 		t.Errorf("total = %d, want 7", got.Total)
@@ -51,7 +56,7 @@ func TestBuildNodeStatsClassifiesAndSums(t *testing.T) {
 }
 
 func TestBuildNodeStatsArchTally(t *testing.T) {
-	got := BuildNodeStats(decodeNodes(t, nodeFixture))
+	got := buildStats(decodeNodes(t, nodeFixture))
 
 	want := []ArchCount{{Arch: "arm64", Count: 4}, {Arch: "amd64", Count: 2}, {Arch: archUnknown, Count: 1}}
 	if len(got.Arch) != len(want) {
@@ -65,7 +70,7 @@ func TestBuildNodeStatsArchTally(t *testing.T) {
 }
 
 func TestBuildNodeStatsAcceptsBareNumberQuantity(t *testing.T) {
-	got := BuildNodeStats(decodeNodes(t,
+	got := buildStats(decodeNodes(t,
 		`{"items":[{"metadata":{"name":"g"},"status":{"capacity":{"nvidia.com/gpu":2},"nodeInfo":{"architecture":"amd64"}}}]}`))
 
 	if got.GPUNodes != 1 || got.GPUs != 2 {
@@ -74,10 +79,10 @@ func TestBuildNodeStatsAcceptsBareNumberQuantity(t *testing.T) {
 }
 
 func TestBuildNodeStatsEmptyAndNil(t *testing.T) {
-	if got := BuildNodeStats(nil); got.Total != 0 || len(got.Arch) != 0 {
+	if got := buildStats(nil); got.Total != 0 || len(got.Arch) != 0 {
 		t.Errorf("nil list = %+v", got)
 	}
-	if got := BuildNodeStats(&kube.NodeList{}); got.Total != 0 || len(got.Arch) != 0 {
+	if got := buildStats(&kube.NodeList{}); got.Total != 0 || len(got.Arch) != 0 {
 		t.Errorf("empty list = %+v", got)
 	}
 }

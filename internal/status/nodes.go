@@ -22,30 +22,50 @@ type NodeStats struct {
 	Total    int
 	CPUNodes int
 	GPUNodes int
-	GPUs     int
-	Arch     []ArchCount
-	Denied   bool
-	Error    string
+	// GPUs is the total device count across every accelerator kind, kept under this
+	// name so the JSON field and the page do not change meaning for NVIDIA clusters.
+	GPUs int
+	// Accelerators breaks that total down per resource, so a cluster with MIG slices
+	// or more than one vendor can see which is which. One entry on a typical cluster.
+	Accelerators []AcceleratorCount
+	Arch         []ArchCount
+	Denied       bool
+	Error        string
+}
+
+// AcceleratorCount is one device type and how much of it the cluster has.
+type AcceleratorCount struct {
+	Resource string
+	Nodes    int
+	Count    int
 }
 
 const archUnknown = "unknown"
 
-// BuildNodeStats classifies nodes by GPU capacity and tallies architectures.
-func BuildNodeStats(list *kube.NodeList) NodeStats {
+// BuildNodeStats classifies nodes by accelerator capacity and tallies architectures.
+// accel is the resource list to count, normally from DiscoverAccelerators.
+func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 	stats := NodeStats{}
 	if list == nil {
 		return stats
 	}
 	byArch := map[string]int{}
+	perRes := map[string][2]int{} // resource -> {nodes, devices}
 	for _, n := range list.Items {
 		stats.Total++
 
-		gpus := quantityInt(string(n.Status.Capacity.NvidiaGPU))
+		gpus := nodeAccelerators(n, accel)
 		if gpus > 0 {
 			stats.GPUNodes++
 			stats.GPUs += gpus
 		} else {
 			stats.CPUNodes++
+		}
+		for _, name := range accel {
+			if c := quantityInt(string(n.Status.Capacity[name])); c > 0 {
+				e := perRes[name]
+				perRes[name] = [2]int{e[0] + 1, e[1] + c}
+			}
 		}
 
 		arch := strings.TrimSpace(n.Status.NodeInfo.Architecture)
@@ -53,6 +73,13 @@ func BuildNodeStats(list *kube.NodeList) NodeStats {
 			arch = archUnknown
 		}
 		byArch[arch]++
+	}
+
+	stats.Accelerators = make([]AcceleratorCount, 0, len(perRes))
+	for _, name := range accel {
+		if e, ok := perRes[name]; ok {
+			stats.Accelerators = append(stats.Accelerators, AcceleratorCount{Resource: name, Nodes: e[0], Count: e[1]})
+		}
 	}
 
 	stats.Arch = make([]ArchCount, 0, len(byArch))

@@ -6,6 +6,9 @@ import (
 	"github.com/ntmggr/k8s-status/internal/kube"
 )
 
+// Most tests describe an NVIDIA cluster; discovery is exercised separately.
+var nvidiaOnly = []string{kube.ResourceGPU}
+
 func gpuWorkload(kind, ns, name string, limit, request string) kube.Workload {
 	c := kube.Container{Image: "example/img:1"}
 	if limit != "" {
@@ -33,7 +36,7 @@ func TestFillGPUMarksOnlyRealRequests(t *testing.T) {
 		gpuWorkload("Deployment", "ml", "lookalike", "", ""),
 	}}
 
-	FillGPU(snap, list, nil)
+	FillGPU(snap, list, nil, nvidiaOnly)
 
 	want := map[string]bool{"inference": true, "api": false, "gpu-lookalike": false}
 	for _, svc := range snap.Services {
@@ -54,7 +57,7 @@ func TestFillGPURequestOnlyAndScaledToZero(t *testing.T) {
 
 	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{
 		gpuWorkload("StatefulSet", "ml", "batch", "", "2"),
-	}}, nil)
+	}}, nil, nvidiaOnly)
 
 	if !snap.Services[0].GPU || snap.Summary.GPU != 1 {
 		t.Fatalf("GPU=%v summary=%d, want true/1", snap.Services[0].GPU, snap.Summary.GPU)
@@ -69,7 +72,7 @@ func TestFillGPUDoesNotMatchAcrossNamespaceOrKind(t *testing.T) {
 	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{
 		gpuWorkload("Deployment", "b", "same", "1", ""),  // other namespace
 		gpuWorkload("StatefulSet", "a", "same", "1", ""), // other kind
-	}}, nil)
+	}}, nil, nvidiaOnly)
 
 	if snap.Services[0].GPU || snap.Summary.GPU != 0 {
 		t.Fatalf("GPU=%v summary=%d, want false/0", snap.Services[0].GPU, snap.Summary.GPU)
@@ -82,7 +85,7 @@ func TestFillGPUNilListLeavesGlobResultIntact(t *testing.T) {
 	snap.addService(Service{Name: "flagged-by-glob", GPU: true})
 	before := snap.Summary.GPU
 
-	FillGPU(snap, nil, nil)
+	FillGPU(snap, nil, nil, nvidiaOnly)
 
 	if !snap.Services[0].GPU || snap.Summary.GPU != before {
 		t.Fatalf("nil list must not change anything: GPU=%v summary=%d", snap.Services[0].GPU, snap.Summary.GPU)
@@ -97,7 +100,7 @@ func TestWorkloadGPUsSumsContainersAndIgnoresJunk(t *testing.T) {
 		{Resources: kube.ResourceRequirements{Limits: map[string]string{kube.ResourceGPU: "not-a-number"}}},
 		{Resources: kube.ResourceRequirements{Limits: map[string]string{"cpu": "500m"}}},
 	}
-	if got := workloadGPUs(w); got != 3 {
+	if got := workloadGPUs(w, nvidiaOnly); got != 3 {
 		t.Fatalf("workloadGPUs=%d, want 3", got)
 	}
 }
@@ -105,7 +108,7 @@ func TestWorkloadGPUsSumsContainersAndIgnoresJunk(t *testing.T) {
 func node(name string, gpus string, labels map[string]string) kube.Node {
 	var n kube.Node
 	n.Metadata.Name, n.Metadata.Labels = name, labels
-	n.Status.Capacity.NvidiaGPU = kube.Quantity(gpus)
+	n.Status.Capacity = map[string]kube.Quantity{kube.ResourceGPU: kube.Quantity(gpus)}
 	return n
 }
 
@@ -136,7 +139,7 @@ func TestFillGPUDetectsAffinityToGPUNodes(t *testing.T) {
 	snap.addService(Service{Name: "pinned", Owned: []Component{{Kind: "Deployment", Namespace: "ml", Name: "pinned"}}})
 
 	w := affinityTo(gpuWorkload("Deployment", "ml", "pinned", "", ""), "NodeGroupType", "inference")
-	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes)
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes, nvidiaOnly)
 
 	if !snap.Services[0].GPU || snap.Summary.GPU != 1 {
 		t.Fatalf("GPU=%v summary=%d, want true/1", snap.Services[0].GPU, snap.Summary.GPU)
@@ -153,7 +156,7 @@ func TestFillGPUAffinityToCPUNodesStaysFalse(t *testing.T) {
 	snap.addService(Service{Name: "transcoder", Owned: []Component{{Kind: "Deployment", Namespace: "ml", Name: "transcoder"}}})
 
 	w := affinityTo(gpuWorkload("Deployment", "ml", "transcoder", "", ""), "NodeGroupType", "transcode")
-	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes)
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes, nvidiaOnly)
 
 	if snap.Services[0].GPU || snap.Summary.GPU != 0 {
 		t.Fatalf("GPU=%v summary=%d, want false/0", snap.Services[0].GPU, snap.Summary.GPU)
@@ -172,7 +175,7 @@ func TestFillGPUUnconstrainedWorkloadIsNotGPU(t *testing.T) {
 
 	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{
 		gpuWorkload("DaemonSet", "ops", "agent", "", ""),
-	}}, nodes)
+	}}, nodes, nvidiaOnly)
 
 	if snap.Services[0].GPU {
 		t.Fatal("an unconstrained DaemonSet must not be reported as GPU-backed")
@@ -190,7 +193,7 @@ func TestFillGPUNodeSelectorCounts(t *testing.T) {
 
 	w := gpuWorkload("Deployment", "ml", "svc", "", "")
 	w.Spec.Template.Spec.NodeSelector = map[string]string{"pool": "gpu"}
-	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes)
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes, nvidiaOnly)
 
 	if !snap.Services[0].GPU {
 		t.Fatal("nodeSelector pinning to GPU nodes should be detected")
@@ -203,7 +206,7 @@ func TestFillGPUNoNodesFallsBackToRequestsOnly(t *testing.T) {
 	snap.addService(Service{Name: "pinned", Owned: []Component{{Kind: "Deployment", Namespace: "ml", Name: "pinned"}}})
 
 	w := affinityTo(gpuWorkload("Deployment", "ml", "pinned", "", ""), "NodeGroupType", "inference")
-	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nil)
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nil, nvidiaOnly)
 
 	if snap.Services[0].GPU {
 		t.Fatal("without nodes, placement cannot be evaluated and must not be claimed")

@@ -42,6 +42,8 @@ func main() {
 	// Empty keeps the built-in list; a site with its own sidecars replaces it here
 	// rather than by patching the binary.
 	sidecarImages := splitGlobs(env("SIDECAR_IMAGES", ""))
+	// Empty discovers accelerators from node capacity; set it only to override that.
+	acceleratorRes := splitGlobs(env("ACCELERATOR_RESOURCES", ""))
 	nodeStats := envBool("NODE_STATS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
@@ -61,12 +63,13 @@ func main() {
 	}
 
 	collector := status.NewCollector(lister, status.Options{
-		Sources:           sources,
-		RootAppName:       rootApp,
-		IgnoreGlobs:       ignoreGlobs,
-		GPUGlobs:          gpuGlobs,
-		SidecarImages:     sidecarImages,
-		UnmanagedIgnoreNS: unmanagedIgnoreNS,
+		Sources:              sources,
+		RootAppName:          rootApp,
+		IgnoreGlobs:          ignoreGlobs,
+		GPUGlobs:             gpuGlobs,
+		SidecarImages:        sidecarImages,
+		AcceleratorResources: acceleratorRes,
+		UnmanagedIgnoreNS:    unmanagedIgnoreNS,
 	}, cacheTTL)
 
 	if useFlux {

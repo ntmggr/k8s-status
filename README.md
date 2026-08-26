@@ -484,6 +484,7 @@ can run it with none of them set.
 | `IGNORE_GLOBS` | *(empty)* | Comma-separated name patterns to hide. Matches are removed from the table and from every count, and reported as `hidden` |
 | `GPU_GLOBS` | *(empty)* | Fallback only. Name patterns marking a service as GPU-backed, used when the workload read that powers real detection is not available |
 | `SIDECAR_IMAGES` | *(built-in list)* | Image names that never carry the service version, such as an injected proxy. Replaces the built-in list |
+| `ACCELERATOR_RESOURCES` | *(discovered)* | Resources that count as accelerators. Empty discovers them from what the nodes advertise |
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
@@ -498,6 +499,13 @@ can run it with none of them set.
 Patterns use Go's `path.Match` syntax: `*` matches any run of characters except `/`, `?`
 matches one character, `[abc]` matches a character class. So `kube-*` matches `kube-system`
 and `payments-*` matches `payments-api`.
+
+Accelerators are discovered, not enumerated. Any vendor-qualified resource the nodes
+advertise counts, so NVIDIA cards, NVIDIA MIG slices, AMD, Intel, AWS Neuron and TPUs
+all work without configuration. Built-in resources are excluded because they carry no
+vendor domain, as are `hugepages-*` and the `vpc.amazonaws.com/*` network attachments
+that EKS advertises when security groups for pods are enabled. `ACCELERATOR_RESOURCES`
+replaces the whole discovery if a cluster needs something this does not cover.
 
 `GPU_GLOBS` is empty by default, because GPU services are detected rather than guessed.
 A service is marked as GPU-backed when a workload it owns requests `nvidia.com/gpu`,
