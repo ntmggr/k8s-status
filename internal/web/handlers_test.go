@@ -610,6 +610,30 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	}
 }
 
+// A MIG-partitioned cluster advertises slices and no nvidia.com/gpu at all, so the
+// page has to name what it found rather than saying "gpu" and "cards" regardless.
+func TestPageNamesNonNvidiaAccelerators(t *testing.T) {
+	nodes := &stubNodeLister{list: &kube.NodeList{Items: []kube.Node{
+		{Status: kube.NodeStatus{Capacity: map[string]kube.Quantity{"nvidia.com/mig-1g.5gb": "7"}, NodeInfo: kube.NodeInfo{Architecture: "amd64"}}},
+		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
+	}}}
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
+
+	body := get(t, h, "/k8s-status/").Body.String()
+	for _, want := range []string{"1 mig", "7 devices", "on mig", "nvidia.com/mig-1g.5gb 7"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page missing %q for a MIG cluster", want)
+		}
+	}
+	// "cards" is wrong for a slice, and the old wording must be gone.
+	if strings.Contains(body, "7 cards") {
+		t.Error("MIG slices must not be counted as cards")
+	}
+	if strings.Contains(body, "<script") {
+		t.Error("page must not contain JavaScript")
+	}
+}
+
 func TestPageStillRendersWhenNodesForbidden(t *testing.T) {
 	nodes := &stubNodeLister{err: &kube.StatusError{Code: http.StatusForbidden, Body: "nodes is forbidden"}}
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))

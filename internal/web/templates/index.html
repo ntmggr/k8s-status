@@ -320,7 +320,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 <div class="views">
   <span class="views-lab">views</span>
-  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services running on GPU nodes">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on gpu</a>
+  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services backed by {{$.Snapshot.AcceleratorLabel}}">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on {{$.Snapshot.AcceleratorLabel}}</a>
   {{- with $.Snapshot.Unmanaged}}
   <a class="vchip{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}" title="Running in the cluster but outside GitOps">{{icon "unmanaged"}}{{.Count}} not in gitops</a>
   {{- end}}
@@ -337,8 +337,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="cap-of">
       <span class="cap-part">{{.CPUNodes}} cpu
         {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
-      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} gpu
-        <span class="cap-split" title="Total GPU cards across those nodes. One node can hold several.">{{.GPUs}} cards</span></span>
+      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} {{$.Snapshot.AcceleratorLabel}}
+        <span class="cap-split" title="Total across those nodes. One node can hold several.{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}</span></span>
     </div>
   </div>
   {{- end}}{{end}}
@@ -361,7 +361,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="pill s-drift"><span class="g">&#8800;</span>DRIFT</span><span>Pods healthy, config differs from git.</span></div>
     <div class="legend-row"><span class="pill s-prune"><span class="g">&#8856;</span>PRUNE</span><span>Orphan awaiting cleanup, not an outage.</span></div>
     <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>SUSPENDED</span><span>Deliberately paused.</span></div>
-    <div class="legend-row"><span class="gpu">GPU</span><span>Runs on GPU nodes.</span></div>
+    <div class="legend-row"><span class="gpu">{{$.Snapshot.AcceleratorBadge}}</span><span>Runs on {{$.Snapshot.AcceleratorLabel}} nodes.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git &mdash;
@@ -413,7 +413,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
-    {{- if .GPU}}<span class="gpu" title="GPU-backed workload">GPU</span>{{end}}</td>
+    {{- if .GPU}}<span class="gpu" title="{{$.Snapshot.AcceleratorLabel}}-backed workload">{{$.Snapshot.AcceleratorBadge}}</span>{{end}}</td>
   {{if $multi}}<td class="hide-sm"><span class="src" title="{{if .Kind}}{{.Kind}}{{else}}ArgoCD Application{{end}}">{{.Source}}</span></td>{{end}}
   <td class="appver">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>
   <td class="chartver hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">
