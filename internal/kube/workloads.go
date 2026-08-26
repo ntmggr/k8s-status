@@ -60,6 +60,37 @@ type PodTemplate struct {
 
 type PodSpec struct {
 	Containers []Container `json:"containers"`
+
+	// NodeSelector and Affinity say which nodes this workload may run on. Some
+	// workloads get a whole GPU node to themselves and talk to the device directly
+	// instead of requesting nvidia.com/gpu, so placement is the only signal they give.
+	NodeSelector map[string]string `json:"nodeSelector"`
+	Affinity     *Affinity         `json:"affinity"`
+}
+
+type Affinity struct {
+	NodeAffinity *NodeAffinity `json:"nodeAffinity"`
+}
+
+// NodeAffinity decodes only the required form. A preferred rule is a hint the
+// scheduler may ignore, so it cannot establish that a workload is GPU-backed.
+type NodeAffinity struct {
+	Required *NodeSelectorSpec `json:"requiredDuringSchedulingIgnoredDuringExecution"`
+}
+
+type NodeSelectorSpec struct {
+	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms"`
+}
+
+type NodeSelectorTerm struct {
+	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions"`
+	MatchFields      []NodeSelectorRequirement `json:"matchFields"`
+}
+
+type NodeSelectorRequirement struct {
+	Key      string   `json:"key"`
+	Operator string   `json:"operator"`
+	Values   []string `json:"values"`
 }
 
 type Container struct {
