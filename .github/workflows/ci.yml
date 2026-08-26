@@ -46,7 +46,7 @@ jobs:
       # are actually reachable. The Go 1.23 stdlib CVEs would have surfaced here first.
       - name: govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           "$(go env GOPATH)/bin/govulncheck" ./...
 
   helm:
