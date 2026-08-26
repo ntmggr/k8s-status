@@ -32,7 +32,7 @@ import (
 // unmanaged view, so it costs no extra request and no extra permission. When that
 // list is absent, GPU marking falls back to whatever GPU_GLOBS was set to, which is
 // nothing unless the operator chose otherwise.
-func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList) {
+func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, accel []string) {
 	if snap == nil || list == nil {
 		return
 	}
@@ -45,7 +45,7 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList) {
 
 	owners := make(map[key]bool, len(list.Items))
 	for _, w := range list.Items {
-		if workloadGPUs(w) > 0 || onlyRunsOnGPUNodes(w, nodeItems) {
+		if workloadGPUs(w, accel) > 0 || onlyRunsOnGPUNodes(w, nodeItems, accel) {
 			owners[key{w.Kind, w.Metadata.Namespace, w.Metadata.Name}] = true
 		}
 	}
@@ -77,15 +77,17 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList) {
 // workloadGPUs returns the GPUs one pod of this workload asks for. Limits win over
 // requests because that is the value the scheduler enforces for an extended resource,
 // and a GPU request without a limit is not valid anyway.
-func workloadGPUs(w kube.Workload) int {
+func workloadGPUs(w kube.Workload, accel []string) int {
 	total := 0
 	for _, c := range w.Spec.Template.Spec.Containers {
-		q := c.Resources.Limits[kube.ResourceGPU]
-		if q == "" {
-			q = c.Resources.Requests[kube.ResourceGPU]
-		}
-		if n, err := strconv.Atoi(strings.TrimSpace(q)); err == nil && n > 0 {
-			total += n
+		for _, name := range accel {
+			q := c.Resources.Limits[name]
+			if q == "" {
+				q = c.Resources.Requests[name]
+			}
+			if n, err := strconv.Atoi(strings.TrimSpace(q)); err == nil && n > 0 {
+				total += n
+			}
 		}
 	}
 	return total
@@ -94,7 +96,7 @@ func workloadGPUs(w kube.Workload) int {
 // onlyRunsOnGPUNodes reports whether every node this workload may be scheduled onto
 // carries a GPU. "Every" rather than "any" is what keeps a DaemonSet out: its rules
 // also select nodes without one, so it cannot be claimed as GPU-backed.
-func onlyRunsOnGPUNodes(w kube.Workload, nodes []kube.Node) bool {
+func onlyRunsOnGPUNodes(w kube.Workload, nodes []kube.Node, accel []string) bool {
 	if len(nodes) == 0 {
 		return false
 	}
@@ -104,7 +106,7 @@ func onlyRunsOnGPUNodes(w kube.Workload, nodes []kube.Node) bool {
 			continue
 		}
 		matched++
-		if quantityInt(string(n.Status.Capacity.NvidiaGPU)) > 0 {
+		if nodeAccelerators(n, accel) > 0 {
 			withGPU++
 		}
 	}
