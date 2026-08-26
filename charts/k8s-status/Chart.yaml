@@ -2,8 +2,10 @@ apiVersion: v2
 name: k8s-status
 description: Read-only per-cluster status page for ArgoCD Application health.
 type: application
-version: 0.2.3
-appVersion: "0.2.3"
+# Stamped by .github/workflows/tag.yml onto the tagged commit, so a released
+# chart always matches its image. Reads 0.0.0-dev on main; that is expected.
+version: 0.0.0-dev
+appVersion: "0.0.0-dev"
 kubeVersion: ">=1.24.0-0"
 keywords:
   - argocd
