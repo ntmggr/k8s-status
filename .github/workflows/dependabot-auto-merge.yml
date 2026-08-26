@@ -7,18 +7,21 @@ name: dependabot auto-merge
 # things, and they deserve a human.
 on: pull_request_target
 
+# Least privilege by default; the merge job elevates below.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   auto-merge:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write        # enable auto-merge on the PR
+      pull-requests: write   # approve and comment
     steps:
       - name: Fetch update metadata
         id: meta
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -12,9 +12,9 @@ on:
   push:
     branches: [main]
 
+# Least privilege by default; the one job that needs to write asks for it below.
 permissions:
-  contents: write
-  actions: write   # needed to dispatch release.yml
+  contents: read
 
 concurrency:
   group: tag-${{ github.ref }}
@@ -23,8 +23,11 @@ concurrency:
 jobs:
   tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push the stamped tag
+      actions: write    # dispatch release.yml
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -34,7 +37,7 @@ jobs:
       # drifted to 0.2.3 while the published image was 0.7.3.
       - name: Compute next version
         id: tag
-        uses: mathieudutour/github-tag-action@v6.2
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: false           # no release for docs/ci/chore-only pushes
