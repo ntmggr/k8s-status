@@ -149,6 +149,7 @@ type workloadJSON struct {
 	Kind      string `json:"kind"`
 	Name      string `json:"name"`
 	ManagedBy string `json:"managedBy"`
+	Members   int    `json:"members,omitempty"`
 	Ready     int    `json:"ready"`
 	Desired   int    `json:"desired"`
 	Version   string `json:"version,omitempty"`
@@ -366,6 +367,7 @@ func unmanaged(snap *status.Snapshot) *unmanagedJSON {
 			Kind:      w.Kind,
 			Name:      w.Name,
 			ManagedBy: w.ManagedBy,
+			Members:   w.Members,
 			Ready:     w.Ready,
 			Desired:   w.Desired,
 			Version:   w.Version,

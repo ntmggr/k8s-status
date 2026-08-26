@@ -86,6 +86,9 @@ type Service struct {
 	Health     string
 	Detail     string
 	Components []Component
+	// Owned lists the workloads this service manages, used to recover an app version
+	// when ArgoCD did not report one. Not rendered.
+	Owned []Component
 }
 
 type Summary struct {
@@ -212,6 +215,7 @@ func Build(list *argocd.ApplicationList, opts Options) Snapshot {
 			Health:     health,
 			Detail:     truncate(detailFor(app, st), maxTextLen),
 			Components: componentsOf(app, st),
+			Owned:      ownedWorkloads(app),
 		})
 	}
 
@@ -386,4 +390,18 @@ func detectRootApp(items []argocd.Application) string {
 		}
 	}
 	return best
+}
+
+// ownedWorkloads lists the Deployments, StatefulSets and DaemonSets an Application
+// owns, from its own status.resources. Used to look up a running image when ArgoCD
+// did not populate status.summary.images.
+func ownedWorkloads(app argocd.Application) []Component {
+	var out []Component
+	for _, r := range app.Status.Resources {
+		switch r.Kind {
+		case "Deployment", "StatefulSet", "DaemonSet":
+			out = append(out, Component{Kind: r.Kind, Name: r.Name, Namespace: r.Namespace})
+		}
+	}
+	return out
 }

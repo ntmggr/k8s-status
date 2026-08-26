@@ -362,3 +362,65 @@ func TestHelmReleaseIsNotMistakenForArgoCD(t *testing.T) {
 		t.Error("app.kubernetes.io/instance without Helm should still count as ArgoCD-tracked")
 	}
 }
+
+// Seven Deployments from one Helm chart are one thing to know about, not seven.
+func TestHelmReleaseCollapsesToOneRow(t *testing.T) {
+	mk := func(name, ver string, ready, desired int) kube.Workload {
+		w := kube.Workload{Kind: "Deployment"}
+		w.Metadata.Name = name
+		w.Metadata.Namespace = "argocd"
+		w.Metadata.Labels = map[string]string{
+			"app.kubernetes.io/instance":   "argocd",
+			"app.kubernetes.io/managed-by": "Helm",
+			"app.kubernetes.io/version":    ver,
+		}
+		w.Status.ReadyReplicas, w.Status.Replicas = ready, desired
+		return w
+	}
+	list := &kube.WorkloadList{Items: []kube.Workload{
+		mk("argocd-server", "v3.4.6", 1, 1),
+		mk("argocd-repo-server", "v3.4.6", 1, 1),
+		mk("argocd-redis", "v3.4.6", 0, 1), // one member unhealthy
+	}}
+
+	u := BuildUnmanaged(list, Options{})
+	if u.Count != 1 {
+		t.Fatalf("count = %d, want 1 collapsed row", u.Count)
+	}
+	row := u.Items[0]
+	if row.Name != "argocd" || row.Kind != "release" {
+		t.Errorf("row = %q/%q, want argocd/release", row.Name, row.Kind)
+	}
+	if row.Members != 3 {
+		t.Errorf("members = %d, want 3", row.Members)
+	}
+	if row.Ready != 2 || row.Desired != 3 {
+		t.Errorf("readiness = %d/%d, want 2/3 summed", row.Ready, row.Desired)
+	}
+	// A broken member must not be hidden by healthy siblings.
+	if row.State != StateDegraded {
+		t.Errorf("state = %s, want DEGRADED from the worst member", row.State)
+	}
+	// Helm records one version for the release; do not report "mixed" from image tags.
+	if row.Version != "v3.4.6" {
+		t.Errorf("version = %q, want v3.4.6", row.Version)
+	}
+}
+
+// Anything Helm did not install stays on its own row.
+func TestNonHelmWorkloadsAreNotCollapsed(t *testing.T) {
+	mk := func(name string) kube.Workload {
+		w := kube.Workload{Kind: "DaemonSet"}
+		w.Metadata.Name, w.Metadata.Namespace = name, "kube-system"
+		return w
+	}
+	u := BuildUnmanaged(&kube.WorkloadList{Items: []kube.Workload{mk("kube-proxy"), mk("ebs-csi-node")}}, Options{})
+	if u.Count != 2 {
+		t.Fatalf("count = %d, want 2 separate rows", u.Count)
+	}
+	for _, w := range u.Items {
+		if w.Members != 1 || w.Kind == "release" {
+			t.Errorf("%s was collapsed but is not a Helm release", w.Name)
+		}
+	}
+}
