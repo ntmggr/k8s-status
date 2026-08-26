@@ -468,7 +468,7 @@ can run it with none of them set.
 | `ROOT_APP_NAME` | `ocp-services` | Name of the root Application that owns all the others. **Set this to yours.** |
 | `ARGOCD_UI_BASE` | *(empty)* | If set, service names link to `<base>/applications/<name>` in the ArgoCD UI |
 | `IGNORE_GLOBS` | *(empty)* | Comma-separated name patterns to hide. Matches are removed from the table and from every count, and reported as `hidden` |
-| `GPU_GLOBS` | *(see below)* | Comma-separated name patterns marking a service as GPU-backed. Set it to a single space to switch the marker off |
+| `GPU_GLOBS` | *(empty)* | Fallback only. Name patterns marking a service as GPU-backed, used when the workload read that powers real detection is not available |
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
@@ -484,9 +484,19 @@ Patterns use Go's `path.Match` syntax: `*` matches any run of characters except 
 matches one character, `[abc]` matches a character class. So `kube-*` matches `kube-system`
 and `payments-*` matches `payments-api`.
 
-The `GPU_GLOBS` default is a list of inference-workload name patterns:
-`*-gpu,*triton*,tts-engine-*,parakeet-*,nvidia-*,s2s-*,resemble-*,*-vllm,deepasr*,hybrid-turn-*,logos-*,*-medium,*-large`.
-Matching is on the Application name only, so it needs no extra cluster permissions.
+`GPU_GLOBS` is empty by default, because GPU services are detected rather than guessed.
+A service is marked as GPU-backed when a workload it owns requests `nvidia.com/gpu`,
+read from the workload list already fetched for the unmanaged view. That means it costs
+no extra request, needs no site-specific pattern list, and cannot drift out of date when
+a service moves off GPU nodes.
+
+Detection is by container resources, not by which node a pod landed on. A DaemonSet
+scheduled onto a GPU node is not a GPU workload, and a service scaled to zero still is
+one.
+
+If you do not enable the workload read (`UNMANAGED`, or `rbac.clusterRole`), nothing is
+detected and no service is marked. Set `GPU_GLOBS` to fall back to name matching in that
+case; patterns are matched against the Application name and need no extra permission.
 
 Nothing is read from a config file. The service account token is never logged.
 
