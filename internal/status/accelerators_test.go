@@ -145,3 +145,90 @@ func TestFillGPUDetectsNonNvidiaRequests(t *testing.T) {
 		t.Fatalf("neuron request not detected: GPU=%v summary=%d", snap.Services[0].GPU, snap.Summary.GPU)
 	}
 }
+
+func snapWith(accs ...AcceleratorCount) *Snapshot {
+	s := &Snapshot{}
+	if accs != nil {
+		s.Nodes = &NodeStats{Accelerators: accs}
+	}
+	return s
+}
+
+func TestAcceleratorLabels(t *testing.T) {
+	cases := []struct {
+		name                       string
+		snap                       *Snapshot
+		label, badge, unit, detail string
+	}{
+		{
+			// No node stats: the page still marks services from resource requests, so
+			// it needs a word, and "gpu" is the one that is right almost everywhere.
+			name: "no node stats falls back to gpu",
+			snap: &Snapshot{}, label: "gpu", badge: "GPU", unit: "cards", detail: "",
+		},
+		{
+			name:  "nvidia cards",
+			snap:  snapWith(AcceleratorCount{Resource: "nvidia.com/gpu", Nodes: 8, Count: 14}),
+			label: "gpu", badge: "GPU", unit: "cards", detail: "nvidia.com/gpu 14",
+		},
+		{
+			name:  "amd is still a gpu",
+			snap:  snapWith(AcceleratorCount{Resource: "amd.com/gpu", Nodes: 2, Count: 2}),
+			label: "gpu", badge: "GPU", unit: "cards", detail: "amd.com/gpu 2",
+		},
+		{
+			// A MIG slice is not a card, so the unit changes with the noun.
+			name:  "mig slices",
+			snap:  snapWith(AcceleratorCount{Resource: "nvidia.com/mig-1g.5gb", Nodes: 1, Count: 7}),
+			label: "mig", badge: "MIG", unit: "devices", detail: "nvidia.com/mig-1g.5gb 7",
+		},
+		{
+			name:  "neuron",
+			snap:  snapWith(AcceleratorCount{Resource: "aws.amazon.com/neuron", Nodes: 3, Count: 12}),
+			label: "neuron", badge: "NEURON", unit: "devices", detail: "aws.amazon.com/neuron 12",
+		},
+		{
+			name:  "tpu",
+			snap:  snapWith(AcceleratorCount{Resource: "google.com/tpu", Nodes: 4, Count: 32}),
+			label: "tpu", badge: "TPU", unit: "devices", detail: "google.com/tpu 32",
+		},
+		{
+			// More than one kind has no single honest noun, and the badge has to stay
+			// short enough to sit beside a service name.
+			name: "mixed cluster",
+			snap: snapWith(
+				AcceleratorCount{Resource: "amd.com/gpu", Nodes: 1, Count: 1},
+				AcceleratorCount{Resource: "nvidia.com/gpu", Nodes: 2, Count: 4},
+			),
+			label: "accelerators", badge: "ACCEL", unit: "devices",
+			detail: "amd.com/gpu 1, nvidia.com/gpu 4",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.snap.AcceleratorLabel(); got != tc.label {
+				t.Errorf("label = %q, want %q", got, tc.label)
+			}
+			if got := tc.snap.AcceleratorBadge(); got != tc.badge {
+				t.Errorf("badge = %q, want %q", got, tc.badge)
+			}
+			if got := tc.snap.AcceleratorUnit(); got != tc.unit {
+				t.Errorf("unit = %q, want %q", got, tc.unit)
+			}
+			if got := tc.snap.AcceleratorDetail(); got != tc.detail {
+				t.Errorf("detail = %q, want %q", got, tc.detail)
+			}
+		})
+	}
+}
+
+// A nil Snapshot must not panic: the template calls these on every render.
+func TestAcceleratorLabelNilSnapshot(t *testing.T) {
+	var s *Snapshot
+	if got := s.AcceleratorLabel(); got != "gpu" {
+		t.Fatalf("label = %q, want gpu", got)
+	}
+	if got := s.AcceleratorDetail(); got != "" {
+		t.Fatalf("detail = %q, want empty", got)
+	}
+}
