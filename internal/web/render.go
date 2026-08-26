@@ -158,14 +158,26 @@ func setList(q url.Values, key string, values []string) {
 // inactive one adds it. Everything else in the query, refresh included, is preserved.
 func (d pageData) FilterHref(kind, value string) string {
 	q := d.query()
+	// "view" selects a different section; the row filters select rows within the
+	// services table. Combining them is meaningless, so choosing one clears the other
+	// rather than leaving a half-applied state the user cannot see.
 	if kind == filterGPU || kind == filterView {
 		if strings.EqualFold(q.Get(kind), value) {
 			q.Del(kind)
 		} else {
 			q.Set(kind, value)
+			if kind == filterView {
+				q.Del(filterGPU)
+				q.Del(filterStatus)
+				q.Del(filterSync)
+			} else {
+				q.Del(filterView)
+			}
 		}
 		return d.href(q)
 	}
+	// Selecting a status or sync value is likewise a services-table action.
+	q.Del(filterView)
 	list := d.Filter.list(kind)
 	if containsFold(list, value) {
 		list = removeFold(list, value)

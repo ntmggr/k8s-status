@@ -30,12 +30,19 @@ type Filter struct {
 
 // ParseFilter accepts both repeated parameters and comma-separated values.
 func ParseFilter(q url.Values) Filter {
-	return Filter{
+	f := Filter{
 		Status: parseFilterList(q[filterStatus]),
 		Sync:   parseFilterList(q[filterSync]),
 		GPU:    strings.TrimSpace(q.Get(filterGPU)),
 		View:   strings.ToLower(strings.TrimSpace(q.Get(filterView))),
 	}
+	// A section view and the row filters describe different tables. The links never
+	// produce both, but a hand-written URL can, and rendering half of each state is
+	// worse than picking one. The view wins because it is the coarser choice.
+	if f.View != "" {
+		f.Status, f.Sync, f.GPU = nil, nil, ""
+	}
+	return f
 }
 
 func parseFilterList(vals []string) []string {
@@ -80,6 +87,8 @@ func (f Filter) has(kind, value string) bool {
 		return containsFold(f.Sync, value)
 	case filterGPU:
 		return strings.EqualFold(f.GPU, value)
+	case filterView:
+		return strings.EqualFold(f.View, value)
 	}
 	return false
 }
