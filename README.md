@@ -79,6 +79,19 @@ on requires `rbac.clusterRole=true`, because these resources are not namespaced:
 Still only `get` and `list`. There is no verb anywhere in this project that changes a
 cluster, and no code path that issues a write.
 
+**It needs its own ServiceAccount.** There is no way to run it without one. A pod that
+does not name a ServiceAccount is given the namespace's `default` account, which is bound
+to nothing, so every read comes back 403 and you get the access error page instead of your
+services. The chart creates a dedicated account and binds the Role above to it.
+
+Authentication is the projected token at
+`/var/run/secrets/kubernetes.io/serviceaccount/token`. There is no kubeconfig, no
+credential to supply, and no cloud identity: the ServiceAccount carries no IRSA or
+Workload Identity annotation, because the service makes no cloud API calls.
+
+To bind an account you already manage, set `serviceAccount.create=false` and
+`serviceAccount.name=<existing-name>`. Granting it the Role above is then yours to do.
+
 If you enable a feature without granting its permission, the page does not break. That
 section shows an inline note telling you which Role it needs, and everything else keeps
 working.
