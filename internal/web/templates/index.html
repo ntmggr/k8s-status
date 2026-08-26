@@ -264,7 +264,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <body>
 <header>
   <h1>{{brand}}{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
-    {{- if .ClusterName}}<span class="badge" title="{{if .EnvType}}{{.EnvType}} environment{{else}}cluster{{end}}">{{.ClusterName}}</span>
+    {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="{{if .EnvType}}{{.EnvType}} environment{{else}}cluster{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
   <div class="meta">checked {{.AgeSeconds}}s ago &middot; auto-refresh
@@ -299,31 +299,6 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{if .Stale}}<div class="banner stale">data is {{.AgeSeconds}}s stale</div>{{end}}
 
 {{if .HasData}}
-<section class="capacity">
-  <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
-  {{- with .Snapshot.Nodes}}{{if not .Error}}
-  {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
-       rather than as five unrelated numbers sitting in a row. */}}
-  <div class="cap-group">
-    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
-    <div class="cap-of">
-      <span class="cap-part">{{.CPUNodes}} cpu
-        {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
-      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} gpu
-        <span class="cap-split" title="Total GPU cards across those nodes. One node can hold several.">{{.GPUs}} cards</span></span>
-    </div>
-  </div>
-  {{- end}}{{end}}
-  {{- with .Snapshot.Nodes}}{{if .Error}}
-  <div class="cap-note">
-    {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.
-    {{- else}}node stats unavailable.{{end}} ({{.Error}})
-  </div>
-  {{- end}}{{end}}
-</section>
-{{end}}
-
-{{if .HasData}}
 {{with .Snapshot.Summary}}
 {{/* The tiles keep counting the whole cluster while a filter is on. Do not "fix" this
      to count only the filtered rows: every other tile would read 0 as soon as one filter
@@ -346,6 +321,31 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   <a class="vchip{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}" title="Running in the cluster but outside GitOps">{{icon "unmanaged"}}{{.Count}} not in gitops</a>
   {{- end}}
 </div>
+
+{{if and $.HasData $.Snapshot.Nodes}}
+<section class="capacity">
+  <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
+  {{- with $.Snapshot.Nodes}}{{if not .Error}}
+  {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
+       rather than as five unrelated numbers sitting in a row. */}}
+  <div class="cap-group">
+    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
+    <div class="cap-of">
+      <span class="cap-part">{{.CPUNodes}} cpu
+        {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
+      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} gpu
+        <span class="cap-split" title="Total GPU cards across those nodes. One node can hold several.">{{.GPUs}} cards</span></span>
+    </div>
+  </div>
+  {{- end}}{{end}}
+  {{- with $.Snapshot.Nodes}}{{if .Error}}
+  <div class="cap-note">
+    {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.
+    {{- else}}node stats unavailable.{{end}} ({{.Error}})
+  </div>
+  {{- end}}{{end}}
+</section>
+{{end}}
 
 <details class="legend">
   <summary>What these states mean</summary>

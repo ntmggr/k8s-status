@@ -36,6 +36,14 @@ jobs:
       - name: build
         run: go build ./...
 
+      # Go-native vulnerability scanning. Trivy sees the built image; this sees the
+      # source and the toolchain, and only reports vulnerabilities in code paths that
+      # are actually reachable. The Go 1.23 stdlib CVEs would have surfaced here first.
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
   helm:
     runs-on: ubuntu-latest
     steps:

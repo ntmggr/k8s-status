@@ -66,6 +66,7 @@ func (s *Server) Routes() *http.ServeMux {
 
 	mux.HandleFunc("GET "+base+"/{$}", s.handlePage)
 	mux.HandleFunc("GET "+base+"/api/status", s.handleAPI)
+	mux.HandleFunc("GET "+base+"/api/versions", s.handleVersions)
 	mux.HandleFunc("GET "+base+"/healthz", s.handleHealthz)
 
 	if base != "" {

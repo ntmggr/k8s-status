@@ -16,8 +16,21 @@
 One web page that tells you what is running in a Kubernetes cluster, which version of it,
 and whether it is healthy. Read-only: it can list, and nothing else.
 
-It runs inside the cluster and reads that cluster only. It makes no outbound calls. There
-is no JavaScript and no database. You open a URL and read a table.
+It reads one cluster and nothing else. It makes no outbound calls. There is no
+JavaScript and no database. You open a URL and read a table.
+
+**You do not have to install it.** It is a single binary, so if you would rather not put
+anything in the cluster, run it on your own machine against a cluster you can already
+read:
+
+```console
+$ ./scripts/local-test.sh cluster <your-kube-context>
+```
+
+That uses your kubeconfig, changes nothing, and installs nothing. It is the fastest way
+to decide whether the tool is worth deploying, and it is a reasonable permanent answer
+for a cluster you only look at occasionally. Deploy it when you want the page to be
+there for everyone, on a URL, without anyone needing cluster access.
 
 The page itself has no login, so it is built to sit behind a VPN or an internal load
 balancer. See [Security](#security).
@@ -414,6 +427,31 @@ they counted only the filtered rows, clicking `DEGRADED` would make every other 
 
 `/healthz` ignores all of it.
 
+### Getting versions as JSON
+
+`GET <base>/api/versions` answers one question: what is deployed here, and at what version.
+
+```console
+$ curl -s http://localhost:8080/k8s-status/api/versions | jq '.services[0]'
+{
+  "name": "alerting-api",
+  "appVersion": "1.0.0-dev-3cdb4337",
+  "chartVersion": "develop",
+  "revision": "c335d820...",
+  "image": "registry.example.com/alerting-api:1.0.0-dev-3cdb4337",
+  "source": "argocd",
+  "state": "OK"
+}
+```
+
+`appVersion` is the running container image tag, the version of the software itself.
+`chartVersion` is the git ref the GitOps controller tracks for it. They are different
+things and the endpoint reports both.
+
+It takes the same filters as the page, so `?status=DEGRADED` or `?gpu=true` narrows it.
+`/api/status` returns the same facts plus health, counts and components, if you want
+everything in one call.
+
 ## Settings
 
 Everything is read from environment variables at startup. Every one has a default, so you
@@ -721,6 +759,27 @@ secrets, environment variables, pod logs, or the ServiceAccount token.
 
 Everything it does is read-only. It cannot change anything in the cluster, because the
 permissions it holds are only `get` and `list`.
+
+## What CI scans
+
+Every push and pull request runs these. The first four fail the build, so a problem
+cannot merge quietly.
+
+| What is checked | Tool | Fails the build |
+|---|---|---|
+| Go source and toolchain for known vulnerabilities | `govulncheck` | Yes |
+| The built image for vulnerable packages | Trivy, HIGH and CRITICAL, fixable only | Yes |
+| The repository for committed secrets | Trivy, secret scanner | Yes |
+| The image against the CIS Docker Benchmark | Dockle, at `fatal` | Yes |
+| Supply-chain posture: pinned actions, branch protection, signed releases | OpenSSF Scorecard | No, publishes to the Security tab |
+
+`govulncheck` and Trivy overlap deliberately and catch different things. Trivy inspects
+the finished image, so it sees whatever ended up inside it. `govulncheck` reads the
+source and the Go toolchain, and only reports vulnerabilities in code paths that are
+actually reachable, so it finds problems earlier and with less noise.
+
+Unfixable findings are reported but do not block, because there is nothing to upgrade
+to. That keeps a red build meaningful.
 
 ## Container hardening
 

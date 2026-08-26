@@ -33,6 +33,7 @@ case "$MODE" in
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-root-app}"   # the fixture's root app is named root-app
     NODE_STATS_DEFAULT=false
+    ENV_NAME_DEFAULT=local
     UNMANAGED_DEFAULT=false
     echo "mode: fixture (offline, synthetic data)"
     ;;
@@ -63,14 +64,14 @@ case "$MODE" in
     NODE_STATS_DEFAULT=true
     UNMANAGED_DEFAULT=true
     # Show which cluster you are actually pointed at, not a generic label.
-    CLUSTER_NAME="${CLUSTER_NAME:-$CONTEXT}"
+    ENV_NAME_DEFAULT="$CONTEXT"
     ;;
   *) usage ;;
 esac
 
 sleep 2
 KUBE_API_URL="$API" \
-ENV_NAME="${ENV_NAME:-local}" ENV_TYPE="${ENV_TYPE:-}" REGION="${REGION:-}" \
+ENV_NAME="${ENV_NAME:-$ENV_NAME_DEFAULT}" ENV_TYPE="${ENV_TYPE:-}" REGION="${REGION:-}" \
 CLUSTER_NAME="${CLUSTER_NAME:-}" ROOT_APP_NAME="$ROOT_APP" \
 ARGOCD_UI_BASE="${ARGOCD_UI_BASE:-}" \
 IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-$NODE_STATS_DEFAULT}" \
