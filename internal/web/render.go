@@ -34,6 +34,7 @@ func templateFuncs() template.FuncMap {
 		"glyph":      stateGlyph,
 		"clip":       clip,
 		"icon":       icon,
+		"brand":      brand,
 	}
 }
 
@@ -99,6 +100,7 @@ type pageData struct {
 	AgeSeconds   int
 	Stale        bool
 	Error        string
+	ClusterError *ClusterError
 	HasData      bool
 }
 
@@ -248,6 +250,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		data.Error = truncate(err.Error(), 200)
+		data.ClusterError = classifyClusterError(err)
 	}
 	if snap != nil {
 		if data.EnvType == "" {
@@ -338,6 +341,8 @@ func icon(name string) template.HTML {
 		body = `<rect x="2" y="5.5" width="9" height="6" rx="1"/><path d="M5 3.5h9a1 1 0 0 1 1 1v6"/>`
 	case "arch": // two blocks, for the architecture split
 		body = `<rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/>`
+	case "warn": // triangle with a bang
+		body = `<path d="M8 2.2 1.6 13.2h12.8L8 2.2Z"/><path d="M8 6.4v3.1M8 11.4h.01"/>`
 	case "unmanaged": // broken link: running, but outside gitops
 		body = `<path d="M6.5 9.5L4.8 11.2a2.4 2.4 0 0 1-3.4-3.4L3.1 6.1"/><path d="M9.5 6.5l1.7-1.7a2.4 2.4 0 0 1 3.4 3.4l-1.7 1.7"/><path d="M6 10L10 6"/>`
 	default:
@@ -348,3 +353,8 @@ func icon(name string) template.HTML {
 
 // AnyFilter reports whether the page is narrowed at all, by row filters or by view.
 func (d pageData) AnyFilter() bool { return d.Filter.Active() || d.Filter.View != "" }
+
+// brand is the logo mark, inlined so the page stays one self-contained file.
+func brand() template.HTML {
+	return template.HTML(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="19" height="19" class="brand" role="img" aria-label="k8s-status"><title>k8s-status</title> <rect x="6" y="12" width="52" height="12" rx="6" fill="#e6f4ea"/> <rect x="6" y="28" width="46" height="12" rx="6" fill="#feefc3"/> <rect x="6" y="44" width="40" height="12" rx="6" fill="#fce8e6"/> <circle cx="16" cy="18" r="4" fill="#137333"/> <circle cx="16" cy="34" r="4" fill="#a15c00"/> <circle cx="16" cy="50" r="4" fill="#c5221f"/> </svg>`)
+}

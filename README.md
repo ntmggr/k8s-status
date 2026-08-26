@@ -1,3 +1,5 @@
+<img src="docs/logo/logo.svg" width="52" align="left" alt="">
+
 # k8s-status
 
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
@@ -7,13 +9,18 @@
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**See what GitOps actually deployed, and what it doesn't know about.**
+
 ## What is this?
 
 One web page that tells you what is running in a Kubernetes cluster, which version of it,
-and whether it is healthy.
+and whether it is healthy. Read-only: it can list, and nothing else.
 
 It runs inside the cluster and reads that cluster only. It makes no outbound calls. There
-is no JavaScript, no database and no login. You open a URL and read a table.
+is no JavaScript and no database. You open a URL and read a table.
+
+The page itself has no login, so it is built to sit behind a VPN or an internal load
+balancer. See [Security](#security).
 
 It gets its information from the cluster's GitOps controller. If that name is new to
 you: a GitOps controller is a tool that installs software into a cluster by copying what

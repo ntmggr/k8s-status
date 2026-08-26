@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {{if .RefreshSeconds}}<meta http-equiv="refresh" content="{{.RefreshSeconds}}">{{end}}
 <title>{{.EnvName}} — OCP status</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%20role%3D%22img%22%20aria-label%3D%22k8s-status%22%3E%3Ctitle%3Ek8s-status%3C%2Ftitle%3E%20%3Crect%20x%3D%226%22%20y%3D%2212%22%20width%3D%2252%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23e6f4ea%22%2F%3E%20%3Crect%20x%3D%226%22%20y%3D%2228%22%20width%3D%2246%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23feefc3%22%2F%3E%20%3Crect%20x%3D%226%22%20y%3D%2244%22%20width%3D%2240%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23fce8e6%22%2F%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2218%22%20r%3D%224%22%20fill%3D%22%23137333%22%2F%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2234%22%20r%3D%224%22%20fill%3D%22%23a15c00%22%2F%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2250%22%20r%3D%224%22%20fill%3D%22%23c5221f%22%2F%3E%20%3C%2Fsvg%3E">
 <style>
 :root {
   color-scheme: light dark;
@@ -70,6 +71,7 @@ header {
   padding: .5rem var(--pad-x);
   background: var(--plane); border-bottom: 1px solid var(--hair);
 }
+.brand { flex: none; margin-right: .5rem; vertical-align: -3px; }
 h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .badge {
@@ -172,6 +174,12 @@ a.cap-item:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
 
 .banner { padding: .6rem .8rem; border-radius: 6px; margin: .7rem 0; font-size: .85rem; }
 .banner.err   { background: var(--deg-bg);  color: var(--deg-fg); }
+.berr-title { display: flex; align-items: center; gap: .4rem; font-weight: 600; }
+.berr-hint { margin-top: .3rem; color: var(--deg-fg); opacity: .92; font-size: .84rem; line-height: 1.45; }
+.berr-more { margin-top: .4rem; font-size: .76rem; }
+.berr-more summary { cursor: pointer; opacity: .75; }
+.berr-more code { display: block; margin-top: .25rem; font-family: ui-monospace, Menlo, monospace;
+                  word-break: break-word; opacity: .85; }
 .banner.stale { background: var(--warn-bg); color: var(--warn-fg); }
 
 .card { background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; margin-top: .9rem; }
@@ -251,7 +259,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </head>
 <body>
 <header>
-  <h1>{{.EnvName}}
+  <h1>{{brand}}{{.EnvName}}
     {{- if .ClusterName}}<span class="badge" title="{{if .EnvType}}{{.EnvType}} environment{{else}}cluster{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
@@ -277,7 +285,13 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 {{end}}{{end}}
 
-{{if .Error}}<div class="banner err">cluster read failed: {{.Error}}</div>{{end}}
+{{with .ClusterError}}
+<div class="banner err">
+  <div class="berr-title">{{icon "warn"}}{{.Title}}</div>
+  <div class="berr-hint">{{.Hint}}</div>
+  {{if .Detail}}<details class="berr-more"><summary>technical detail</summary><code>{{.Detail}}</code></details>{{end}}
+</div>
+{{end}}
 {{if .Stale}}<div class="banner stale">data is {{.AgeSeconds}}s stale</div>{{end}}
 
 {{if .HasData}}
