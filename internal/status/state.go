@@ -142,11 +142,19 @@ func Build(list *argocd.ApplicationList, opts Options) Snapshot {
 		return snap
 	}
 
+	// The app-of-apps is identified by shape, not by name: it is the Application
+	// that owns other Applications. Hard-coding a name only ever works on the one
+	// cluster it was written for. An explicit RootAppName still wins.
+	rootName := opts.RootAppName
+	if rootName == "" {
+		rootName = detectRootApp(list.Items)
+	}
+
 	var root *argocd.Application
 	children := make([]argocd.Application, 0, len(list.Items))
 	for i := range list.Items {
 		app := list.Items[i]
-		if app.Metadata.Name == opts.RootAppName {
+		if app.Metadata.Name == rootName {
 			root = &list.Items[i]
 			continue
 		}
@@ -359,4 +367,23 @@ func componentsOf(app argocd.Application, st State) []Component {
 		return out[i].Name < out[j].Name
 	})
 	return out
+}
+
+// detectRootApp returns the name of the Application that owns the most other
+// Applications, or "" when nothing does. A flat ArgoCD install or a Flux-only
+// cluster has no root, and the page renders without the environment header.
+func detectRootApp(items []argocd.Application) string {
+	best, bestN := "", 0
+	for _, a := range items {
+		n := 0
+		for _, r := range a.Status.Resources {
+			if r.Kind == "Application" && r.Group == "argoproj.io" {
+				n++
+			}
+		}
+		if n > bestN {
+			best, bestN = a.Metadata.Name, n
+		}
+	}
+	return best
 }

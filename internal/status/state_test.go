@@ -190,3 +190,32 @@ func TestBuildWithoutRootTreatsRootAsSettled(t *testing.T) {
 		t.Errorf("state = %s, want DEGRADED", snap.Services[0].State)
 	}
 }
+
+// The app-of-apps is found by shape, so the tool works on clusters that call it
+// something other than whatever this repo happened to be written against.
+func TestDetectRootAppByShape(t *testing.T) {
+	app := func(name string, kids int) argocd.Application {
+		var a argocd.Application
+		a.Metadata.Name = name
+		for i := 0; i < kids; i++ {
+			a.Status.Resources = append(a.Status.Resources,
+				argocd.Resource{Group: "argoproj.io", Kind: "Application", Name: "child"})
+		}
+		return a
+	}
+	items := []argocd.Application{
+		app("orders-api", 0),
+		app("platform-root", 12),
+		app("nested-root", 3),
+	}
+	if got := detectRootApp(items); got != "platform-root" {
+		t.Errorf("detectRootApp = %q, want platform-root (most Application children)", got)
+	}
+	// A workload that owns ConfigMaps, not Applications, is not a root.
+	var plain argocd.Application
+	plain.Metadata.Name = "orders-api"
+	plain.Status.Resources = []argocd.Resource{{Group: "", Kind: "ConfigMap", Name: "cm"}}
+	if got := detectRootApp([]argocd.Application{plain}); got != "" {
+		t.Errorf("detectRootApp = %q, want empty when nothing owns Applications", got)
+	}
+}

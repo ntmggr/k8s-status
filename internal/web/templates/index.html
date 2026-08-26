@@ -170,7 +170,6 @@ a.cap-item { text-decoration: none; color: inherit; border-radius: 6px;
              padding: .05rem .3rem; margin: -.05rem -.3rem; }
 a.cap-item:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
 
-
 .banner { padding: .6rem .8rem; border-radius: 6px; margin: .7rem 0; font-size: .85rem; }
 .banner.err   { background: var(--deg-bg);  color: var(--deg-fg); }
 .banner.stale { background: var(--warn-bg); color: var(--warn-fg); }
@@ -330,28 +329,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{end}}
 
 {{if or .Snapshot.Nodes .Snapshot.Unmanaged}}
-<section class="capacity">
-  <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
-  {{- with .Snapshot.Nodes}}{{if not .Error}}
-  {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
-       rather than as five unrelated numbers sitting in a row. */}}
-  <div class="cap-group">
-    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
-    <div class="cap-of">
-      <span class="cap-part">{{.CPUNodes}} cpu
-        {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
-      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} gpu
-        <span class="cap-split" title="Total GPU cards across those nodes. One node can hold several.">{{.GPUs}} cards</span></span>
-    </div>
-  </div>
-  {{- end}}{{end}}
-  {{- with .Snapshot.Nodes}}{{if .Error}}
-  <div class="cap-note">
-    {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.
-    {{- else}}node stats unavailable.{{end}} ({{.Error}})
-  </div>
-  {{- end}}{{end}}
-</section>
+
 {{end}}
 
 {{if .Filter.Active}}
@@ -476,6 +454,31 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{end}}
 {{end}}
 {{end}}
+{{end}}
+
+{{if .HasData}}
+<section class="capacity">
+  <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
+  {{- with .Snapshot.Nodes}}{{if not .Error}}
+  {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
+       rather than as five unrelated numbers sitting in a row. */}}
+  <div class="cap-group">
+    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
+    <div class="cap-of">
+      <span class="cap-part">{{.CPUNodes}} cpu
+        {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
+      <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} gpu
+        <span class="cap-split" title="Total GPU cards across those nodes. One node can hold several.">{{.GPUs}} cards</span></span>
+    </div>
+  </div>
+  {{- end}}{{end}}
+  {{- with .Snapshot.Nodes}}{{if .Error}}
+  <div class="cap-note">
+    {{- if .Denied}}node stats need a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">nodes</span>; the default install is namespaced-Role-only.
+    {{- else}}node stats unavailable.{{end}} ({{.Error}})
+  </div>
+  {{- end}}{{end}}
+</section>
 {{end}}
 
 <footer>k8s-status {{.BuildVersion}}{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</footer>

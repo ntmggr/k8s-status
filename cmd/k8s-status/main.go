@@ -35,7 +35,7 @@ func main() {
 	useArgoCD := hasSource(sources, status.SourceArgoCD)
 	useFlux := hasSource(sources, status.SourceFlux)
 	namespace := env("ARGOCD_NAMESPACE", "argocd")
-	rootApp := env("ROOT_APP_NAME", "ocp-services")
+	rootApp := env("ROOT_APP_NAME", "")
 	argocdUI := env("ARGOCD_UI_BASE", "")
 	ignoreGlobs := splitGlobs(env("IGNORE_GLOBS", ""))
 	gpuGlobs := splitGlobs(env("GPU_GLOBS", defaultGPUGlobs))
