@@ -28,7 +28,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compute and push tag
+      # Compute the version WITHOUT pushing the tag yet. The chart has to be stamped
+      # with that version first, otherwise the tag lands on a commit whose Chart.yaml
+      # still advertises the previous release -- which is how appVersion silently
+      # drifted to 0.2.3 while the published image was 0.7.3.
+      - name: Compute next version
         id: tag
         uses: mathieudutour/github-tag-action@v6.2
         with:
@@ -36,6 +40,26 @@ jobs:
           default_bump: false           # no release for docs/ci/chore-only pushes
           release_branches: main
           tag_prefix: v
+          dry_run: true
+
+      # Branch protection on main rejects a push from GITHUB_TOKEN, so the stamped
+      # Chart.yaml is committed off-branch and the tag is placed on that commit.
+      # Consumers resolve the chart by tag, so what has to be self-consistent is the
+      # tagged tree; main keeps the 0.0.0-dev placeholder.
+      - name: Stamp chart version and push tag
+        if: steps.tag.outputs.new_tag != ''
+        env:
+          VERSION: ${{ steps.tag.outputs.new_version }}
+          NEW_TAG: ${{ steps.tag.outputs.new_tag }}
+        run: |
+          sed -i -E "s|^version: .*|version: ${VERSION}|" charts/k8s-status/Chart.yaml
+          sed -i -E "s|^appVersion: .*|appVersion: \"${VERSION}\"|" charts/k8s-status/Chart.yaml
+          grep -E '^(version|appVersion):' charts/k8s-status/Chart.yaml
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): stamp chart ${NEW_TAG}"
+          git tag -a "${NEW_TAG}" -m "${NEW_TAG}"
+          git push origin "refs/tags/${NEW_TAG}"
 
       # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows -- GitHub
       # blocks that to prevent recursion. So dispatch the release explicitly,
