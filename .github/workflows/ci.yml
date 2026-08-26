@@ -13,9 +13,9 @@ jobs:
   go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -33,6 +33,11 @@ jobs:
       - name: test
         run: go test ./... -race -cover
 
+      # The seed corpus runs as part of `go test`; this explores beyond it. Short on
+      # purpose, since CI is not where a long fuzz campaign belongs.
+      - name: fuzz
+        run: go test ./internal/status/ -run '^$' -fuzz FuzzParseImage -fuzztime 30s
+
       - name: build
         run: go build ./...
 
@@ -47,8 +52,8 @@ jobs:
   helm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
 
       - name: lint
         run: helm lint charts/k8s-status
@@ -66,13 +71,11 @@ jobs:
   image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-
-      # Build only — publishing happens in release.yml on a tag.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       # Loaded into the local daemon so the scanners below can read it.
       - name: build image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: false
@@ -86,7 +89,7 @@ jobs:
       # Fail the build on a fixable HIGH/CRITICAL CVE. Unfixable ones are reported
       # but do not block, since there is nothing to upgrade to.
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: k8s-status:ci
           format: table
@@ -95,7 +98,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Scan filesystem for leaked secrets
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: secret
@@ -105,7 +108,7 @@ jobs:
       # CIS Docker Benchmark checks on the built image (non-root user, no setuid
       # binaries, healthcheck/metadata, no credentials in env or layers).
       - name: CIS Docker Benchmark (dockle)
-        uses: erzz/dockle-action@v1.4.1
+        uses: erzz/dockle-action@e8a7c41f36f1236ca3282b298d425ffbfdb2e922 # v1.4.1
         with:
           image: k8s-status:ci
           exit-code: "1"
