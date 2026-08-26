@@ -1,6 +1,6 @@
 # Build stage. Pinned to a specific Go minor so a toolchain bump is a deliberate commit.
 # Keep this current: the stdlib CVEs Trivy reports are fixed by the toolchain, not by us.
-FROM golang:1.27-bookworm AS build
+FROM golang:1.27-bookworm@sha256:ded31c68586d2e49e760acc2e65a884b23d032e9bbbed0ae0c55abd3fcaf4452 AS build
 
 ARG VERSION=dev
 WORKDIR /src
@@ -24,7 +24,7 @@ RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/k8s-s
 # run as root by accident.
 #
 # See README "Container hardening" for how this maps to the CIS controls.
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
 # OCI metadata, so a scanner or registry can attribute the image (CIS 4.11).
 LABEL org.opencontainers.image.title="k8s-status" \
