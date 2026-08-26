@@ -209,3 +209,60 @@ func TestRefreshOptionsKeepFilters(t *testing.T) {
 		t.Errorf("last option = %+v, want the off switch", opts[len(opts)-1])
 	}
 }
+
+// The views chips select a section; the status tiles select rows inside the services
+// table. Choosing one must visibly deselect the other, or the page shows a state the
+// user cannot account for.
+func TestViewAndRowFiltersAreMutuallyExclusive(t *testing.T) {
+	href := func(raw, kind, val string) string {
+		q := query(t, raw)
+		d := pageData{BasePath: "/k8s-status", Query: q, Filter: ParseFilter(q)}
+		return d.FilterHref(kind, val)
+	}
+
+	// Choosing a row filter drops the section view.
+	if got := href("view=unmanaged", "gpu", "true"); strings.Contains(got, "view=") {
+		t.Errorf("selecting gpu kept the view: %s", got)
+	}
+	if got := href("view=unmanaged", "status", "DEGRADED"); strings.Contains(got, "view=") {
+		t.Errorf("selecting a status kept the view: %s", got)
+	}
+	// Choosing the section view drops the row filters.
+	got := href("gpu=true&status=DEGRADED", "view", "unmanaged")
+	if strings.Contains(got, "gpu=") || strings.Contains(got, "status=") {
+		t.Errorf("selecting the view kept row filters: %s", got)
+	}
+	if !strings.Contains(got, "view=unmanaged") {
+		t.Errorf("view was not applied: %s", got)
+	}
+	// It still toggles off.
+	if got := href("view=unmanaged", "view", "unmanaged"); strings.Contains(got, "view=") {
+		t.Errorf("clicking the active view should clear it: %s", got)
+	}
+}
+
+// Without this the chip never lights up, because has() did not know the kind.
+func TestViewFilterReportsItselfActive(t *testing.T) {
+	q := query(t, "view=unmanaged")
+	d := pageData{BasePath: "/k8s-status", Query: q, Filter: ParseFilter(q)}
+	if !d.FilterActive("view", "unmanaged") {
+		t.Error("the not-in-gitops chip must render as selected when the view is active")
+	}
+	if d.FilterActive("view", "something-else") {
+		t.Error("a different view value must not report active")
+	}
+}
+
+// A hand-written URL can carry both; the page must still render one coherent state.
+func TestViewWinsOverRowFiltersInAHandWrittenURL(t *testing.T) {
+	f := ParseFilter(query(t, "view=unmanaged&gpu=true&status=DEGRADED&sync=Synced"))
+	if f.View != "unmanaged" {
+		t.Fatalf("view = %q, want unmanaged", f.View)
+	}
+	if f.GPU != "" || len(f.Status) != 0 || len(f.Sync) != 0 {
+		t.Errorf("row filters survived alongside a view: gpu=%q status=%v sync=%v", f.GPU, f.Status, f.Sync)
+	}
+	if f.Active() {
+		t.Error("with only a view set, no row filter should report active")
+	}
+}
