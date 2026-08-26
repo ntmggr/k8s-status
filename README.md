@@ -38,6 +38,38 @@ each one. ArgoCD alone is the default; see [`SOURCES`](#choosing-the-source).
 <sub>Screenshot uses made-up data from `testdata/`. There is also a dark theme
 ([screenshot](docs/screenshot-dark.png)) that follows your system setting.</sub>
 
+## What access does it need?
+
+Read-only, and as little of it as possible. The service can list things. It cannot
+create, change, delete or restart anything, and that is enforced by Kubernetes rather
+than by the code being polite: the ServiceAccount is only ever granted `get` and `list`.
+
+**By default it gets one namespaced Role, and nothing cluster-wide at all:**
+
+| Where | API group | Resources | Verbs |
+|---|---|---|---|
+| Role in the `argocd` namespace | `argoproj.io` | `applications` | `get`, `list` |
+
+That is the whole default install. No ClusterRole is created, so the service cannot see
+outside that one namespace. It cannot read your Secrets, your ConfigMaps, or anything in
+any other namespace.
+
+**The optional features each need more, so each is off by default.** Turning any of them
+on requires `rbac.clusterRole=true`, because these resources are not namespaced:
+
+| Feature | Setting | Additionally grants |
+|---|---|---|
+| Cluster capacity | `config.nodeStats` | `get`, `list` on `nodes` |
+| Workloads outside GitOps | `config.unmanaged` | `get`, `list` on `deployments`, `statefulsets`, `daemonsets` |
+| Flux support | `config.sources` includes `flux` | `get`, `list` on `helmreleases`, `kustomizations` |
+
+Still only `get` and `list`. There is no verb anywhere in this project that changes a
+cluster, and no code path that issues a write.
+
+If you enable a feature without granting its permission, the page does not break. That
+section shows an inline note telling you which Role it needs, and everything else keeps
+working.
+
 ## Quick start
 
 The fastest way to see it work needs no cluster and no ArgoCD. It serves a bundled

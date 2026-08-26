@@ -93,6 +93,7 @@ func main() {
 	}
 
 	srv, err := web.NewServer(web.Config{
+		LocalMode:      os.Getenv("KUBE_API_URL") != "",
 		EnvName:        envName,
 		EnvType:        envType,
 		Region:         region,
