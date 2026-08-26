@@ -99,6 +99,7 @@ type pageData struct {
 	Shown        int
 	AgeSeconds   int
 	Stale        bool
+	LocalMode    bool
 	Error        string
 	ClusterError *ClusterError
 	HasData      bool
@@ -245,6 +246,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		BuildVersion:   s.cfg.BuildVersion,
 		Snapshot:       snap,
 		Filter:         ParseFilter(query),
+		LocalMode:      s.cfg.LocalMode,
 		Query:          query,
 		HasData:        snap != nil,
 	}

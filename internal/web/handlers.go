@@ -13,6 +13,10 @@ import (
 )
 
 type Config struct {
+	// LocalMode is set when the binary is talking to a proxied API from outside the
+	// cluster. Worth showing: the permissions in play are the operator's kubeconfig,
+	// not the ServiceAccount a real deployment would be limited to.
+	LocalMode bool
 	EnvName        string
 	EnvType        string
 	Region         string
