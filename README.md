@@ -521,9 +521,14 @@ A cluster can have GPUs that Kubernetes cannot schedule. Access to a device come
 the driver and the container runtime; only *allocation* needs a device plugin. Where the
 runtime injects devices by default, workloads use the GPU perfectly well while the node
 advertises no capacity at all. Nodes carrying a `.../gpu.present=true` label with nothing
-allocatable are counted separately and shown as `N unschedulable`, and services pinned to
-them are still marked as GPU-backed. Reporting a plain zero there would hide the fact that
-the scheduler cannot allocate or limit those cards, so any number of pods can land on one.
+allocatable still count as GPU nodes, and the page says `no device plugin` instead of
+printing a card count it cannot know. Services pinned to them are marked as GPU-backed,
+because the runtime does hand them the device.
+
+This matters more than it sounds. A production cluster running 38 GPU nodes that serve
+live traffic reported `0 gpu, 0 cards` under the earlier rule, because it counted only
+what the scheduler could allocate. The card count genuinely is not discoverable without
+a plugin, but the nodes are unmistakably there.
 
 If you do not enable the workload read (`UNMANAGED`, or `rbac.clusterRole`), nothing is
 detected and no service is marked. Set `GPU_GLOBS` to fall back to name matching in that

@@ -267,17 +267,23 @@ func TestNodeStatsFlagsHardwareWithoutPlugin(t *testing.T) {
 		hwNode("m8g.xlarge", "", false),
 	}}
 	got := BuildNodeStats(list, DiscoverAccelerators(list, nil))
-	if got.GPUNodes != 0 {
-		t.Errorf("gpuNodes=%d, want 0: nothing is allocatable", got.GPUNodes)
+	// They are GPU nodes: the workloads on them reach the hardware and can be serving
+	// traffic. Reporting 0 here is what made a production cluster read as GPU-less.
+	if got.GPUNodes != 2 {
+		t.Errorf("gpuNodes=%d, want 2", got.GPUNodes)
 	}
+	// The card count is genuinely unknowable without a plugin.
 	if got.GPUs != 0 {
-		t.Errorf("GPUs=%d, want 0", got.GPUs)
+		t.Errorf("GPUs=%d, want 0: nothing is allocatable", got.GPUs)
 	}
 	if got.UnschedulableGPUNodes != 2 {
 		t.Errorf("unschedulable=%d, want 2", got.UnschedulableGPUNodes)
 	}
-	if got.CPUNodes != 3 {
-		t.Errorf("cpuNodes=%d, want 3: they are not schedulable as GPU nodes", got.CPUNodes)
+	if got.CPUNodes != 1 {
+		t.Errorf("cpuNodes=%d, want 1", got.CPUNodes)
+	}
+	if got.Total != got.CPUNodes+got.GPUNodes {
+		t.Errorf("totals must add up: %d != %d+%d", got.Total, got.CPUNodes, got.GPUNodes)
 	}
 }
 

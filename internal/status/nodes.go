@@ -22,13 +22,14 @@ type NodeStats struct {
 	Total    int
 	CPUNodes int
 	GPUNodes int
-	// GPUs is the total device count across every accelerator kind, kept under this
-	// name so the JSON field and the page do not change meaning for NVIDIA clusters.
+	// GPUs counts allocatable devices only. Without a device plugin the number of
+	// cards is not discoverable at all, so this is zero even where GPUNodes is not,
+	// and the page says so rather than printing a bare "0 cards".
 	GPUs int
 	// Accelerators breaks that total down per resource, so a cluster with MIG slices
 	// or more than one vendor can see which is which. One entry on a typical cluster.
 	Accelerators []AcceleratorCount
-	// UnschedulableGPUNodes have a device physically but advertise none, which means
+	// UnschedulableGPUNodes is the subset of GPUNodes that advertise nothing, meaning
 	// no device plugin. Workloads there still reach the GPU through the runtime, but
 	// the scheduler cannot allocate or limit it, so any number of pods can land on one
 	// card and fight over its memory. Worth showing rather than silently reporting zero.
@@ -59,15 +60,21 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 	for _, n := range list.Items {
 		stats.Total++
 
+		// A node with a device is a GPU node whether or not the scheduler can hand it
+		// out. Counting only allocatable ones reports "0 gpu" on a cluster whose GPUs
+		// are busy serving traffic, which is the most misleading thing the page could
+		// say about it.
 		gpus := nodeAccelerators(n, accel)
-		if gpus > 0 {
+		hardware := hasAcceleratorHardware(n)
+		switch {
+		case gpus > 0:
 			stats.GPUNodes++
 			stats.GPUs += gpus
-		} else {
+		case hardware:
+			stats.GPUNodes++
+			stats.UnschedulableGPUNodes++
+		default:
 			stats.CPUNodes++
-			if hasAcceleratorHardware(n) {
-				stats.UnschedulableGPUNodes++
-			}
 		}
 		for _, name := range accel {
 			if c := quantityInt(string(n.Status.Capacity[name])); c > 0 {
