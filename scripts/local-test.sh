@@ -59,7 +59,7 @@ case "$MODE" in
     kubectl --context "$CONTEXT" proxy --port="$PROXY_PORT" >/dev/null 2>&1 &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
-    ROOT_APP="${ROOT_APP_NAME:-ocp-services}"
+    ROOT_APP="${ROOT_APP_NAME:-}"
     # Your kubeconfig can already read nodes and workloads, so show both by default locally.
     NODE_STATS_DEFAULT=true
     UNMANAGED_DEFAULT=true

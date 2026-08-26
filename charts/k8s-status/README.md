@@ -107,7 +107,7 @@ for. Leave it empty.
 | `config.clusterName` | `""` | `CLUSTER_NAME` — cluster name in the page header. |
 | `config.basePath` | `/k8s-status` | `BASE_PATH` — path prefix served natively, no rewrite. |
 | `config.argocdNamespace` | `argocd` | `ARGOCD_NAMESPACE` — namespace to read Applications from. |
-| `config.rootAppName` | `ocp-services` | `ROOT_APP_NAME` — app-of-apps used to derive prune orphans. |
+| `config.rootAppName` | `""` | `ROOT_APP_NAME` — app-of-apps used to derive prune orphans. Empty detects it. |
 | `config.argocdUIBase` | `""` | `ARGOCD_UI_BASE` — ArgoCD UI base URL for deep links. |
 | `config.ignoreGlobs` | `""` | `IGNORE_GLOBS` — comma-separated globs of Application names to hide. |
 | `config.cacheTTLSeconds` | `15` | `CACHE_TTL_SECONDS` — snapshot cache TTL. |

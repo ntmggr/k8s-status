@@ -110,7 +110,8 @@ data:
   # ClusterRole above to be uncommented, with its two fluxcd.io rules.
   SOURCES: "argocd"
   ARGOCD_NAMESPACE: "argocd"
-  ROOT_APP_NAME: "ocp-services"
+  # Empty detects the app-of-apps by shape; set it only if you have more than one.
+  ROOT_APP_NAME: ""
   ARGOCD_UI_BASE: ""
   IGNORE_GLOBS: ""
   CACHE_TTL_SECONDS: "15"

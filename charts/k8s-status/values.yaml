@@ -54,8 +54,10 @@ config:
   sources: argocd
   # ARGOCD_NAMESPACE - namespace the app reads Applications from.
   argocdNamespace: argocd
-  # ROOT_APP_NAME - app-of-apps Application used to derive pruning orphans.
-  rootAppName: ocp-services
+  # ROOT_APP_NAME - app-of-apps Application used to derive pruning orphans. Empty
+  # detects it: the Application that owns the most other Applications wins. Set it
+  # only if your cluster has more than one app-of-apps.
+  rootAppName: ""
   # ARGOCD_UI_BASE - base URL of the ArgoCD UI for deep links. Empty disables links.
   argocdUIBase: ""
   # IGNORE_GLOBS - comma-separated globs of Application names to hide.

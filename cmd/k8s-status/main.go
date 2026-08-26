@@ -39,6 +39,9 @@ func main() {
 	argocdUI := env("ARGOCD_UI_BASE", "")
 	ignoreGlobs := splitGlobs(env("IGNORE_GLOBS", ""))
 	gpuGlobs := splitGlobs(env("GPU_GLOBS", defaultGPUGlobs))
+	// Empty keeps the built-in list; a site with its own sidecars replaces it here
+	// rather than by patching the binary.
+	sidecarImages := splitGlobs(env("SIDECAR_IMAGES", ""))
 	nodeStats := envBool("NODE_STATS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
@@ -62,6 +65,7 @@ func main() {
 		RootAppName:       rootApp,
 		IgnoreGlobs:       ignoreGlobs,
 		GPUGlobs:          gpuGlobs,
+		SidecarImages:     sidecarImages,
 		UnmanagedIgnoreNS: unmanagedIgnoreNS,
 	}, cacheTTL)
 
