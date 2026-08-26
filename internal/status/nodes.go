@@ -28,9 +28,14 @@ type NodeStats struct {
 	// Accelerators breaks that total down per resource, so a cluster with MIG slices
 	// or more than one vendor can see which is which. One entry on a typical cluster.
 	Accelerators []AcceleratorCount
-	Arch         []ArchCount
-	Denied       bool
-	Error        string
+	// UnschedulableGPUNodes have a device physically but advertise none, which means
+	// no device plugin. Workloads there still reach the GPU through the runtime, but
+	// the scheduler cannot allocate or limit it, so any number of pods can land on one
+	// card and fight over its memory. Worth showing rather than silently reporting zero.
+	UnschedulableGPUNodes int
+	Arch                  []ArchCount
+	Denied                bool
+	Error                 string
 }
 
 // AcceleratorCount is one device type and how much of it the cluster has.
@@ -60,6 +65,9 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 			stats.GPUs += gpus
 		} else {
 			stats.CPUNodes++
+			if hasAcceleratorHardware(n) {
+				stats.UnschedulableGPUNodes++
+			}
 		}
 		for _, name := range accel {
 			if c := quantityInt(string(n.Status.Capacity[name])); c > 0 {

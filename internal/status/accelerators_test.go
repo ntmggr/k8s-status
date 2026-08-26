@@ -232,3 +232,87 @@ func TestAcceleratorLabelNilSnapshot(t *testing.T) {
 		t.Fatalf("detail = %q, want empty", got)
 	}
 }
+
+func hwNode(instanceType string, gpuCap string, present bool) kube.Node {
+	var n kube.Node
+	n.Metadata.Labels = map[string]string{"node.kubernetes.io/instance-type": instanceType}
+	if present {
+		n.Metadata.Labels["nvidia.com/gpu.present"] = "true"
+	}
+	n.Status.Capacity = map[string]kube.Quantity{"cpu": "8"}
+	if gpuCap != "" {
+		n.Status.Capacity["nvidia.com/gpu"] = kube.Quantity(gpuCap)
+	}
+	return n
+}
+
+// A cluster with a device plugin: hardware and capacity agree, so nothing is flagged.
+func TestNodeStatsNoUnschedulableWhenPluginPresent(t *testing.T) {
+	list := &kube.NodeList{Items: []kube.Node{
+		hwNode("g5.xlarge", "1", true),
+		hwNode("m8g.xlarge", "", false),
+	}}
+	got := BuildNodeStats(list, DiscoverAccelerators(list, nil))
+	if got.GPUNodes != 1 || got.UnschedulableGPUNodes != 0 {
+		t.Fatalf("gpuNodes=%d unschedulable=%d, want 1/0", got.GPUNodes, got.UnschedulableGPUNodes)
+	}
+}
+
+// A cluster without one: the hardware is there, nothing is allocatable, and reporting
+// a plain zero would hide it.
+func TestNodeStatsFlagsHardwareWithoutPlugin(t *testing.T) {
+	list := &kube.NodeList{Items: []kube.Node{
+		hwNode("g4dn.xlarge", "", true),
+		hwNode("g5.2xlarge", "", true),
+		hwNode("m8g.xlarge", "", false),
+	}}
+	got := BuildNodeStats(list, DiscoverAccelerators(list, nil))
+	if got.GPUNodes != 0 {
+		t.Errorf("gpuNodes=%d, want 0: nothing is allocatable", got.GPUNodes)
+	}
+	if got.GPUs != 0 {
+		t.Errorf("GPUs=%d, want 0", got.GPUs)
+	}
+	if got.UnschedulableGPUNodes != 2 {
+		t.Errorf("unschedulable=%d, want 2", got.UnschedulableGPUNodes)
+	}
+	if got.CPUNodes != 3 {
+		t.Errorf("cpuNodes=%d, want 3: they are not schedulable as GPU nodes", got.CPUNodes)
+	}
+}
+
+// The label alone must not imply a GPU; a stale or hand-set label with value other
+// than true is ignored.
+func TestHardwareLabelMustBeTrue(t *testing.T) {
+	var n kube.Node
+	n.Metadata.Labels = map[string]string{"nvidia.com/gpu.present": "false"}
+	if hasAcceleratorHardware(n) {
+		t.Fatal("gpu.present=false must not count as hardware")
+	}
+	n.Metadata.Labels["nvidia.com/gpu.present"] = "TRUE"
+	if !hasAcceleratorHardware(n) {
+		t.Fatal("the value should be matched case-insensitively")
+	}
+}
+
+// Services pinned to GPU nodes are GPU-backed even where nothing is allocatable: the
+// runtime still hands them the device.
+func TestFillGPUFlagsServicesOnPluginlessGPUNodes(t *testing.T) {
+	nodes := &kube.NodeList{Items: []kube.Node{
+		hwNode("g4dn.xlarge", "", true),
+		hwNode("m8g.xlarge", "", false),
+	}}
+	nodes.Items[0].Metadata.Labels["NodeGroupType"] = "tts-gpu"
+	nodes.Items[1].Metadata.Labels["NodeGroupType"] = "base"
+	accel := DiscoverAccelerators(nodes, nil) // empty: nothing is advertised
+
+	snap := &Snapshot{}
+	snap.addService(Service{Name: "tts", Owned: []Component{{Kind: "Deployment", Namespace: "tts", Name: "tts"}}})
+
+	w := affinityTo(gpuWorkload("Deployment", "tts", "tts", "", ""), "NodeGroupType", "tts-gpu")
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nodes, accel)
+
+	if !snap.Services[0].GPU {
+		t.Fatal("a service pinned to GPU hardware is GPU-backed even with no device plugin")
+	}
+}

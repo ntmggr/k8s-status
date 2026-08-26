@@ -94,7 +94,8 @@ func workloadGPUs(w kube.Workload, accel []string) int {
 }
 
 // onlyRunsOnGPUNodes reports whether every node this workload may be scheduled onto
-// carries a GPU. "Every" rather than "any" is what keeps a DaemonSet out: its rules
+// carries a device, counting hardware the cluster cannot schedule as well as capacity
+// it can. A cluster without a device plugin still runs GPU workloads. "Every" rather than "any" is what keeps a DaemonSet out: its rules
 // also select nodes without one, so it cannot be claimed as GPU-backed.
 func onlyRunsOnGPUNodes(w kube.Workload, nodes []kube.Node, accel []string) bool {
 	if len(nodes) == 0 {
@@ -106,7 +107,7 @@ func onlyRunsOnGPUNodes(w kube.Workload, nodes []kube.Node, accel []string) bool
 			continue
 		}
 		matched++
-		if nodeAccelerators(n, accel) > 0 {
+		if nodeHasAccelerator(n, accel) {
 			withGPU++
 		}
 	}

@@ -131,6 +131,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-of { display: flex; gap: .9rem; align-items: baseline; color: var(--ink-2); font-size: .8rem; }
 .cap-of .cap-part { display: inline-flex; align-items: baseline; gap: .3rem; }
 .cap-of .is-gpu { color: var(--gpu-fg); }
+.cap-of .is-warn { color: var(--warn-fg); }
 .tile.t-ok        { background: var(--ok-bg);    border-color: transparent; } .tile.t-ok .n,        .tile.t-ok .k        { color: var(--ok-fg); }
 .tile.t-degraded  { background: var(--deg-bg);   border-color: transparent; } .tile.t-degraded .n,  .tile.t-degraded .k  { color: var(--deg-fg); }
 .tile.t-warning   { background: var(--warn-bg);  border-color: transparent; } .tile.t-warning .n,   .tile.t-warning .k   { color: var(--warn-fg); }
@@ -339,6 +340,10 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
       <span class="cap-part is-gpu">{{icon "gpu"}}{{.GPUNodes}} {{$.Snapshot.AcceleratorLabel}}
         <span class="cap-split" title="Total across those nodes. One node can hold several.{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}</span></span>
+      {{- if .UnschedulableGPUNodes}}
+      <span class="cap-part is-warn" title="These nodes have a device but advertise none, so no device plugin is running. Workloads still reach the hardware through the container runtime, but the scheduler cannot allocate or limit it: any number of pods can land on one card.">{{.UnschedulableGPUNodes}} unschedulable
+        <span class="cap-split">hardware, no device plugin</span></span>
+      {{- end}}
     </div>
   </div>
   {{- end}}{{end}}

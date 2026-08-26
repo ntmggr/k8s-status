@@ -517,6 +517,14 @@ Detection is by container resources, not by which node a pod landed on. A Daemon
 scheduled onto a GPU node is not a GPU workload, and a service scaled to zero still is
 one.
 
+A cluster can have GPUs that Kubernetes cannot schedule. Access to a device comes from
+the driver and the container runtime; only *allocation* needs a device plugin. Where the
+runtime injects devices by default, workloads use the GPU perfectly well while the node
+advertises no capacity at all. Nodes carrying a `.../gpu.present=true` label with nothing
+allocatable are counted separately and shown as `N unschedulable`, and services pinned to
+them are still marked as GPU-backed. Reporting a plain zero there would hide the fact that
+the scheduler cannot allocate or limit those cards, so any number of pods can land on one.
+
 If you do not enable the workload read (`UNMANAGED`, or `rbac.clusterRole`), nothing is
 detected and no service is marked. Set `GPU_GLOBS` to fall back to name matching in that
 case; patterns are matched against the Application name and need no extra permission.

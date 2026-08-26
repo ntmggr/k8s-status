@@ -75,6 +75,33 @@ func nodeAccelerators(n kube.Node, accel []string) int {
 	return total
 }
 
+// gpuPresentSuffix is the label node-feature-discovery and the GPU operator set on a
+// node that physically has a device: nvidia.com/gpu.present, amd.com/gpu.present.
+// Matching on the suffix rather than a vendor list keeps it open-ended.
+const gpuPresentSuffix = "/gpu.present"
+
+// hasAcceleratorHardware reports whether a node carries a device the cluster knows
+// about physically, whether or not anything can be scheduled onto it.
+//
+// This is not the same question as capacity. Access to a GPU comes from the driver and
+// the container runtime; only *allocation* needs a device plugin. A cluster whose
+// runtime injects devices by default runs GPU workloads perfectly well while advertising
+// no capacity at all, so a node can be genuinely GPU-backed and allocatably empty.
+func hasAcceleratorHardware(n kube.Node) bool {
+	for k, v := range n.Metadata.Labels {
+		if strings.HasSuffix(k, gpuPresentSuffix) && strings.EqualFold(v, "true") {
+			return true
+		}
+	}
+	return false
+}
+
+// nodeHasAccelerator is the question placement detection asks: can a workload here
+// reach a device? Allocatable capacity proves it, and so does the hardware label.
+func nodeHasAccelerator(n kube.Node, accel []string) bool {
+	return nodeAccelerators(n, accel) > 0 || hasAcceleratorHardware(n)
+}
+
 // AcceleratorLabel is the noun the page uses for accelerators: "gpu" on an ordinary
 // NVIDIA or AMD cluster, "neuron" or "tpu" where that is what is installed, and
 // "accelerators" when a cluster runs more than one kind.

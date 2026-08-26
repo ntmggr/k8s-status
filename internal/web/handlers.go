@@ -133,8 +133,11 @@ type nodesJSON struct {
 	// Accelerators breaks gpus down by resource name, so a consumer can tell NVIDIA
 	// cards from MIG slices or another vendor. Omitted when nothing was found.
 	Accelerators map[string]int `json:"accelerators,omitempty"`
-	Arch         map[string]int `json:"arch,omitempty"`
-	Error        string         `json:"error,omitempty"`
+	// UnschedulableGPUNodes is nonzero when a cluster has GPU hardware no device
+	// plugin is advertising, so the scheduler cannot allocate it.
+	UnschedulableGPUNodes int            `json:"unschedulableGpuNodes,omitempty"`
+	Arch                  map[string]int `json:"arch,omitempty"`
+	Error                 string         `json:"error,omitempty"`
 }
 
 // unmanagedJSON is omitted entirely when UNMANAGED is off. These are workloads running
@@ -336,12 +339,13 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 	}
 	n := snap.Nodes
 	out := &nodesJSON{
-		Total:       n.Total,
-		CPUNodes:    n.CPUNodes,
-		GPUNodes:    n.GPUNodes,
-		GPUs:        n.GPUs,
-		GPUServices: snap.Summary.GPU,
-		Error:       n.Error,
+		Total:                 n.Total,
+		CPUNodes:              n.CPUNodes,
+		GPUNodes:              n.GPUNodes,
+		GPUs:                  n.GPUs,
+		GPUServices:           snap.Summary.GPU,
+		UnschedulableGPUNodes: n.UnschedulableGPUNodes,
+		Error:                 n.Error,
 	}
 	if len(n.Accelerators) > 0 {
 		out.Accelerators = make(map[string]int, len(n.Accelerators))
