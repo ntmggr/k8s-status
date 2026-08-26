@@ -356,6 +356,8 @@ func splitGlobs(s string) []string {
 	return out
 }
 
-// defaultGPUGlobs marks inference workloads that typically run on GPU nodes.
-// Override with GPU_GLOBS; set it to an empty string to disable the marker.
-const defaultGPUGlobs = "*-gpu,*triton*,tts-engine-*,parakeet-*,nvidia-*,s2s-*,resemble-*,*-vllm,deepasr*,hybrid-turn-*,logos-*,*-medium,*-large"
+// defaultGPUGlobs is deliberately empty. GPU services are detected from what they
+// actually request (see status.FillGPU), which needs no site-specific list and cannot
+// go stale. GPU_GLOBS remains as an escape hatch for clusters that do not grant the
+// workload read the detection needs.
+const defaultGPUGlobs = ""
