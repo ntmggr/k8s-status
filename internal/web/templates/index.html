@@ -78,6 +78,8 @@ header {
 .brand { flex: none; margin-right: .5rem; vertical-align: -3px; }
 h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.badge.is-envtype { text-transform: uppercase; letter-spacing: .06em; font-size: .62rem;
+                    border-style: dashed; opacity: .85; }
 .badge {
   display: inline-block; margin-left: .5rem; padding: .1rem .45rem;
   border: 1px solid var(--ring); border-radius: 999px;
@@ -266,8 +268,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <body>
 <header>
   <h1>{{brand}}{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
-    {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="{{if .EnvType}}{{.EnvType}} environment{{else}}cluster{{end}}">{{.ClusterName}}</span>
-    {{- else if .EnvType}}<span class="badge">{{.EnvType}}</span>{{end}}
+    {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
+    {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
   <div class="meta">checked {{.AgeSeconds}}s ago &middot; auto-refresh
     {{- range $i, $o := .RefreshOptions}}{{if $i}} &middot;{{end}}

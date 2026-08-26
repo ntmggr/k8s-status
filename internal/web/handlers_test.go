@@ -169,13 +169,13 @@ func TestBadgeShowsClusterOverEnvType(t *testing.T) {
 	if !strings.Contains(body, `>k8s-stage</span>`) {
 		t.Errorf("badge should show the cluster/context when known")
 	}
-	if strings.Contains(body, `class="badge">dev<`) {
+	if strings.Contains(body, `class="badge is-envtype"`) {
 		t.Errorf("badge should not fall back to env type when a cluster is known")
 	}
 
 	// With no cluster configured the env type is still better than nothing.
 	h = newTestServer(t, base, fakeProvider{snap: fixtureSnapshot(t)})
-	if body := get(t, h, "/k8s-status/").Body.String(); !strings.Contains(body, `class="badge">dev<`) {
+	if body := get(t, h, "/k8s-status/").Body.String(); !strings.Contains(body, `class="badge is-envtype"`) {
 		t.Errorf("badge should fall back to env type when no cluster is set")
 	}
 }
@@ -200,7 +200,7 @@ func TestPageRenders(t *testing.T) {
 
 	body := rec.Body.String()
 	for _, want := range []string{
-		"sample-dev", "eu-west-1", "class=\"badge\">dev<",
+		"sample-dev", "eu-west-1", "class=\"badge is-envtype\"",
 		`<meta http-equiv="refresh" content="30">`,
 		"DEGRADED", "PROGRESSING", "PRUNE", "SUSPENDED", "OK",
 		"s-degraded", "s-warning", "s-drift", "s-prune",
