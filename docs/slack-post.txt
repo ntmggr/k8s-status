@@ -1,0 +1,11 @@
+One page: every service in your cluster, its version, and whether it is actually healthy. ArgoCD and Flux.
+
+Two things I couldn't find elsewhere: it tells "out of sync" apart from "broken", and it lists what GitOps does not manage at all (cloud addons, Terraform bits, hand-installed Helm).
+
+No install, no cluster needed to try it:
+
+git clone https://github.com/ntmggr/k8s-status && cd k8s-status && ./scripts/local-test.sh fixture
+
+Read-only by construction: get and list, no ClusterRole. Single Go binary, zero dependencies, 4.5 MB, MIT.
+
+https://github.com/ntmggr/k8s-status

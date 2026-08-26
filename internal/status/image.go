@@ -3,11 +3,14 @@ package status
 import "strings"
 
 // defaultSidecarImages are images that appear alongside a service but are not the
-// service itself: the istio proxy, shared auth sidecars, and init helpers. They are
-// skipped when deciding which image carries the component version.
+// service itself: the istio proxy and common init helpers. They are skipped when
+// deciding which image carries the component version.
+//
+// Deliberately limited to images any cluster would recognise. A site with its own
+// sidecars should add them through SIDECAR_IMAGES rather than grow this list, which
+// is why nothing installation-specific belongs here.
 var defaultSidecarImages = []string{
 	"proxyv2",
-	"authz-sidecar",
 	"aws-cli",
 	"busybox",
 	"kubectl",

@@ -95,7 +95,7 @@ Set `NODE_STATS=false` or `UNMANAGED=false` to turn either off.
 1. Checks `kind`, `kubectl`, `docker` and `go`, and that the Docker daemon responds.
 2. Creates the kind cluster `k8s-status-demo`, or reuses it if it is already there.
 3. Applies `hack/application-crd.yaml`, then waits for it to be Established.
-4. Applies `hack/demo-apps.yaml` — the `argocd` namespace, the `ocp-services` root app
+4. Applies `hack/demo-apps.yaml` — the `argocd` namespace, the `platform` root app
    and nine children.
 5. Reads every object back and fails loudly if any of them lost its `status`.
 6. Builds the binary, starts `kubectl proxy`, and starts `k8s-status` pointed at the
