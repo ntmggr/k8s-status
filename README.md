@@ -256,7 +256,8 @@ Before you start you need:
 - a cluster that already runs ArgoCD or Flux,
 - for ArgoCD, the name of the **root Application** — the one Application that owns all
   the others. ArgoCD people call this pattern *app-of-apps*. The default here is
-  `ocp-services`; set `ROOT_APP_NAME` to whatever yours is called,
+  detected automatically as the Application that owns the most others; set
+  `ROOT_APP_NAME` only if your cluster has more than one app-of-apps,
 - for Flux, `SOURCES` set to include `flux` and the extra permission described in
   [Optional extras](#optional-extras).
 
@@ -478,10 +479,11 @@ can run it with none of them set.
 | `REGION` | *(empty)* | Region shown in the header, e.g. `eu-west-1` |
 | `BASE_PATH` | `/k8s-status` | Path prefix the app serves. Normalized to a leading slash with no trailing slash. Empty means serve at `/` |
 | `ARGOCD_NAMESPACE` | `argocd` | Namespace that holds the ArgoCD `Application` objects |
-| `ROOT_APP_NAME` | `ocp-services` | Name of the root Application that owns all the others. **Set this to yours.** |
+| `ROOT_APP_NAME` | *(detected)* | Root Application that owns all the others. Empty picks the Application owning the most others; set it only with more than one app-of-apps |
 | `ARGOCD_UI_BASE` | *(empty)* | If set, service names link to `<base>/applications/<name>` in the ArgoCD UI |
 | `IGNORE_GLOBS` | *(empty)* | Comma-separated name patterns to hide. Matches are removed from the table and from every count, and reported as `hidden` |
 | `GPU_GLOBS` | *(empty)* | Fallback only. Name patterns marking a service as GPU-backed, used when the workload read that powers real detection is not available |
+| `SIDECAR_IMAGES` | *(built-in list)* | Image names that never carry the service version, such as an injected proxy. Replaces the built-in list |
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |

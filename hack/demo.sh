@@ -11,7 +11,7 @@ set -euo pipefail
 CLUSTER="k8s-status-demo"
 CONTEXT="kind-${CLUSTER}"
 NAMESPACE="argocd"
-ROOT_APP="ocp-services"          # the ROOT_APP_NAME default, so no override is needed
+ROOT_APP="platform"              # any name works: the app-of-apps is detected by shape
 PORT="${PORT:-8080}"
 PROXY_PORT="${PROXY_PORT:-8001}"
 

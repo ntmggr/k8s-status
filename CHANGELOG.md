@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated.
 - `testdata/applications.json` application names replaced with generic, obviously synthetic names
   (`orders-api`, `search-api`, `media-encoder`, ...) and the fixture root app renamed to `root-app`.
-  Tests updated accordingly. The runtime `ROOT_APP_NAME` default is unchanged (`ocp-services`).
+  Tests updated accordingly. The runtime `ROOT_APP_NAME` default is unchanged.
 - `scripts/local-test.sh` no longer carries environment-specific defaults: `ARGOCD_UI_BASE`,
   `CLUSTER_NAME`, `REGION` and `ENV_TYPE` default to empty, `ENV_NAME` defaults to `local`, and the
   kube context is now a required argument in `cluster` mode.

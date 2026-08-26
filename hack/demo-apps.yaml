@@ -6,7 +6,8 @@
 # first matching rule wins, so `legacy-batch` is PRUNE even though it is also
 # Degraded, and `checkout-web` is PROGRESSING rather than DRIFT.
 #
-# The root app is named ocp-services because that is the ROOT_APP_NAME default.
+# The root app name is arbitrary. It is found by shape, being the Application that
+# owns the most other Applications, so no ROOT_APP_NAME override is needed.
 ---
 apiVersion: v1
 kind: Namespace
@@ -20,7 +21,7 @@ metadata:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ocp-services
+  name: platform
   namespace: argocd
   labels:
     EnvType: dev
