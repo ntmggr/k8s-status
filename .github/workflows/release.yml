@@ -86,8 +86,12 @@ jobs:
           chart="$(grep -E '^version:' charts/k8s-status/Chart.yaml | awk '{print $2}')"
           app="$(grep -E '^appVersion:' charts/k8s-status/Chart.yaml | tr -d '"' | awk '{print $2}')"
           echo "chart version=$chart appVersion=$app tag=${{ steps.v.outputs.version }}"
-          if [ "$app" != "${{ steps.v.outputs.version }}" ]; then
-            echo "::warning::Chart appVersion ($app) does not match the released tag (${{ steps.v.outputs.version }})"
+          # A warning here was ignored for 13 releases. The tag workflow stamps both
+          # fields, so a mismatch now means the stamp did not run: fail the release
+          # rather than publish a chart that points at the wrong image.
+          if [ "$app" != "${{ steps.v.outputs.version }}" ] || [ "$chart" != "${{ steps.v.outputs.version }}" ]; then
+            echo "::error::Chart version=$chart appVersion=$app do not match the released tag (${{ steps.v.outputs.version }})"
+            exit 1
           fi
 
       # One job must own the GitHub release, otherwise two steps race to create the
