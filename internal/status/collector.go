@@ -48,8 +48,9 @@ type Collector struct {
 	nodeStats *NodeStats
 	nodesAt   time.Time
 
-	unmanaged   *Unmanaged
-	unmanagedAt time.Time
+	unmanaged    *Unmanaged
+	unmanagedAt  time.Time
+	workloadList *kube.WorkloadList
 }
 
 func NewCollector(lister Lister, opts Options, ttl time.Duration) *Collector {
@@ -166,6 +167,9 @@ func (c *Collector) attachUnmanaged(ctx context.Context, snap *Snapshot) {
 		}
 		c.unmanaged = &u
 		c.unmanagedAt = c.now()
+		c.workloadList = list
 	}
 	snap.Unmanaged = c.unmanaged
+	// The same workload list also recovers app versions ArgoCD did not report.
+	FillMissingVersions(snap, c.workloadList)
 }

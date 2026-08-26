@@ -251,6 +251,8 @@ table.components td.k { color: var(--muted); }
 .ready { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
          font-size: .8rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .by { color: var(--ink-2); font-size: .8rem; }
+.members { margin-left: .4rem; padding: .02rem .32rem; border-radius: 3px; background: var(--hair);
+           color: var(--muted); font-size: .62rem; font-weight: 600; white-space: nowrap; }
 .by.is-unknown { color: var(--muted); }
 
 footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
@@ -477,7 +479,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <tr>
   <td class="ns">{{.Namespace}}</td>
   <td class="kind">{{.Kind}}</td>
-  <td class="name">{{.Name}}</td>
+  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}</td>
   <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>
   <td class="appver hide-sm">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
   <td class="ready">{{.Ready}}/{{.Desired}}</td>

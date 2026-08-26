@@ -21,6 +21,13 @@ const (
 // absent.
 const labelManagedBy = "app.kubernetes.io/managed-by"
 
+// Helm stamps these on everything in a release, which is what lets a release be
+// collapsed into one row.
+const (
+	labelChart      = "helm.sh/chart"
+	labelAppVersion = "app.kubernetes.io/version"
+)
+
 const managedByUnknown = "unknown"
 
 // Workload is one running thing that ArgoCD does not manage.
@@ -34,6 +41,15 @@ type Workload struct {
 	Version   string
 	Image     string
 	State     State
+	// Release is the Helm release this belongs to, when it belongs to one. Workloads
+	// sharing a release are collapsed into a single row: seven argocd-* Deployments
+	// all at the same chart version are one thing to know about, not seven.
+	Release string
+	// ReleaseVersion is the version Helm recorded for the release, preferred over
+	// image tags when collapsing.
+	ReleaseVersion string
+	// Members is how many workloads the row stands for. 1 unless collapsed.
+	Members int
 }
 
 // Unmanaged is the set of workloads running outside GitOps. Error is set when the
@@ -78,8 +94,15 @@ func BuildUnmanaged(list *kube.WorkloadList, opts Options) Unmanaged {
 			Version:   img.Tag,
 			Image:     img.Full,
 			State:     workloadState(ready, desired),
+			Release:   releaseOf(w),
+			Members:   1,
+			// A release has one app version, recorded by Helm. Deriving it from image
+			// tags instead reports "mixed" whenever a chart ships a sidecar on its own
+			// version, which is most of them.
+			ReleaseVersion: w.Metadata.Labels[labelAppVersion],
 		})
 	}
+	out.Items = collapseReleases(out.Items)
 	out.Count = len(out.Items)
 
 	sort.Slice(out.Items, func(i, j int) bool {
@@ -174,4 +197,64 @@ func unmanagedError(u Unmanaged, err error) Unmanaged {
 		u.Denied = se.Code == http.StatusForbidden || se.Code == http.StatusUnauthorized
 	}
 	return u
+}
+
+// releaseOf identifies the Helm release a workload belongs to. Namespace is part of
+// the key because the same chart is often installed more than once in a cluster.
+func releaseOf(w kube.Workload) string {
+	l := w.Metadata.Labels
+	inst := l[labelInstance]
+	if inst == "" || !strings.EqualFold(l[labelManagedBy], "Helm") {
+		return ""
+	}
+	return w.Metadata.Namespace + "/" + inst
+}
+
+// collapseReleases folds the workloads of one Helm release into a single row. Seven
+// Deployments from the same chart at the same version are one fact, not seven, and
+// listing them separately buries the things that are genuinely their own.
+//
+// The row keeps the worst state of its members so a broken component is never hidden
+// by healthy siblings, and sums readiness so 6/7 still reads as incomplete.
+func collapseReleases(items []Workload) []Workload {
+	out := make([]Workload, 0, len(items))
+	at := map[string]int{}
+
+	for _, w := range items {
+		if w.Release == "" {
+			out = append(out, w)
+			continue
+		}
+		i, seen := at[w.Release]
+		if !seen {
+			w.Name = releaseName(w.Release)
+			w.Kind = "release"
+			if w.ReleaseVersion != "" {
+				w.Version, w.Image = w.ReleaseVersion, ""
+			}
+			at[w.Release] = len(out)
+			out = append(out, w)
+			continue
+		}
+		g := &out[i]
+		g.Members++
+		g.Ready += w.Ready
+		g.Desired += w.Desired
+		if severity[w.State] < severity[g.State] {
+			g.State = w.State
+		}
+		// A release has one version; if members disagree, say so rather than pick one.
+		if g.ReleaseVersion == "" && g.Version != w.Version {
+			g.Version = "mixed"
+			g.Image = ""
+		}
+	}
+	return out
+}
+
+func releaseName(release string) string {
+	if i := strings.IndexByte(release, '/'); i >= 0 {
+		return release[i+1:]
+	}
+	return release
 }
