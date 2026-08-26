@@ -236,7 +236,7 @@ func TestPageErrorAndStaleBanners(t *testing.T) {
 		fakeProvider{snap: stale, err: errors.New("kubernetes api returned 503")})
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	if !strings.Contains(body, "cluster read failed") {
+	if !strings.Contains(body, "Could not read the cluster") {
 		t.Error("missing error banner")
 	}
 	if !strings.Contains(body, "stale") {
@@ -251,7 +251,8 @@ func TestPageRendersWhenClusterReadFails(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "cluster read failed") {
+	// "connection refused" is classified, so the banner names the actual cause.
+	if !strings.Contains(rec.Body.String(), "Cannot reach the Kubernetes API") {
 		t.Error("missing error banner")
 	}
 }

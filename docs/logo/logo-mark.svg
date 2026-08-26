@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="k8s-status"><title>k8s-status</title>
+  <rect x="6" y="12" width="52" height="12" rx="6" fill="#e6f4ea"/>
+  <rect x="6" y="28" width="46" height="12" rx="6" fill="#feefc3"/>
+  <rect x="6" y="44" width="40" height="12" rx="6" fill="#fce8e6"/>
+  <circle cx="16" cy="18" r="4" fill="#137333"/>
+  <circle cx="16" cy="34" r="4" fill="#a15c00"/>
+  <circle cx="16" cy="50" r="4" fill="#c5221f"/>
+</svg>
