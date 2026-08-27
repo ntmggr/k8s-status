@@ -536,11 +536,16 @@ Every GPU row also carries what it asks for and what it holds: devices per repli
 replicas ready against desired, and the resulting allocation. That separates three
 things a boolean marker hides, which is the point of it:
 
-| Reads as | Means |
+| Badge | Means |
 |---|---|
-| `running` | holding devices |
-| `idle` | parked at zero replicas, so its devices are free for others |
-| `waiting` | asked for devices and has not got them |
+| `GPU 2` | running and holding that many devices |
+| `GPU waiting` | wants devices and has not got any: none free, or no node to run on |
+| `GPU idle` | scaled to zero on purpose, so its devices are free for others |
+
+A badge with no number is a service that reaches a device through the runtime without
+requesting one, so the count is not knowable. The three states are coloured apart rather
+than left to a tooltip, because on a real cluster 14 of 19 GPU services were parked and
+one was stuck, and a single badge said the same thing about all of them.
 
 `waiting` is the one worth acting on. A row also carries `measured: false` when the
 service never requests a device and reaches one through the runtime, because then the
