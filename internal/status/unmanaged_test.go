@@ -124,7 +124,7 @@ func TestWorkloadStateMapping(t *testing.T) {
 		{2, 2, StateOK},
 		{81, 82, StateDegraded},
 		{0, 2, StateDegraded},
-		// 0/0 is a DaemonSet that matches no node — a Windows daemonset on a cluster
+		// 0/0 is a DaemonSet that matches no node, a Windows daemonset on a cluster
 		// with no Windows nodes. Legitimate, not broken.
 		{0, 0, StateSuspended},
 	}

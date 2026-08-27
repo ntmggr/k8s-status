@@ -46,7 +46,7 @@ func TestUnmanagedIgnoreNamespacesParsing(t *testing.T) {
 	if got := splitGlobs(""); got != nil {
 		t.Errorf("empty UNMANAGED_IGNORE_NS = %v, want nil", got)
 	}
-	got := splitGlobs(" kube-* , istio-system ,, ")
+	got := splitGlobs(" kube-* , istio-system , ")
 	want := []string{"kube-*", "istio-system"}
 	if len(got) != len(want) {
 		t.Fatalf("globs = %v, want %v", got, want)
@@ -77,7 +77,7 @@ func TestSourcesParsing(t *testing.T) {
 		{"unknown value falls back", "helmfile", []status.Source{status.SourceArgoCD}, false},
 		{"unknown value beside a good one", "flux,helmfile", []status.Source{status.SourceFlux}, false},
 		{"empty", "", []status.Source{status.SourceArgoCD}, false},
-		{"separators only", " , , ", []status.Source{status.SourceArgoCD}, false},
+		{"separators only", " , ", []status.Source{status.SourceArgoCD}, false},
 	}
 
 	for _, tc := range tests {

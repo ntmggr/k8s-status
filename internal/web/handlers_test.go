@@ -761,7 +761,7 @@ func TestPageUnknownFilterValueRendersEmptyState(t *testing.T) {
 	}
 	body := rec.Body.String()
 	if got := countRows(body); got != 0 {
-		t.Errorf("rows = %d, want 0 — an unknown value must not show everything", got)
+		t.Errorf("rows = %d, want 0, an unknown value must not show everything", got)
 	}
 	if !strings.Contains(body, "no services match") {
 		t.Error("want an explicit empty state")
@@ -822,7 +822,7 @@ func TestRefreshAndFilterCompose(t *testing.T) {
 		t.Error("refresh override lost when a filter is active")
 	}
 	if countRows(body) != 2 {
-		t.Errorf("rows = %d, want 2 — filter lost when refresh is set", countRows(body))
+		t.Errorf("rows = %d, want 2, filter lost when refresh is set", countRows(body))
 	}
 	// The chip's remove link keeps the refresh choice.
 	if !strings.Contains(body, `href="/k8s-status/?refresh=60"`) {

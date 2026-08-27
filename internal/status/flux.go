@@ -98,7 +98,7 @@ func BuildFluxServices(list *kube.FluxList, opts Options) []Service {
 // the summary, and a failed or partial read becomes an inline note.
 //
 // It deliberately returns nothing. Flux is an optional source, so a denied or absent
-// read must degrade exactly as NODE_STATS and UNMANAGED do — never blank the page.
+// read must degrade exactly as NODE_STATS and UNMANAGED do, never blank the page.
 func (s *Snapshot) AppendFlux(list *kube.FluxList, err error, opts Options) {
 	sec := FluxSection{}
 	if list != nil {
@@ -130,7 +130,7 @@ func (s *Snapshot) AppendFlux(list *kube.FluxList, err error, opts Options) {
 // fluxVerdict turns spec.suspend and status.conditions into a state, a health word and
 // a line of detail. The order matters and mirrors how Flux itself reports:
 //
-//   - suspend wins outright — a suspended object keeps whatever conditions it had when
+//   - suspend wins outright, a suspended object keeps whatever conditions it had when
 //     it was paused, so reading them would report stale news as current;
 //   - Ready=False is a real failure and outranks everything else;
 //   - Reconciling=True is checked before Ready=True, because Flux leaves the previous
