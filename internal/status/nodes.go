@@ -29,6 +29,9 @@ type NodeStats struct {
 	// Accelerators breaks that total down per resource, so a cluster with MIG slices
 	// or more than one vendor can see which is which. One entry on a typical cluster.
 	Accelerators []AcceleratorCount
+	// GPUsAllocated is how many of GPUs the scheduler has actually handed to a
+	// workload. The gap between the two is idle hardware.
+	GPUsAllocated int
 	// UnschedulableGPUNodes is the subset of GPUNodes that advertise nothing, meaning
 	// no device plugin. Workloads there still reach the GPU through the runtime, but
 	// the scheduler cannot allocate or limit it, so any number of pods can land on one

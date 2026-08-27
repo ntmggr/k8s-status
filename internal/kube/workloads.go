@@ -52,6 +52,9 @@ type OwnerReference struct {
 
 type WorkloadSpec struct {
 	Template PodTemplate `json:"template"`
+	// Replicas is a pointer so "absent" (a DaemonSet) is distinguishable from an
+	// explicit zero, which is a service deliberately parked.
+	Replicas *int `json:"replicas"`
 }
 
 type PodTemplate struct {

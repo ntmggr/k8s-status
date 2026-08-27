@@ -43,34 +43,64 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 		nodeItems = nodes.Items
 	}
 
-	owners := make(map[key]bool, len(list.Items))
+	type detail struct {
+		gpu            bool
+		perReplica     int
+		desired, ready int
+	}
+	owners := make(map[key]detail, len(list.Items))
 	for _, w := range list.Items {
-		if workloadGPUs(w, accel) > 0 || onlyRunsOnGPUNodes(w, nodeItems, accel) {
-			owners[key{w.Kind, w.Metadata.Namespace, w.Metadata.Name}] = true
+		g := workloadGPUs(w, accel)
+		if g > 0 || onlyRunsOnGPUNodes(w, nodeItems, accel) {
+			d, r := workloadReplicas(w)
+			owners[key{w.Kind, w.Metadata.Namespace, w.Metadata.Name}] = detail{
+				gpu: true, perReplica: g, desired: d, ready: r,
+			}
 		}
 	}
 
 	for i := range snap.Services {
 		svc := &snap.Services[i]
+		// A service can own more than one workload, so the totals are summed rather
+		// than taken from the first match.
 		for _, r := range svc.Owned {
 			switch r.Kind {
 			case "Deployment", "StatefulSet", "DaemonSet":
 			default:
 				continue
 			}
-			if owners[key{r.Kind, r.Namespace, r.Name}] {
-				svc.GPU = true
-				break
+			d, ok := owners[key{r.Kind, r.Namespace, r.Name}]
+			if !ok || !d.gpu {
+				continue
 			}
+			svc.GPU = true
+			svc.GPUAlloc.PerReplica += d.perReplica
+			svc.GPUAlloc.Desired += d.desired
+			svc.GPUAlloc.Ready += d.ready
+			svc.GPUAlloc.Allocated += d.perReplica * d.ready
 		}
 	}
 
 	// addService tallied this while building, before any workload was known.
 	snap.Summary.GPU = 0
+	allocated, waiting, idle := 0, 0, 0
 	for _, svc := range snap.Services {
-		if svc.GPU {
-			snap.Summary.GPU++
+		if !svc.GPU {
+			continue
 		}
+		snap.Summary.GPU++
+		allocated += svc.GPUAlloc.Allocated
+		switch {
+		case svc.GPUAlloc.Waiting():
+			waiting++
+		case svc.GPUAlloc.Idle():
+			idle++
+		}
+	}
+	snap.Summary.GPUWaiting = waiting
+	snap.Summary.GPUIdle = idle
+	if snap.Nodes != nil {
+		snap.Nodes.GPUsAllocated = allocated
 	}
 }
 
@@ -176,4 +206,20 @@ func contains(values []string, v string) bool {
 		}
 	}
 	return false
+}
+
+// workloadReplicas returns desired and ready counts across the three kinds. Deployment
+// and StatefulSet report spec.replicas and status.readyReplicas; a DaemonSet reports
+// desiredNumberScheduled and numberReady instead.
+func workloadReplicas(w kube.Workload) (desired, ready int) {
+	if w.Kind == "DaemonSet" {
+		return w.Status.DesiredNumberScheduled, w.Status.NumberReady
+	}
+	desired = w.Status.Replicas
+	if w.Spec.Replicas != nil {
+		// spec.replicas is the intent; status.replicas lags during a scale-down and
+		// would make a service parked at zero look like it is still trying.
+		desired = *w.Spec.Replicas
+	}
+	return desired, w.Status.ReadyReplicas
 }

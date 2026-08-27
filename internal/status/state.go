@@ -64,6 +64,33 @@ type Options struct {
 // Component is an individual Kubernetes resource inside a service that is not
 // matching git. ArgoCD does not populate per-resource health in the Application
 // CR, so only sync state is available here.
+// GPUAllocation separates three states that look identical in a boolean GPU marker:
+// a service holding devices, one deliberately scaled to zero, and one that wants
+// devices and cannot get them. The last is the interesting one and the only one that
+// needs attention.
+type GPUAllocation struct {
+	// PerReplica is what one replica requests. Zero means the service never names the
+	// resource and reaches its device through the runtime, so how much it uses is not
+	// knowable from the API.
+	PerReplica int
+	Desired    int
+	Ready      int
+	// Allocated is PerReplica * Ready: devices the scheduler has actually handed over.
+	Allocated int
+}
+
+// Waiting reports a service that asked for devices and did not get them. Distinct from
+// scaled to zero, which is deliberate, and from holding fewer than it wants only
+// because it is mid-rollout, which still shows here and is worth seeing.
+func (g GPUAllocation) Waiting() bool { return g.Desired > 0 && g.Ready < g.Desired }
+
+// Idle reports a service parked at zero replicas. Its GPUs are free for others.
+func (g GPUAllocation) Idle() bool { return g.Desired == 0 }
+
+// Unmeasured reports a service that reaches a device without requesting it, so the
+// API cannot say how much it holds.
+func (g GPUAllocation) Unmeasured() bool { return g.PerReplica == 0 }
+
 type Component struct {
 	Kind      string
 	Name      string
@@ -85,6 +112,9 @@ type Service struct {
 	AppVersion string
 	Image      string
 	GPU        bool
+	// GPUAlloc describes what this service asks of the accelerators and what it
+	// actually holds. Only meaningful when GPU is set.
+	GPUAlloc   GPUAllocation
 	State      State
 	Sync       string
 	Health     string
@@ -106,6 +136,10 @@ type Summary struct {
 	Suspended   int
 	Hidden      int
 	GPU         int
+	// GPUWaiting asked for a device and has not got one; GPUIdle is parked at zero.
+	// Split out because a boolean GPU count hides both.
+	GPUWaiting int
+	GPUIdle    int
 }
 
 type Snapshot struct {
