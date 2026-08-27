@@ -135,6 +135,8 @@ type serviceJSON struct {
 	GPU        bool   `json:"gpu,omitempty"`
 	// Blocked is present only when the scheduler refused to place this service.
 	Blocked *blockedJSON `json:"blocked,omitempty"`
+	// Arch is set only when the service can run on one CPU architecture.
+	Arch string `json:"arch,omitempty"`
 	// GPUAlloc is present only on GPU rows: what one replica asks for, how many
 	// replicas are up, and how many devices that adds up to.
 	GPUAlloc   *gpuAllocJSON   `json:"gpuAllocation,omitempty"`
@@ -315,6 +317,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 				GPU:        svc.GPU,
 				GPUAlloc:   gpuAlloc(svc),
 				Blocked:    blocked(svc),
+				Arch:       svc.Arch,
 				Image:      svc.Image,
 				State:      string(svc.State),
 				Sync:       svc.Sync,

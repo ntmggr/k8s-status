@@ -119,6 +119,9 @@ type Service struct {
 	// Blocked is set when the scheduler could not place this service's pods. Nil for
 	// everything else, which is almost every row.
 	Blocked *Blocked
+	// Arch is set only when every node this service may run on shares one CPU
+	// architecture. Empty means it can go either way, which is the common case.
+	Arch string
 	// GPUAlloc describes what this service asks of the accelerators and what it
 	// actually holds. Only meaningful when GPU is set.
 	GPUAlloc   GPUAllocation
@@ -147,11 +150,18 @@ type Summary struct {
 	// replicas at all. Split out because a boolean GPU count hides both.
 	GPUWaiting int
 	GPUStopped int
-	// Blocked counts services the scheduler could not place.
-	Blocked int
+	// Blocked counts services the scheduler could not place, split by what ran out:
+	// an accelerator, ordinary cpu or memory, or no matching node at all.
+	Blocked          int
+	BlockedGPU       int
+	BlockedCPU       int
+	BlockedPlacement int
 }
 
 type Snapshot struct {
+	// ArchCounts tallies services pinned to a single CPU architecture. Kept here
+	// rather than on Summary so Summary stays a comparable value.
+	ArchCounts []ArchCount
 	// Sources are the GitOps controllers this snapshot was read from, in the order
 	// SOURCES named them. The Source column is only rendered when there is more than
 	// one, so a single-source cluster keeps the uncluttered table.

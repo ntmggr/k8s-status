@@ -213,4 +213,5 @@ func (c *Collector) attachUnmanaged(ctx context.Context, snap *Snapshot) {
 	// tells us which services actually ask for a GPU.
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
+	FillArch(snap, c.workloadList, c.nodeList)
 }

@@ -159,3 +159,50 @@ func TestDegradedStillOutranksBlocked(t *testing.T) {
 		t.Fatalf("first row is %q, want the degraded one", snap.Services[0].Name)
 	}
 }
+
+// The two shortages need different people to fix them, so they are counted apart.
+func TestBlockedKindSeparatesAcceleratorFromCPU(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(blockedSvc("gpu-hungry", "ml", "gpu-hungry"))
+	snap.addService(blockedSvc("cpu-hungry", "ml", "cpu-hungry"))
+	snap.addService(blockedSvc("nowhere", "ml", "nowhere"))
+
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("ml", "gpu-hungry-1-a", "0/9 nodes are available: 9 Insufficient nvidia.com/gpu."),
+		schedEvent("ml", "cpu-hungry-1-a", "0/9 nodes are available: 4 Insufficient cpu, 5 Insufficient memory."),
+		schedEvent("ml", "nowhere-1-a", "0/9 nodes are available: 9 node(s) didn't match Pod's node affinity/selector."),
+	}})
+
+	kinds := map[string]string{}
+	for _, s := range snap.Services {
+		if s.Blocked != nil {
+			kinds[s.Name] = s.Blocked.Kind()
+		}
+	}
+	for name, want := range map[string]string{
+		"gpu-hungry": "accelerator", "cpu-hungry": "cpu", "nowhere": "placement",
+	} {
+		if kinds[name] != want {
+			t.Errorf("%s: Kind=%q, want %q", name, kinds[name], want)
+		}
+	}
+	if snap.Summary.BlockedGPU != 1 || snap.Summary.BlockedCPU != 1 || snap.Summary.BlockedPlacement != 1 {
+		t.Errorf("counters gpu/cpu/placement = %d/%d/%d, want 1/1/1",
+			snap.Summary.BlockedGPU, snap.Summary.BlockedCPU, snap.Summary.BlockedPlacement)
+	}
+	if snap.Summary.Blocked != 3 {
+		t.Errorf("Blocked=%d, want 3", snap.Summary.Blocked)
+	}
+}
+
+// A message naming both counts as an accelerator shortage: that is the scarce thing.
+func TestBlockedKindPrefersAccelerator(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(blockedSvc("svc", "ml", "svc"))
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("ml", "svc-1-a", "0/9 nodes are available: 4 Insufficient cpu, 5 Insufficient nvidia.com/gpu."),
+	}})
+	if got := snap.Services[0].Blocked.Kind(); got != "accelerator" {
+		t.Fatalf("Kind=%q, want accelerator", got)
+	}
+}

@@ -214,7 +214,12 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
 .blocked { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
        font-weight: 700; letter-spacing: .03em; background: var(--warn-bg); color: var(--warn-fg);
        white-space: nowrap; }
+.blocked.is-accelerator { background: var(--gpu-bg); color: var(--gpu-fg); }
 .blocked .ic { width: 9px; height: 9px; margin-right: .15rem; vertical-align: -1px; }
+.arch { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
+       font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.arch.is-arm64 { background: var(--prog-bg); color: var(--prog-fg); }
+.arch.is-amd64 { background: var(--drift-bg); color: var(--drift-fg); }
 .gpu.is-waiting { background: var(--warn-bg); color: var(--warn-fg); }
 .gpu.is-stopped { background: var(--susp-bg); color: var(--susp-fg); }
 .gpu.is-running { background: var(--ok-bg); color: var(--ok-fg); }
@@ -331,8 +336,17 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <div class="views">
   <span class="views-lab">views</span>
   <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services backed by {{$.Snapshot.AcceleratorLabel}}">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.GPUWaiting}} <b>{{$.Snapshot.Summary.GPUWaiting}} waiting</b>{{end}}{{if $.Snapshot.Summary.GPUStopped}} <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
-    {{- if $.Snapshot.Summary.Blocked}}
-    <a class="vchip is-warnchip{{if $.FilterActive "blocked" "true"}} is-on{{end}}" href="{{$.FilterHref "blocked" "true"}}" title="Services whose pods the scheduler could not place. They are not broken; there is nowhere to run them.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} unschedulable</a>
+    {{- range $.Snapshot.ArchCounts}}
+    <a class="vchip{{if $.FilterActive "arch" .Arch}} is-on{{end}}" href="{{$.FilterHref "arch" .Arch}}" title="Services that can only run on {{.Arch}} nodes">{{.Count}} {{.Arch}} only</a>
+    {{- end}}
+    {{- if $.Snapshot.Summary.BlockedGPU}}
+    <a class="vchip is-warnchip{{if $.FilterActive "blocked" "accelerator"}} is-on{{end}}" href="{{$.FilterHref "blocked" "accelerator"}}" title="Waiting on {{$.Snapshot.AcceleratorLabel}}: the cluster has no free device to give them.">{{icon "warn"}}{{$.Snapshot.Summary.BlockedGPU}} need {{$.Snapshot.AcceleratorLabel}}</a>
+    {{- end}}
+    {{- if $.Snapshot.Summary.BlockedCPU}}
+    <a class="vchip is-warnchip{{if $.FilterActive "blocked" "cpu"}} is-on{{end}}" href="{{$.FilterHref "blocked" "cpu"}}" title="Waiting on ordinary compute: the cluster is out of cpu or memory.">{{icon "warn"}}{{$.Snapshot.Summary.BlockedCPU}} need cpu</a>
+    {{- end}}
+    {{- if $.Snapshot.Summary.BlockedPlacement}}
+    <a class="vchip is-warnchip{{if $.FilterActive "blocked" "placement"}} is-on{{end}}" href="{{$.FilterHref "blocked" "placement"}}" title="No node matched at all, usually a nodegroup that has scaled to nothing.">{{icon "warn"}}{{$.Snapshot.Summary.BlockedPlacement}} no node</a>
     {{- end}}
   {{- with $.Snapshot.Unmanaged}}
   <a class="vchip{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}" title="Running in the cluster but outside GitOps">{{icon "unmanaged"}}{{.Count}} not in gitops</a>
@@ -381,10 +395,12 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="pill s-drift"><span class="g">&#8800;</span>DRIFT</span><span>Pods healthy, config differs from git.</span></div>
     <div class="legend-row"><span class="pill s-prune"><span class="g">&#8856;</span>PRUNE</span><span>Orphan awaiting cleanup, not an outage.</span></div>
     <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>SUSPENDED</span><span>Deliberately paused.</span></div>
+    <div class="legend-row"><span class="arch is-arm64">arm64</span><span>Can only run on arm64 nodes, which on AWS are Graviton.</span></div>
+    <div class="legend-row"><span class="arch is-amd64">amd64</span><span>Can only run on amd64 nodes. No badge means it can run on either.</span></div>
     <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} 2</span><span>Holding that many {{$.Snapshot.AcceleratorLabel}} devices right now.</span></div>
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
-    <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip says what is missing.</span></div>
+    <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git &mdash;
@@ -436,7 +452,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
-    {{- with .Blocked}}<span class="blocked" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
+    {{- with .Blocked}}<span class="blocked is-{{.Kind}}" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
+    {{- with .Arch}}<span class="arch is-{{.}}" title="Every node this service may run on is {{.}}{{if eq . "arm64"}}, which on AWS means Graviton{{end}}. Services free to run on either architecture carry no badge.">{{.}}</span>{{end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for

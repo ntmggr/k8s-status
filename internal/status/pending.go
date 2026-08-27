@@ -31,6 +31,22 @@ type Blocked struct {
 	Pods int
 }
 
+// Kind separates the shortages that need different people to fix them. Running out of
+// accelerators is a capacity decision about expensive hardware; running out of cpu or
+// memory is ordinary right-sizing; matching no node at all is usually a nodegroup that
+// scaled to nothing.
+func (b Blocked) Kind() string {
+	for _, r := range b.Resources {
+		if isAcceleratorResource(r) {
+			return "accelerator"
+		}
+	}
+	if len(b.Resources) > 0 {
+		return "cpu"
+	}
+	return "placement"
+}
+
 // Reason is a short phrase for the row: what the cluster ran out of, or that nothing
 // matched at all.
 func (b Blocked) Reason() string {
@@ -67,7 +83,8 @@ func FillPending(snap *Snapshot, events *kube.EventList) {
 		for i := range snap.Services {
 			snap.Services[i].Blocked = nil
 		}
-		snap.Summary.Blocked = 0
+		snap.Summary.Blocked, snap.Summary.BlockedGPU = 0, 0
+		snap.Summary.BlockedCPU, snap.Summary.BlockedPlacement = 0, 0
 		return
 	}
 
@@ -87,7 +104,8 @@ func FillPending(snap *Snapshot, events *kube.EventList) {
 	for i := range snap.Services {
 		snap.Services[i].Blocked = nil
 	}
-	snap.Summary.Blocked = 0
+	snap.Summary.Blocked, snap.Summary.BlockedGPU = 0, 0
+	snap.Summary.BlockedCPU, snap.Summary.BlockedPlacement = 0, 0
 
 	acc := map[int]*Blocked{}
 	for _, e := range events.Items {
@@ -128,6 +146,14 @@ func FillPending(snap *Snapshot, events *kube.EventList) {
 		sort.Strings(b.Resources)
 		snap.Services[idx].Blocked = b
 		snap.Summary.Blocked++
+		switch b.Kind() {
+		case "accelerator":
+			snap.Summary.BlockedGPU++
+		case "cpu":
+			snap.Summary.BlockedCPU++
+		default:
+			snap.Summary.BlockedPlacement++
+		}
 	}
 	// The rows were ordered before any of this was known, and a blocked row outranks
 	// what its state alone would suggest.
