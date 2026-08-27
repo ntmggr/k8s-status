@@ -3,7 +3,7 @@ package status
 import "github.com/ntmggr/k8s-status/internal/kube"
 
 // FillMissingVersions supplies an app version for services where ArgoCD did not
-// populate status.summary.images. On a live cluster that was 37 of 146 services.
+// populate status.summary.images, which on a large cluster was a quarter of them.
 //
 // It resolves them through each Application's own status.resources, which names the
 // workloads it owns, rather than guessing from the service name: several services

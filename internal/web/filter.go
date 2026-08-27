@@ -9,10 +9,12 @@ import (
 )
 
 const (
-	filterStatus = "status"
-	filterSync   = "sync"
-	filterGPU    = "gpu"
-	filterView   = "view"
+	filterStatus  = "status"
+	filterSync    = "sync"
+	filterGPU     = "gpu"
+	filterBlocked = "blocked"
+	filterArch    = "arch"
+	filterView    = "view"
 )
 
 // Filter is the row selection parsed from the query string. Values are kept as the
@@ -20,9 +22,11 @@ const (
 // An unrecognised value matches nothing rather than being dropped, so a typo shows an
 // empty table instead of silently showing everything.
 type Filter struct {
-	Status []string
-	Sync   []string
-	GPU    string
+	Status  []string
+	Sync    []string
+	GPU     string
+	Blocked string
+	Arch    string
 	// View narrows the page to one section rather than filtering rows.
 	// "unmanaged" shows only workloads ArgoCD does not manage.
 	View string
@@ -31,16 +35,18 @@ type Filter struct {
 // ParseFilter accepts both repeated parameters and comma-separated values.
 func ParseFilter(q url.Values) Filter {
 	f := Filter{
-		Status: parseFilterList(q[filterStatus]),
-		Sync:   parseFilterList(q[filterSync]),
-		GPU:    strings.TrimSpace(q.Get(filterGPU)),
-		View:   strings.ToLower(strings.TrimSpace(q.Get(filterView))),
+		Status:  parseFilterList(q[filterStatus]),
+		Sync:    parseFilterList(q[filterSync]),
+		GPU:     strings.TrimSpace(q.Get(filterGPU)),
+		Blocked: strings.TrimSpace(q.Get(filterBlocked)),
+		Arch:    strings.TrimSpace(q.Get(filterArch)),
+		View:    strings.ToLower(strings.TrimSpace(q.Get(filterView))),
 	}
 	// A section view and the row filters describe different tables. The links never
 	// produce both, but a hand-written URL can, and rendering half of each state is
 	// worse than picking one. The view wins because it is the coarser choice.
 	if f.View != "" {
-		f.Status, f.Sync, f.GPU = nil, nil, ""
+		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch = nil, nil, "", "", ""
 	}
 	return f
 }
@@ -66,7 +72,7 @@ func parseFilterList(vals []string) []string {
 }
 
 func (f Filter) Active() bool {
-	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != ""
+	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != ""
 }
 
 func (f Filter) list(kind string) []string {
@@ -87,6 +93,10 @@ func (f Filter) has(kind, value string) bool {
 		return containsFold(f.Sync, value)
 	case filterGPU:
 		return strings.EqualFold(f.GPU, value)
+	case filterBlocked:
+		return strings.EqualFold(f.Blocked, value)
+	case filterArch:
+		return strings.EqualFold(f.Arch, value)
 	case filterView:
 		return strings.EqualFold(f.View, value)
 	}
@@ -112,6 +122,19 @@ func (f Filter) matches(svc status.Service) bool {
 	}
 	if len(f.Sync) > 0 && !containsFold(f.Sync, syncOf(svc)) {
 		return false
+	}
+	if f.Arch != "" && !strings.EqualFold(svc.Arch, f.Arch) {
+		return false
+	}
+	if f.Blocked != "" {
+		// "true" keeps meaning any shortage; a kind narrows it to one.
+		if want, err := strconv.ParseBool(f.Blocked); err == nil {
+			if (svc.Blocked != nil) != want {
+				return false
+			}
+		} else if svc.Blocked == nil || !strings.EqualFold(svc.Blocked.Kind(), f.Blocked) {
+			return false
+		}
 	}
 	if f.GPU != "" {
 		want, ok := f.gpuWant()

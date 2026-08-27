@@ -149,3 +149,17 @@ func Sanitize(s string) string {
 	}
 	return string(out)
 }
+
+// FromCache appends resourceVersion=0, which asks the API server to answer from its
+// watch cache instead of doing a quorum read from etcd. These lists run to megabytes
+// on a busy cluster, and skipping the quorum read roughly halved the time they took.
+//
+// The trade is that the answer can lag the very latest write by a moment. That costs
+// nothing here: the result is cached for the refresh interval anyway, and the page
+// prints how old its data is.
+func FromCache(path string) string {
+	if strings.Contains(path, "?") {
+		return path + "&resourceVersion=0"
+	}
+	return path + "?resourceVersion=0"
+}

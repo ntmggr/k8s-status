@@ -152,7 +152,7 @@ func (c *Client) ListWorkloads(ctx context.Context) (*WorkloadList, error) {
 		go func() {
 			defer wg.Done()
 			var list WorkloadList
-			if err := c.GetJSON(ctx, k.path, k.what, &list); err != nil {
+			if err := c.GetJSON(ctx, FromCache(k.path), k.what, &list); err != nil {
 				errs[i] = err
 				return
 			}

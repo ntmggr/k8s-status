@@ -484,6 +484,7 @@ can run it with none of them set.
 | `IGNORE_GLOBS` | *(empty)* | Comma-separated name patterns to hide. Matches are removed from the table and from every count, and reported as `hidden` |
 | `GPU_GLOBS` | *(empty)* | Fallback only. Name patterns marking a service as GPU-backed, used when the workload read that powers real detection is not available |
 | `SIDECAR_IMAGES` | *(built-in list)* | Image names that never carry the service version, such as an injected proxy. Replaces the built-in list |
+| `PENDING_REASONS` | `false` | Explain why a service's pods cannot be scheduled and grey the row. Reads Events. Needs a ClusterRole |
 | `ACCELERATOR_RESOURCES` | *(discovered)* | Resources that count as accelerators. Empty discovers them from what the nodes advertise |
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
@@ -513,15 +514,44 @@ read from the workload list already fetched for the unmanaged view. That means i
 no extra request, needs no site-specific pattern list, and cannot drift out of date when
 a service moves off GPU nodes.
 
+A row is greyed out, with a yellow chip naming the reason, when the scheduler could not
+place its pods. Two shapes turn up in practice:
+
+| Chip | Message behind it |
+|---|---|
+| `no cpu, memory` | the cluster is out of that resource |
+| `no matching node` | every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty |
+
+This reads Events rather than pods, and needs `get`/`list` on `events` via
+`PENDING_REASONS`, off by default. Pods would give a richer reason, and were deliberately
+not used: a pod carries its whole spec including environment values, which are routinely
+secrets. An Event carries an object reference, a reason and a message, and nothing else
+worth protecting.
+
+Events name a pod, so it is matched back to a workload by name prefix within its
+namespace, longest match first. `api` and `api-canary` both prefix a daphne
+pod and only the longer one owns it.
+
 Every GPU row also carries what it asks for and what it holds: devices per replica,
 replicas ready against desired, and the resulting allocation. That separates three
 things a boolean marker hides, which is the point of it:
 
-| Reads as | Means |
+| Badge | Means |
 |---|---|
-| `running` | holding devices |
-| `idle` | parked at zero replicas, so its devices are free for others |
-| `waiting` | asked for devices and has not got them |
+| `GPU 2` | running and holding that many devices |
+| `GPU waiting` | wants devices and has not got any: none free, or no node to run on |
+| `GPU 0 pods` | no replicas requested, so nothing is running and no device is held |
+
+A badge with no number is a service that reaches a device through the runtime without
+requesting one, so the count is not knowable. The three states are coloured apart rather
+than left to a tooltip, because on a real cluster most GPU services had no pods and
+one was stuck, and a single badge said the same thing about all of them.
+
+The zero-replica case is deliberately not called "idle". Idle describes a device that is
+allocated and doing no work, which is a utilisation fact this project cannot see: it
+reads the Kubernetes API, not the hardware. What it knows is that no replicas were asked
+for. Whether that is a deliberate stop or an autoscaler at rest is not visible from the
+workload either, so the badge states the fact and stops there.
 
 `waiting` is the one worth acting on. A row also carries `measured: false` when the
 service never requests a device and reaches one through the runtime, because then the
@@ -529,7 +559,12 @@ per-replica and allocated numbers cannot be trusted. That is separate from the s
 since such a service can still be stuck.
 
 The capacity line totals the same thing cluster-wide, as `N cards, M allocated`. The gap
-is idle hardware.
+is hardware nothing has claimed.
+
+That total is a floor rather than a complete figure. It counts devices the scheduler was
+asked for, so a service that reaches one through the runtime without requesting it adds
+nothing. Those are counted separately and shown as `N uncounted`, because a total that
+quietly omits them reads as though it were the whole story.
 
 Detection is by container resources, not by which node a pod landed on. A DaemonSet
 scheduled onto a GPU node is not a GPU workload, and a service scaled to zero still is
@@ -543,7 +578,7 @@ allocatable still count as GPU nodes, and the page says `no device plugin` inste
 printing a card count it cannot know. Services pinned to them are marked as GPU-backed,
 because the runtime does hand them the device.
 
-This matters more than it sounds. A production cluster running 38 GPU nodes that serve
+This matters more than it sounds. A production cluster running dozens of GPU nodes that serve
 live traffic reported `0 gpu, 0 cards` under the earlier rule, because it counted only
 what the scheduler could allocate. The card count genuinely is not discoverable without
 a plugin, but the nodes are unmistakably there.

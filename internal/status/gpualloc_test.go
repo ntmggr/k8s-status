@@ -42,10 +42,10 @@ func svcWith(name, ns, wl string) Service {
 
 func TestGPUAllocationStates(t *testing.T) {
 	cases := []struct {
-		name                      string
-		gpu, desired, ready       int
-		wantAlloc                 int
-		waiting, idle, unmeasured bool
+		name                         string
+		gpu, desired, ready          int
+		wantAlloc                    int
+		waiting, stopped, unmeasured bool
 	}{
 		{name: "holding devices", gpu: 1, desired: 1, ready: 1, wantAlloc: 1},
 		{name: "several per replica", gpu: 3, desired: 2, ready: 2, wantAlloc: 6},
@@ -53,7 +53,7 @@ func TestGPUAllocationStates(t *testing.T) {
 		{name: "waiting for a device", gpu: 1, desired: 2, ready: 0, wantAlloc: 0, waiting: true},
 		{name: "partially rolled out", gpu: 1, desired: 3, ready: 1, wantAlloc: 1, waiting: true},
 		// Deliberate, not a problem: its cards are free for others.
-		{name: "parked at zero", gpu: 1, desired: 0, ready: 0, wantAlloc: 0, idle: true},
+		{name: "parked at zero", gpu: 1, desired: 0, ready: 0, wantAlloc: 0, stopped: true},
 		// Reaches the device through the runtime; the API cannot say how much.
 		{name: "no request at all", gpu: 0, desired: 2, ready: 2, wantAlloc: 0, unmeasured: true},
 	}
@@ -79,8 +79,8 @@ func TestGPUAllocationStates(t *testing.T) {
 			if g.Waiting() != tc.waiting {
 				t.Errorf("Waiting=%v, want %v", g.Waiting(), tc.waiting)
 			}
-			if g.Idle() != tc.idle {
-				t.Errorf("Idle=%v, want %v", g.Idle(), tc.idle)
+			if g.ScaledToZero() != tc.stopped {
+				t.Errorf("ScaledToZero=%v, want %v", g.ScaledToZero(), tc.stopped)
 			}
 			if g.Unmeasured() != tc.unmeasured {
 				t.Errorf("Unmeasured=%v, want %v", g.Unmeasured(), tc.unmeasured)
@@ -119,7 +119,7 @@ func TestGPUAllocationUsesSpecReplicasNotStatus(t *testing.T) {
 	snap.addService(svcWith("svc", "ml", "svc"))
 	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nil, []string{kube.ResourceGPU})
 
-	if g := snap.Services[0].GPUAlloc; !g.Idle() || g.Waiting() {
+	if g := snap.Services[0].GPUAlloc; !g.ScaledToZero() || g.Waiting() {
 		t.Fatalf("a draining scale-down must read as idle, got desired=%d ready=%d", g.Desired, g.Ready)
 	}
 }
@@ -141,7 +141,48 @@ func TestSummaryCountsWaitingAndIdle(t *testing.T) {
 	if snap.Summary.GPUWaiting != 1 {
 		t.Errorf("GPUWaiting=%d, want 1", snap.Summary.GPUWaiting)
 	}
-	if snap.Summary.GPUIdle != 1 {
-		t.Errorf("GPUIdle=%d, want 1", snap.Summary.GPUIdle)
+	if snap.Summary.GPUStopped != 1 {
+		t.Errorf("GPUStopped=%d, want 1", snap.Summary.GPUStopped)
+	}
+}
+
+// The allocated total counts only what was formally requested, so a cluster where some
+// services reach devices through the runtime is under-reported. The count of those is
+// tracked so the page can say the total is a floor instead of implying it is complete.
+func TestSummaryCountsUnmeasuredServices(t *testing.T) {
+	nodes := &kube.NodeList{Items: []kube.Node{node("gpu-1", "4", map[string]string{"k": "v"})}}
+	snap := &Snapshot{}
+	snap.addService(svcWith("asks", "ml", "asks"))
+	snap.addService(svcWith("just-pinned", "ml", "just-pinned"))
+
+	pinned := affinityTo(replicaWorkload("Deployment", "ml", "just-pinned", 0, 1, 1), "k", "v")
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{
+		replicaWorkload("Deployment", "ml", "asks", 2, 1, 1),
+		pinned,
+	}}, nodes, []string{kube.ResourceGPU})
+
+	if snap.Summary.GPUUnmeasured != 1 {
+		t.Errorf("GPUUnmeasured=%d, want 1", snap.Summary.GPUUnmeasured)
+	}
+	// A service with no replicas uses nothing, so it is not an uncounted user even
+	// though its usage would be unmeasurable if it ran.
+	snap2 := &Snapshot{}
+	snap2.addService(svcWith("parked", "ml", "parked"))
+	FillGPU(snap2, &kube.WorkloadList{Items: []kube.Workload{
+		affinityTo(replicaWorkload("Deployment", "ml", "parked", 0, 0, 0), "k", "v"),
+	}}, nodes, []string{kube.ResourceGPU})
+	if snap2.Summary.GPUUnmeasured != 0 {
+		t.Errorf("a parked service counted as uncounted usage: %d", snap2.Summary.GPUUnmeasured)
+	}
+	if snap.Nodes != nil {
+		t.Fatal("guard: this test does not attach node stats")
+	}
+	// The measured one still contributes; the pinned one cannot.
+	var total int
+	for _, s := range snap.Services {
+		total += s.GPUAlloc.Allocated
+	}
+	if total != 2 {
+		t.Errorf("allocated total=%d, want 2 from the measured service only", total)
 	}
 }

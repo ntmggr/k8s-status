@@ -61,6 +61,11 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 
 	for i := range snap.Services {
 		svc := &snap.Services[i]
+		// Reset before summing. A cached snapshot is decorated again on the stale
+		// path, and its Services share a backing array with the cached copy, so a
+		// bare += would keep adding to yesterday's totals: a workload asking for one
+		// device reported two.
+		svc.GPUAlloc = GPUAllocation{}
 		// A service can own more than one workload, so the totals are summed rather
 		// than taken from the first match.
 		for _, r := range svc.Owned {
@@ -83,22 +88,32 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 
 	// addService tallied this while building, before any workload was known.
 	snap.Summary.GPU = 0
-	allocated, waiting, idle := 0, 0, 0
+	allocated, running, waiting, stopped, unmeasured := 0, 0, 0, 0, 0
 	for _, svc := range snap.Services {
 		if !svc.GPU {
 			continue
 		}
 		snap.Summary.GPU++
 		allocated += svc.GPUAlloc.Allocated
+		// Only a running one is actually using a device we cannot count. A service
+		// with no replicas consumes nothing, and counting those read as though most
+		// of the cluster's usage were invisible.
+		if svc.GPUAlloc.Unmeasured() && !svc.GPUAlloc.ScaledToZero() && !svc.GPUAlloc.Waiting() {
+			unmeasured++
+		}
 		switch {
 		case svc.GPUAlloc.Waiting():
 			waiting++
-		case svc.GPUAlloc.Idle():
-			idle++
+		case svc.GPUAlloc.ScaledToZero():
+			stopped++
+		default:
+			running++
 		}
 	}
 	snap.Summary.GPUWaiting = waiting
-	snap.Summary.GPUIdle = idle
+	snap.Summary.GPURunning = running
+	snap.Summary.GPUUnmeasured = unmeasured
+	snap.Summary.GPUStopped = stopped
 	if snap.Nodes != nil {
 		snap.Nodes.GPUsAllocated = allocated
 	}

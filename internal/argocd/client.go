@@ -47,7 +47,7 @@ func (c *Client) applicationsPath() string {
 // ListApplications returns every Application in the configured namespace.
 func (c *Client) ListApplications(ctx context.Context) (*ApplicationList, error) {
 	var list ApplicationList
-	if err := c.kube().GetJSON(ctx, c.applicationsPath(), "application list", &list); err != nil {
+	if err := c.kube().GetJSON(ctx, kube.FromCache(c.applicationsPath()), "application list", &list); err != nil {
 		return nil, err
 	}
 	return &list, nil
