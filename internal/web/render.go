@@ -382,8 +382,8 @@ func icon(name string) template.HTML {
 		body = `<rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.75h.01M4.5 11.25h.01"/>`
 	case "cpu": // chip with pins
 		body = `<rect x="4.5" y="4.5" width="7" height="7" rx="1"/><path d="M6.5 2v2.5M9.5 2v2.5M6.5 11.5V14M9.5 11.5V14M2 6.5h2.5M2 9.5h2.5M11.5 6.5H14M11.5 9.5H14"/>`
-	case "gpu": // chip with a bolt: a compute card
-		body = `<rect x="2" y="4" width="12" height="8" rx="1"/><path d="M8.5 6L6.8 8.4h2L7.4 10.6"/><path d="M4.5 12v1.5M11.5 12v1.5"/>`
+	case "gpu": // a graphics card: board, fan, and the pins it seats on
+		body = `<rect x="1.5" y="3.5" width="13" height="8" rx="1.5"/><circle cx="5.8" cy="7.5" r="2.1"/><path d="M10 5.8v3.4M12.2 5.8v3.4"/><path d="M4.5 11.5v2M11 11.5v2"/>`
 	case "card": // stacked cards, for a count of physical GPUs
 		body = `<rect x="2" y="5.5" width="9" height="6" rx="1"/><path d="M5 3.5h9a1 1 0 0 1 1 1v6"/>`
 	case "arch": // two blocks, for the architecture split
