@@ -27,14 +27,20 @@ case "$MODE" in
   fixture)
     FAKE_DIR="$(mktemp -d)"
     mkdir -p "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd"
+    mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1"
     cp testdata/applications.json "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd/applications"
+    cp testdata/nodes.json        "$FAKE_DIR/api/v1/nodes"
+    cp testdata/events.json       "$FAKE_DIR/api/v1/events"
+    cp testdata/deployments.json  "$FAKE_DIR/apis/apps/v1/deployments"
+    cp testdata/statefulsets.json "$FAKE_DIR/apis/apps/v1/statefulsets"
+    cp testdata/daemonsets.json   "$FAKE_DIR/apis/apps/v1/daemonsets"
     ( cd "$FAKE_DIR" && python3 -m http.server "$PROXY_PORT" >/dev/null 2>&1 ) &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-root-app}"   # the fixture's root app is named root-app
-    NODE_STATS_DEFAULT=false
+    NODE_STATS_DEFAULT=true
     ENV_NAME_DEFAULT=local
-    UNMANAGED_DEFAULT=false
+    UNMANAGED_DEFAULT=true
     echo "mode: fixture (offline, synthetic data)"
     ;;
   cluster)

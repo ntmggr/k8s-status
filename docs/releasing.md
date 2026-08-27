@@ -19,7 +19,7 @@ Commit subjects since the last tag:
 | `feat: ...` | minor |
 | `fix: ...`, `perf: ...` | patch |
 | anything with `BREAKING CHANGE` | major |
-| `docs:`, `ci:`, `chore:`, `refactor:`, `test:` | none — no release at all |
+| `docs:`, `ci:`, `chore:`, `refactor:`, `test:` | none, no release at all |
 
 If nothing release-worthy landed, no tag is created and the pipeline stops there.
 Otherwise it pushes `vX.Y.Z`.
@@ -28,17 +28,17 @@ Otherwise it pushes `vX.Y.Z`.
 
 `.github/workflows/release.yml` runs on `push` of a `v*.*.*` tag. In order:
 
-1. **Resolve version** — strips the leading `v` and rejects anything that is not
+1. **Resolve version**, strips the leading `v` and rejects anything that is not
    semver. The tag is the single source of truth for the image tag, the binary
    version and the GitHub release, so they cannot disagree.
-2. **Test** — `go test ./... -race`. An image is never published from code that does
+2. **Test**, `go test ./... -race`. An image is never published from code that does
    not pass its own tests.
-3. **Build and push the image** — buildx, `linux/amd64` and `linux/arm64`, tagged
+3. **Build and push the image**, buildx, `linux/amd64` and `linux/arm64`, tagged
    `X.Y.Z` plus `latest` (the `latest` tag is withheld from pre-release tags such as
    `v1.2.3-rc.1`).
-4. **Chart version check** — warns, does not fail, if `charts/k8s-status/Chart.yaml`
+4. **Chart version check**, warns, does not fail, if `charts/k8s-status/Chart.yaml`
    `appVersion` does not match the tag.
-5. **goreleaser** — builds the binaries, packs the archives, writes `checksums.txt`
+5. **goreleaser**, builds the binaries, packs the archives, writes `checksums.txt`
    and creates the GitHub release with all of it attached.
 
 ## 3. What goreleaser produces
@@ -62,7 +62,7 @@ sha256sum -c checksums.txt
 Builds are `CGO_ENABLED=0` and `-trimpath`, with `mod_timestamp` pinned to the commit
 timestamp so the archives do not change just because the clock moved.
 
-The version is stamped with `-ldflags "-s -w -X main.version=<version>"` — the same
+The version is stamped with `-ldflags "-s -w -X main.version=<version>"`, the same
 variable and the same flags the `Dockerfile` uses. That is deliberate: a binary
 unpacked from an archive and the binary inside the image report the same version
 string in the startup log and in the page footer.
@@ -85,7 +85,7 @@ pushed.
 
 goreleaser derives the notes from the commit subjects, grouped into *Breaking
 changes*, *Features*, *Fixes*, *Performance* and *Other*. `docs:`, `ci:`, `chore:`,
-`test:` and merge commits are filtered out — they are already excluded from producing
+`test:` and merge commits are filtered out, they are already excluded from producing
 a release, so they should not describe one either.
 
 ## Manual runs

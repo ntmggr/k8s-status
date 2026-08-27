@@ -124,8 +124,8 @@ func BuildUnmanaged(list *kube.WorkloadList, opts Options) Unmanaged {
 // infrastructure but churn: pods spawned by an in-cluster operator inherit no ArgoCD
 // label, so a marker-only rule listed 292 workloads on a live cluster, nearly all of
 // them per-request Deployments created by another controller. Requiring an empty
-// metadata.ownerReferences drops every one of those — a workload with an owner was
-// created by something already running in the cluster, not installed into it — and
+// metadata.ownerReferences drops every one of those, a workload with an owner was
+// created by something already running in the cluster, not installed into it, and
 // leaves 11 rows that are all real infrastructure. Do not remove the ownerReferences
 // check to "simplify" this; the list becomes unreadable and the signal is lost.
 func isUnmanaged(w kube.Workload) bool {
@@ -161,8 +161,8 @@ func readiness(w kube.Workload) (ready, desired int) {
 }
 
 // workloadState maps the counters onto the page's existing states. desired == 0 is
-// SUSPENDED, not broken: a DaemonSet whose node selector matches no node — a Windows
-// daemonset on a cluster with no Windows nodes — is legitimately 0/0.
+// SUSPENDED, not broken: a DaemonSet whose node selector matches no node, a Windows
+// daemonset on a cluster with no Windows nodes, is legitimately 0/0.
 func workloadState(ready, desired int) State {
 	switch {
 	case desired <= 0:

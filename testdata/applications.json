@@ -1,710 +1,830 @@
 {
-  "apiVersion": "argoproj.io/v1alpha1",
-  "kind": "ApplicationList",
-  "items": [
-    {
-      "metadata": {
-        "name": "root-app",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev",
-          "app.kubernetes.io/part-of": "platform"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "envs/sample-dev",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/apps.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Degraded",
-          "message": "one or more child applications are degraded"
-        },
-        "sync": {
-          "status": "OutOfSync",
-          "revision": "437a162c4f9b8d0e5a1c73f620b8e94d1a6c0f22"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:31:12Z"
-        },
-        "history": [
-          {
-            "id": 1047,
-            "revision": "9b1d0e5a1c73f620b8e94d1a6c0f22437a162c4f",
-            "deployedAt": "2026-08-19T08:02:44Z"
-          },
-          {
-            "id": 1048,
-            "revision": "437a162c4f9b8d0e5a1c73f620b8e94d1a6c0f22",
-            "deployedAt": "2026-08-21T11:30:57Z"
-          }
-        ],
-        "resources": [
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "accounts-api",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "admin-ui",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "media-encoder",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "ingest-gateway",
-            "namespace": "argocd",
-            "status": "OutOfSync"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "orders-api",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "metrics-collector",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "edge-proxy",
-            "namespace": "argocd",
-            "status": "OutOfSync"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "report-runner",
-            "namespace": "argocd",
-            "status": "OutOfSync",
-            "requiresPruning": true
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "cache-shim",
-            "namespace": "argocd",
-            "status": "OutOfSync",
-            "requiresPruning": true
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "search-api",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "session-store",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "toolbox",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "log-shipper",
-            "namespace": "argocd",
-            "status": "Synced"
-          },
-          {
-            "group": "argoproj.io",
-            "kind": "Application",
-            "name": "notify-worker",
-            "namespace": "argocd",
-            "status": "Synced"
-          }
-        ]
-      }
-    },
-    {
-      "metadata": {
-        "name": "accounts-api",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/accounts-api",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:40Z"
-        },
-        "history": [
-          {
-            "id": 214,
-            "revision": "3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb",
-            "deployedAt": "2026-08-21T11:30:40Z"
-          }
-        ],
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/accounts-api:2.4.1"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "admin-ui",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/admin-ui",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "b7f21c8d9e4a60357c1b28ef4d90a5136be7cc02"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:41Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/admin-ui:1.15.0",
-            "registry.example.invalid/istio/proxyv2:1.30.1"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "media-encoder",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/media-encoder",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Degraded",
-          "message": "0/2 replicas available"
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "5d0ba93e71cc4802f6ae13b7d5924c8f0a63b1de"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:44Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/media-encoder:5.2.0"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "ingest-gateway",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/ingest-gateway",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Progressing",
-          "message": "waiting for rollout to finish: 1 of 3 updated replicas are available"
-        },
-        "sync": {
-          "status": "OutOfSync",
-          "revision": "e41c7a6b28d0f395ba7e6c1d840f52397ab0dc61"
-        },
-        "operationState": {
-          "phase": "Running",
-          "message": "syncing",
-          "finishedAt": ""
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/ingest-gateway:3.0.0-beta.2",
-            "registry.example.invalid/istio/proxyv2:1.30.1"
-          ]
-        },
-        "resources": [
-          {
-            "group": "",
-            "version": "v1",
-            "kind": "Deployment",
-            "name": "ingest-gateway",
-            "namespace": "ingest-gateway",
-            "status": "OutOfSync"
-          },
-          {
-            "group": "",
-            "version": "v1",
-            "kind": "Service",
-            "name": "ingest-gateway",
-            "namespace": "ingest-gateway",
-            "status": "OutOfSync"
-          },
-          {
-            "group": "",
-            "version": "v1",
-            "kind": "ConfigMap",
-            "name": "ingest-gateway",
-            "namespace": "ingest-gateway",
-            "status": "OutOfSync"
-          }
-        ]
-      }
-    },
-    {
-      "metadata": {
-        "name": "orders-api",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/orders-api",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Missing",
-          "message": "Deployment not found"
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "a90f34c7be215d6083fc41ae9b7d2650cc18f3a4"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:46Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/orders-api:2.4.1",
-            "registry.example.invalid/istio/proxyv2:1.30.1"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "metrics-collector",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/metrics-collector",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Suspended",
-          "message": "CronJob is suspended"
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "27ab6e04d1f8935c7be0a24d6f13c9805ea7b4d2"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:47Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/metrics-collector:4.11.2"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "edge-proxy",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/edge-proxy",
-          "targetRevision": "release-4.2",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "OutOfSync",
-          "revision": "6fd2c8be913a405d7e1cb0a97432df85610ce9a7"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:49Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/edge-proxy:1.8.12"
-          ]
-        },
-        "resources": [
-          {
-            "group": "",
-            "version": "v1",
-            "kind": "Deployment",
-            "name": "edge-proxy",
-            "namespace": "edge-proxy",
-            "status": "OutOfSync"
-          },
-          {
-            "group": "",
-            "version": "v1",
-            "kind": "ServiceAccount",
-            "name": "edge-proxy",
-            "namespace": "edge-proxy",
-            "status": "OutOfSync"
-          }
-        ]
-      }
-    },
-    {
-      "metadata": {
-        "name": "report-runner",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/report-runner",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Degraded",
-          "message": "0/1 replicas available"
-        },
-        "sync": {
-          "status": "OutOfSync",
-          "revision": "14c9b7e0da3856f2c40b1e7d9538ac6021fb4e83"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-18T09:14:03Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/report-runner:0.9.4"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "cache-shim",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/cache-shim",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "OutOfSync",
-          "revision": "8ae5310cf94b62d07a1e8b4c35f9d206ce71ab4f"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-17T22:41:19Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/cache-shim:1.2.0"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "search-api",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/search-api",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "d3810a7c6be294f5028ad713c6b9e4f01a25dc86"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:51Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/search-api:1.19.0-rc.3"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "session-store",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/session-store",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": null
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:52Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/session-store:6.2.4"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "toolbox",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/toolbox",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "0b6e42d1a97c3f508de24bc61a7930f5d81ce6a2"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:53Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/toolbox:0.3.1"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "log-shipper",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/log-shipper",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "f7203ca5be18d94607e3b1cd82a45f9016bd3e70"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:55Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/log-shipper:7.17.9"
-          ]
-        }
-      }
-    },
-    {
-      "metadata": {
-        "name": "notify-worker",
-        "namespace": "argocd",
-        "labels": {
-          "EnvType": "dev"
-        }
-      },
-      "spec": {
-        "source": {
-          "path": "charts/notify-worker",
-          "targetRevision": "develop",
-          "repoURL": "https://git.example.invalid/example/platform/charts.git"
-        }
-      },
-      "status": {
-        "health": {
-          "status": "Healthy",
-          "message": ""
-        },
-        "sync": {
-          "status": "Synced",
-          "revision": "5b91ed07ac3428df610b7c95e2a4310fd8c6be29"
-        },
-        "operationState": {
-          "phase": "Succeeded",
-          "message": "successfully synced (all tasks run)",
-          "finishedAt": "2026-08-21T11:30:56Z"
-        },
-        "summary": {
-          "images": [
-            "registry.example.invalid/platform/notify-worker:3.6.0"
-          ]
-        }
-      }
+ "apiVersion": "argoproj.io/v1alpha1",
+ "kind": "ApplicationList",
+ "items": [
+  {
+   "metadata": {
+    "name": "root-app",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev",
+     "app.kubernetes.io/part-of": "platform"
     }
-  ]
+   },
+   "spec": {
+    "source": {
+     "path": "envs/sample-dev",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/apps.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Degraded",
+     "message": "one or more child applications are degraded"
+    },
+    "sync": {
+     "status": "OutOfSync",
+     "revision": "437a162c4f9b8d0e5a1c73f620b8e94d1a6c0f22"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:31:12Z"
+    },
+    "history": [
+     {
+      "id": 1047,
+      "revision": "9b1d0e5a1c73f620b8e94d1a6c0f22437a162c4f",
+      "deployedAt": "2026-08-19T08:02:44Z"
+     },
+     {
+      "id": 1048,
+      "revision": "437a162c4f9b8d0e5a1c73f620b8e94d1a6c0f22",
+      "deployedAt": "2026-08-21T11:30:57Z"
+     }
+    ],
+    "resources": [
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "accounts-api",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "admin-ui",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "media-encoder",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "ingest-gateway",
+      "namespace": "argocd",
+      "status": "OutOfSync"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "orders-api",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "metrics-collector",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "edge-proxy",
+      "namespace": "argocd",
+      "status": "OutOfSync"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "report-runner",
+      "namespace": "argocd",
+      "status": "OutOfSync",
+      "requiresPruning": true
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "cache-shim",
+      "namespace": "argocd",
+      "status": "OutOfSync",
+      "requiresPruning": true
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "search-api",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "session-store",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "toolbox",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "log-shipper",
+      "namespace": "argocd",
+      "status": "Synced"
+     },
+     {
+      "group": "argoproj.io",
+      "kind": "Application",
+      "name": "notify-worker",
+      "namespace": "argocd",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "accounts-api",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/accounts-api",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:40Z"
+    },
+    "history": [
+     {
+      "id": 214,
+      "revision": "3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb",
+      "deployedAt": "2026-08-21T11:30:40Z"
+     }
+    ],
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/accounts-api:2.4.1"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "accounts-api",
+      "name": "accounts-api",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "admin-ui",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/admin-ui",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "b7f21c8d9e4a60357c1b28ef4d90a5136be7cc02"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:41Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/admin-ui:1.15.0",
+      "registry.example.invalid/istio/proxyv2:1.30.1"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "admin-ui",
+      "name": "admin-ui",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "media-encoder",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/media-encoder",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Degraded",
+     "message": "0/2 replicas available"
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "5d0ba93e71cc4802f6ae13b7d5924c8f0a63b1de"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:44Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/media-encoder:5.2.0"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "media-encoder",
+      "name": "media-encoder",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "ingest-gateway",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/ingest-gateway",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Progressing",
+     "message": "waiting for rollout to finish: 1 of 3 updated replicas are available"
+    },
+    "sync": {
+     "status": "OutOfSync",
+     "revision": "e41c7a6b28d0f395ba7e6c1d840f52397ab0dc61"
+    },
+    "operationState": {
+     "phase": "Running",
+     "message": "syncing",
+     "finishedAt": ""
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/ingest-gateway:3.0.0-beta.2",
+      "registry.example.invalid/istio/proxyv2:1.30.1"
+     ]
+    },
+    "resources": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Deployment",
+      "name": "ingest-gateway",
+      "namespace": "ingest-gateway",
+      "status": "OutOfSync"
+     },
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Service",
+      "name": "ingest-gateway",
+      "namespace": "ingest-gateway",
+      "status": "OutOfSync"
+     },
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap",
+      "name": "ingest-gateway",
+      "namespace": "ingest-gateway",
+      "status": "OutOfSync"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "orders-api",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/orders-api",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Missing",
+     "message": "Deployment not found"
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "a90f34c7be215d6083fc41ae9b7d2650cc18f3a4"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:46Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/orders-api:2.4.1",
+      "registry.example.invalid/istio/proxyv2:1.30.1"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "orders-api",
+      "name": "orders-api",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "metrics-collector",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/metrics-collector",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Suspended",
+     "message": "CronJob is suspended"
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "27ab6e04d1f8935c7be0a24d6f13c9805ea7b4d2"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:47Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/metrics-collector:4.11.2"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "metrics-collector",
+      "name": "metrics-collector",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "edge-proxy",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/edge-proxy",
+     "targetRevision": "release-4.2",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "OutOfSync",
+     "revision": "6fd2c8be913a405d7e1cb0a97432df85610ce9a7"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:49Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/edge-proxy:1.8.12"
+     ]
+    },
+    "resources": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Deployment",
+      "name": "edge-proxy",
+      "namespace": "edge-proxy",
+      "status": "OutOfSync"
+     },
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "ServiceAccount",
+      "name": "edge-proxy",
+      "namespace": "edge-proxy",
+      "status": "OutOfSync"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "report-runner",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/report-runner",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Degraded",
+     "message": "0/1 replicas available"
+    },
+    "sync": {
+     "status": "OutOfSync",
+     "revision": "14c9b7e0da3856f2c40b1e7d9538ac6021fb4e83"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-18T09:14:03Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/report-runner:0.9.4"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "report-runner",
+      "name": "report-runner",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "cache-shim",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/cache-shim",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "OutOfSync",
+     "revision": "8ae5310cf94b62d07a1e8b4c35f9d206ce71ab4f"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-17T22:41:19Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/cache-shim:1.2.0"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "cache-shim",
+      "name": "cache-shim",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "search-api",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/search-api",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "d3810a7c6be294f5028ad713c6b9e4f01a25dc86"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:51Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/search-api:1.19.0-rc.3"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "search-api",
+      "name": "search-api",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "session-store",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/session-store",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": null
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:52Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/session-store:6.2.4"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "session-store",
+      "name": "session-store",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "toolbox",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/toolbox",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "0b6e42d1a97c3f508de24bc61a7930f5d81ce6a2"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:53Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/toolbox:0.3.1"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "toolbox",
+      "name": "toolbox",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "log-shipper",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/log-shipper",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "f7203ca5be18d94607e3b1cd82a45f9016bd3e70"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:55Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/log-shipper:7.17.9"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "log-shipper",
+      "name": "log-shipper",
+      "status": "Synced"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "notify-worker",
+    "namespace": "argocd",
+    "labels": {
+     "EnvType": "dev"
+    }
+   },
+   "spec": {
+    "source": {
+     "path": "charts/notify-worker",
+     "targetRevision": "develop",
+     "repoURL": "https://git.example.invalid/example/platform/charts.git"
+    }
+   },
+   "status": {
+    "health": {
+     "status": "Healthy",
+     "message": ""
+    },
+    "sync": {
+     "status": "Synced",
+     "revision": "5b91ed07ac3428df610b7c95e2a4310fd8c6be29"
+    },
+    "operationState": {
+     "phase": "Succeeded",
+     "message": "successfully synced (all tasks run)",
+     "finishedAt": "2026-08-21T11:30:56Z"
+    },
+    "summary": {
+     "images": [
+      "registry.example.invalid/platform/notify-worker:3.6.0"
+     ]
+    },
+    "resources": [
+     {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "notify-worker",
+      "name": "notify-worker",
+      "status": "Synced"
+     }
+    ]
+   }
+  }
+ ]
 }
