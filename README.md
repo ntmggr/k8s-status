@@ -10,7 +10,7 @@
 [![OpenSSF Scorecard](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.scorecard.dev%2Fprojects%2Fgithub.com%2Fntmggr%2Fk8s-status&query=%24.score&label=openssf%20scorecard)](https://scorecard.dev/viewer/?uri=github.com/ntmggr/k8s-status)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14260/badge)](https://www.bestpractices.dev/projects/14260)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 **See what GitOps actually deployed, and what it doesn't know about.**
 
