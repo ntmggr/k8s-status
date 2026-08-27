@@ -513,6 +513,24 @@ read from the workload list already fetched for the unmanaged view. That means i
 no extra request, needs no site-specific pattern list, and cannot drift out of date when
 a service moves off GPU nodes.
 
+Every GPU row also carries what it asks for and what it holds: devices per replica,
+replicas ready against desired, and the resulting allocation. That separates three
+things a boolean marker hides, which is the point of it:
+
+| Reads as | Means |
+|---|---|
+| `running` | holding devices |
+| `idle` | parked at zero replicas, so its devices are free for others |
+| `waiting` | asked for devices and has not got them |
+
+`waiting` is the one worth acting on. A row also carries `measured: false` when the
+service never requests a device and reaches one through the runtime, because then the
+per-replica and allocated numbers cannot be trusted. That is separate from the state,
+since such a service can still be stuck.
+
+The capacity line totals the same thing cluster-wide, as `N cards, M allocated`. The gap
+is idle hardware.
+
 Detection is by container resources, not by which node a pod landed on. A DaemonSet
 scheduled onto a GPU node is not a GPU workload, and a service scaled to zero still is
 one.
