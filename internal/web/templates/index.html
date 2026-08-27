@@ -209,6 +209,12 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
 .appver, .chartver { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                     white-space: nowrap; }
 .appver { font-size: .8rem; color: var(--ink); font-weight: 600; }
+.svc.is-blocked td { opacity: .55; }
+.svc.is-blocked td.name { opacity: 1; }
+.blocked { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
+       font-weight: 700; letter-spacing: .03em; background: var(--warn-bg); color: var(--warn-fg);
+       white-space: nowrap; }
+.blocked .ic { width: 9px; height: 9px; margin-right: .15rem; vertical-align: -1px; }
 .gpu.is-waiting { background: var(--warn-bg); color: var(--warn-fg); }
 .gpu { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
        font-weight: 700; letter-spacing: .05em; background: var(--gpu-bg); color: var(--gpu-fg);
@@ -418,10 +424,11 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{$ui := .ArgoCDUIBase}}
 {{$multi := .MultiSource}}
 {{range .Services}}
-<tbody class="svc{{if .GPU}} is-gpu{{end}}">
+<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}">
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
+    {{- with .Blocked}}<span class="blocked" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
     {{- if .GPU}}<span class="gpu{{if .GPUAlloc.Waiting}} is-waiting{{end}}" title="{{if .GPUAlloc.Unmeasured}}Reaches a device through the runtime without requesting one, so how much it holds is not knowable from the API.{{else}}{{.GPUAlloc.PerReplica}} per replica, {{.GPUAlloc.Ready}} of {{.GPUAlloc.Desired}} replicas ready, {{.GPUAlloc.Allocated}} allocated.{{end}}{{if .GPUAlloc.Waiting}} Asked for a device and has not got one.{{else if .GPUAlloc.Idle}} Parked at zero replicas.{{end}}">{{$.Snapshot.AcceleratorBadge}}{{if .GPUAlloc.Waiting}}!{{end}}</span>{{end}}</td>
   {{if $multi}}<td class="hide-sm"><span class="src" title="{{if .Kind}}{{.Kind}}{{else}}ArgoCD Application{{end}}">{{.Source}}</span></td>{{end}}
   <td class="appver">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>

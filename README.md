@@ -484,6 +484,7 @@ can run it with none of them set.
 | `IGNORE_GLOBS` | *(empty)* | Comma-separated name patterns to hide. Matches are removed from the table and from every count, and reported as `hidden` |
 | `GPU_GLOBS` | *(empty)* | Fallback only. Name patterns marking a service as GPU-backed, used when the workload read that powers real detection is not available |
 | `SIDECAR_IMAGES` | *(built-in list)* | Image names that never carry the service version, such as an injected proxy. Replaces the built-in list |
+| `PENDING_REASONS` | `false` | Explain why a service's pods cannot be scheduled and grey the row. Reads Events. Needs a ClusterRole |
 | `ACCELERATOR_RESOURCES` | *(discovered)* | Resources that count as accelerators. Empty discovers them from what the nodes advertise |
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
@@ -512,6 +513,24 @@ A service is marked as GPU-backed when a workload it owns requests `nvidia.com/g
 read from the workload list already fetched for the unmanaged view. That means it costs
 no extra request, needs no site-specific pattern list, and cannot drift out of date when
 a service moves off GPU nodes.
+
+A row is greyed out, with a yellow chip naming the reason, when the scheduler could not
+place its pods. Two shapes turn up in practice:
+
+| Chip | Message behind it |
+|---|---|
+| `no cpu, memory` | the cluster is out of that resource |
+| `no matching node` | every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty |
+
+This reads Events rather than pods, and needs `get`/`list` on `events` via
+`PENDING_REASONS`, off by default. Pods would give a richer reason, and were deliberately
+not used: a pod carries its whole spec including environment values, which are routinely
+secrets. An Event carries an object reference, a reason and a message, and nothing else
+worth protecting.
+
+Events name a pod, so it is matched back to a workload by name prefix within its
+namespace, longest match first. `tts-engine` and `tts-engine-daphne` both prefix a daphne
+pod and only the longer one owns it.
 
 Every GPU row also carries what it asks for and what it holds: devices per replica,
 replicas ready against desired, and the resulting allocation. That separates three

@@ -52,6 +52,14 @@ rules:
     resources: ["deployments", "statefulsets", "daemonsets"]
     verbs: ["get", "list"]
   {{- end }}
+  {{- if .Values.config.pendingReasons }}
+  {{- /* Events, not pods. Answering "why is this pending" needs the scheduler's own
+         words, and a pod carries its whole spec including environment values that are
+         routinely secrets. An Event carries a reference, a reason and a message. */}}
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list"]
+  {{- end }}
   {{- if has "flux" $sources }}
   {{- /* Flux objects live in the namespaces they deploy into rather than in one
          controller namespace, so these are cluster-wide reads a Role cannot serve. */}}

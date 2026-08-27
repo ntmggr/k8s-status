@@ -45,6 +45,10 @@ func main() {
 	// Empty discovers accelerators from node capacity; set it only to override that.
 	acceleratorRes := splitGlobs(env("ACCELERATOR_RESOURCES", ""))
 	nodeStats := envBool("NODE_STATS", false)
+	// PENDING_REASONS reads scheduling failures so a stuck row can say why. Needs
+	// get/list on events, which carry an object reference and a message and nothing
+	// sensitive, unlike a pod spec.
+	pendingReasons := envBool("PENDING_REASONS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
 	cacheTTL := time.Duration(envInt("CACHE_TTL_SECONDS", 15)) * time.Second
@@ -90,6 +94,15 @@ func main() {
 		collector.WithNodes(nodeLister)
 	}
 
+	if pendingReasons {
+		eventLister, eerr := buildEventLister()
+		if eerr != nil {
+			log.Printf("pending reasons enabled but the events client is unavailable: %v", eerr)
+		} else {
+			collector.WithEvents(eventLister)
+		}
+	}
+
 	if unmanaged {
 		workloadLister, werr := buildWorkloadLister()
 		if werr != nil {
@@ -114,8 +127,8 @@ func main() {
 		log.Fatalf("build server: %v", err)
 	}
 
-	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t unmanaged=%t unmanagedIgnoreNS=%v",
-		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, unmanaged, unmanagedIgnoreNS)
+	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v",
+		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + port,
@@ -177,6 +190,16 @@ func buildKubeClient() (*kube.Client, error) {
 
 // buildNodeLister is only called when NODE_STATS is on: nodes are cluster-scoped.
 func buildNodeLister() (status.NodeLister, error) {
+	c, err := buildKubeClient()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// buildEventLister is only called when PENDING_REASONS is on: events are read across
+// all namespaces, so this is a cluster-wide read.
+func buildEventLister() (status.EventLister, error) {
 	c, err := buildKubeClient()
 	if err != nil {
 		return nil, err

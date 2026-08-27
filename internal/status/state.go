@@ -112,6 +112,9 @@ type Service struct {
 	AppVersion string
 	Image      string
 	GPU        bool
+	// Blocked is set when the scheduler could not place this service's pods. Nil for
+	// everything else, which is almost every row.
+	Blocked *Blocked
 	// GPUAlloc describes what this service asks of the accelerators and what it
 	// actually holds. Only meaningful when GPU is set.
 	GPUAlloc   GPUAllocation
@@ -140,6 +143,8 @@ type Summary struct {
 	// Split out because a boolean GPU count hides both.
 	GPUWaiting int
 	GPUIdle    int
+	// Blocked counts services the scheduler could not place.
+	Blocked int
 }
 
 type Snapshot struct {

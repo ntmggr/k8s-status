@@ -99,6 +99,15 @@ type summaryJSON struct {
 	// which is deliberate and leaves its devices free.
 	GPUWaiting int `json:"gpuWaiting"`
 	GPUIdle    int `json:"gpuIdle"`
+	// Blocked counts services the scheduler could not place.
+	Blocked int `json:"blocked"`
+}
+
+type blockedJSON struct {
+	Reason        string   `json:"reason"`
+	Resources     []string `json:"resources,omitempty"`
+	NoNodeMatched bool     `json:"noNodeMatched,omitempty"`
+	Pods          int      `json:"pods"`
 }
 
 type gpuAllocJSON struct {
@@ -124,6 +133,8 @@ type serviceJSON struct {
 	RepoURL    string `json:"repoUrl,omitempty"`
 	AppVersion string `json:"appVersion,omitempty"`
 	GPU        bool   `json:"gpu,omitempty"`
+	// Blocked is present only when the scheduler refused to place this service.
+	Blocked *blockedJSON `json:"blocked,omitempty"`
 	// GPUAlloc is present only on GPU rows: what one replica asks for, how many
 	// replicas are up, and how many devices that adds up to.
 	GPUAlloc   *gpuAllocJSON   `json:"gpuAllocation,omitempty"`
@@ -275,6 +286,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 			GPU:         snap.Summary.GPU,
 			GPUWaiting:  snap.Summary.GPUWaiting,
 			GPUIdle:     snap.Summary.GPUIdle,
+			Blocked:     snap.Summary.Blocked,
 		}
 		resp.Sources = sources(snap)
 		resp.Nodes = nodes(snap)
@@ -302,6 +314,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 				AppVersion: svc.AppVersion,
 				GPU:        svc.GPU,
 				GPUAlloc:   gpuAlloc(svc),
+				Blocked:    blocked(svc),
 				Image:      svc.Image,
 				State:      string(svc.State),
 				Sync:       svc.Sync,
@@ -446,5 +459,17 @@ func gpuAlloc(svc status.Service) *gpuAllocJSON {
 		PerReplica: g.PerReplica, Desired: g.Desired,
 		Ready: g.Ready, Allocated: g.Allocated, State: state,
 		Measured: !g.Unmeasured(),
+	}
+}
+
+// blocked renders the scheduling failure, and only for rows that have one.
+func blocked(svc status.Service) *blockedJSON {
+	if svc.Blocked == nil {
+		return nil
+	}
+	b := svc.Blocked
+	return &blockedJSON{
+		Reason: b.Reason(), Resources: b.Resources,
+		NoNodeMatched: b.NoNodeMatched, Pods: b.Pods,
 	}
 }
