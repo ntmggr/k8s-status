@@ -216,7 +216,7 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
        white-space: nowrap; }
 .blocked .ic { width: 9px; height: 9px; margin-right: .15rem; vertical-align: -1px; }
 .gpu.is-waiting { background: var(--warn-bg); color: var(--warn-fg); }
-.gpu.is-idle { background: var(--susp-bg); color: var(--susp-fg); }
+.gpu.is-stopped { background: var(--susp-bg); color: var(--susp-fg); }
 .gpu.is-running { background: var(--ok-bg); color: var(--ok-fg); }
 .gpu { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
        font-weight: 700; letter-spacing: .05em; background: var(--gpu-bg); color: var(--gpu-fg);
@@ -330,7 +330,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 <div class="views">
   <span class="views-lab">views</span>
-  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services backed by {{$.Snapshot.AcceleratorLabel}}">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.GPUWaiting}} <b>{{$.Snapshot.Summary.GPUWaiting}} waiting</b>{{end}}{{if $.Snapshot.Summary.GPUIdle}} <i>{{$.Snapshot.Summary.GPUIdle}} idle</i>{{end}}</a>
+  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services backed by {{$.Snapshot.AcceleratorLabel}}">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.GPUWaiting}} <b>{{$.Snapshot.Summary.GPUWaiting}} waiting</b>{{end}}{{if $.Snapshot.Summary.GPUStopped}} <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
     {{- if $.Snapshot.Summary.Blocked}}
     <a class="vchip is-warnchip{{if $.FilterActive "blocked" "true"}} is-on{{end}}" href="{{$.FilterHref "blocked" "true"}}" title="Services whose pods the scheduler could not place. They are not broken; there is nowhere to run them.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} unschedulable</a>
     {{- end}}
@@ -354,7 +354,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- /* Without a device plugin the card count is not discoverable, so say that
                instead of printing a bare "0 cards" beside nodes that are busy. */}}
         {{- if .GPUs}}
-        <span class="cap-split" title="Total across those nodes, and how many a workload actually holds. The gap is idle hardware.{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}<i>·</i>{{.GPUsAllocated}} allocated</span>
+        <span class="cap-split" title="Total across those nodes, and how many a workload actually holds. The gap is hardware nothing has claimed.{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}<i>·</i>{{.GPUsAllocated}} allocated</span>
         {{- end}}
         {{- if .UnschedulableGPUNodes}}
         <span class="cap-split is-warn" title="These nodes have a device but advertise none, so no device plugin is running. Workloads still reach the hardware through the container runtime and can be serving traffic, but the scheduler cannot allocate or limit it: any number of pods can land on one card, and the card count is not discoverable.">{{if eq .UnschedulableGPUNodes .GPUNodes}}no device plugin{{else}}{{.UnschedulableGPUNodes}} without a device plugin{{end}}</span>
@@ -383,7 +383,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>SUSPENDED</span><span>Deliberately paused.</span></div>
     <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} 2</span><span>Holding that many {{$.Snapshot.AcceleratorLabel}} devices right now.</span></div>
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
-    <div class="legend-row"><span class="gpu is-idle">{{$.Snapshot.AcceleratorBadge}} idle</span><span>Scaled to zero on purpose. Its {{$.Snapshot.AcceleratorLabel}} is free for others.</span></div>
+    <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip says what is missing.</span></div>
   </div>
   <div class="legend-note">
@@ -441,9 +441,9 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for
            one, and parked at zero. Each gets its own colour and its own word. */}}
-    <span class="gpu{{if $g.Waiting}} is-waiting{{else if $g.Idle}} is-idle{{else}} is-running{{end}}"
-      title="{{if $g.Unmeasured}}Reaches a device through the runtime without requesting one, so how much it holds is not knowable from the API. {{else}}{{$g.PerReplica}} per replica, {{$g.Ready}} of {{$g.Desired}} replicas ready, {{$g.Allocated}} allocated. {{end}}{{if $g.Waiting}}Asked for {{$.Snapshot.AcceleratorLabel}} and has not got {{if eq $g.Desired 1}}it{{else}}them{{end}}.{{else if $g.Idle}}Scaled to zero, so its {{$.Snapshot.AcceleratorLabel}} is free for others.{{else}}Running.{{end}}"
-      >{{$.Snapshot.AcceleratorBadge}}{{if $g.Waiting}} waiting{{else if $g.Idle}} idle{{else if and (not $g.Unmeasured) $g.Allocated}} {{$g.Allocated}}{{end}}</span>{{end}}</td>
+    <span class="gpu{{if $g.Waiting}} is-waiting{{else if $g.ScaledToZero}} is-stopped{{else}} is-running{{end}}"
+      title="{{if $g.Unmeasured}}Reaches a device through the runtime without requesting one, so how much it holds is not knowable from the API. {{else}}{{$g.PerReplica}} per replica, {{$g.Ready}} of {{$g.Desired}} replicas ready, {{$g.Allocated}} allocated. {{end}}{{if $g.Waiting}}Asked for {{$.Snapshot.AcceleratorLabel}} and has not got {{if eq $g.Desired 1}}it{{else}}them{{end}}.{{else if $g.ScaledToZero}}No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held. Whether that is a deliberate stop or an autoscaler at rest is not visible from the workload.{{else}}Running.{{end}}"
+      >{{$.Snapshot.AcceleratorBadge}}{{if $g.Waiting}} waiting{{else if $g.ScaledToZero}} 0 pods{{else if and (not $g.Unmeasured) $g.Allocated}} {{$g.Allocated}}{{end}}</span>{{end}}</td>
   {{if $multi}}<td class="hide-sm"><span class="src" title="{{if .Kind}}{{.Kind}}{{else}}ArgoCD Application{{end}}">{{.Source}}</span></td>{{end}}
   <td class="appver">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>
   <td class="chartver hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">

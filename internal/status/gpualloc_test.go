@@ -42,10 +42,10 @@ func svcWith(name, ns, wl string) Service {
 
 func TestGPUAllocationStates(t *testing.T) {
 	cases := []struct {
-		name                      string
-		gpu, desired, ready       int
-		wantAlloc                 int
-		waiting, idle, unmeasured bool
+		name                         string
+		gpu, desired, ready          int
+		wantAlloc                    int
+		waiting, stopped, unmeasured bool
 	}{
 		{name: "holding devices", gpu: 1, desired: 1, ready: 1, wantAlloc: 1},
 		{name: "several per replica", gpu: 3, desired: 2, ready: 2, wantAlloc: 6},
@@ -53,7 +53,7 @@ func TestGPUAllocationStates(t *testing.T) {
 		{name: "waiting for a device", gpu: 1, desired: 2, ready: 0, wantAlloc: 0, waiting: true},
 		{name: "partially rolled out", gpu: 1, desired: 3, ready: 1, wantAlloc: 1, waiting: true},
 		// Deliberate, not a problem: its cards are free for others.
-		{name: "parked at zero", gpu: 1, desired: 0, ready: 0, wantAlloc: 0, idle: true},
+		{name: "parked at zero", gpu: 1, desired: 0, ready: 0, wantAlloc: 0, stopped: true},
 		// Reaches the device through the runtime; the API cannot say how much.
 		{name: "no request at all", gpu: 0, desired: 2, ready: 2, wantAlloc: 0, unmeasured: true},
 	}
@@ -79,8 +79,8 @@ func TestGPUAllocationStates(t *testing.T) {
 			if g.Waiting() != tc.waiting {
 				t.Errorf("Waiting=%v, want %v", g.Waiting(), tc.waiting)
 			}
-			if g.Idle() != tc.idle {
-				t.Errorf("Idle=%v, want %v", g.Idle(), tc.idle)
+			if g.ScaledToZero() != tc.stopped {
+				t.Errorf("ScaledToZero=%v, want %v", g.ScaledToZero(), tc.stopped)
 			}
 			if g.Unmeasured() != tc.unmeasured {
 				t.Errorf("Unmeasured=%v, want %v", g.Unmeasured(), tc.unmeasured)
@@ -119,7 +119,7 @@ func TestGPUAllocationUsesSpecReplicasNotStatus(t *testing.T) {
 	snap.addService(svcWith("svc", "ml", "svc"))
 	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{w}}, nil, []string{kube.ResourceGPU})
 
-	if g := snap.Services[0].GPUAlloc; !g.Idle() || g.Waiting() {
+	if g := snap.Services[0].GPUAlloc; !g.ScaledToZero() || g.Waiting() {
 		t.Fatalf("a draining scale-down must read as idle, got desired=%d ready=%d", g.Desired, g.Ready)
 	}
 }
@@ -141,7 +141,7 @@ func TestSummaryCountsWaitingAndIdle(t *testing.T) {
 	if snap.Summary.GPUWaiting != 1 {
 		t.Errorf("GPUWaiting=%d, want 1", snap.Summary.GPUWaiting)
 	}
-	if snap.Summary.GPUIdle != 1 {
-		t.Errorf("GPUIdle=%d, want 1", snap.Summary.GPUIdle)
+	if snap.Summary.GPUStopped != 1 {
+		t.Errorf("GPUStopped=%d, want 1", snap.Summary.GPUStopped)
 	}
 }

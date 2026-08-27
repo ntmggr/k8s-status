@@ -540,12 +540,18 @@ things a boolean marker hides, which is the point of it:
 |---|---|
 | `GPU 2` | running and holding that many devices |
 | `GPU waiting` | wants devices and has not got any: none free, or no node to run on |
-| `GPU idle` | scaled to zero on purpose, so its devices are free for others |
+| `GPU 0 pods` | no replicas requested, so nothing is running and no device is held |
 
 A badge with no number is a service that reaches a device through the runtime without
 requesting one, so the count is not knowable. The three states are coloured apart rather
-than left to a tooltip, because on a real cluster 14 of 19 GPU services were parked and
+than left to a tooltip, because on a real cluster 14 of 19 GPU services had no pods and
 one was stuck, and a single badge said the same thing about all of them.
+
+The zero-replica case is deliberately not called "idle". Idle describes a device that is
+allocated and doing no work, which is a utilisation fact this project cannot see: it
+reads the Kubernetes API, not the hardware. What it knows is that no replicas were asked
+for. Whether that is a deliberate stop or an autoscaler at rest is not visible from the
+workload either, so the badge states the fact and stops there.
 
 `waiting` is the one worth acting on. A row also carries `measured: false` when the
 service never requests a device and reaches one through the runtime, because then the

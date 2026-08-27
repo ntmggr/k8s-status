@@ -95,10 +95,10 @@ type summaryJSON struct {
 	Suspended   int `json:"suspended"`
 	Hidden      int `json:"hidden"`
 	GPU         int `json:"gpu"`
-	// GPUWaiting asked for a device and has not got one. GPUIdle is parked at zero,
-	// which is deliberate and leaves its devices free.
+	// GPUWaiting asked for a device and has not got one. GPUStopped is asking for no
+	// replicas, so nothing is running and no device is held.
 	GPUWaiting int `json:"gpuWaiting"`
-	GPUIdle    int `json:"gpuIdle"`
+	GPUStopped int `json:"gpuStopped"`
 	// Blocked counts services the scheduler could not place.
 	Blocked int `json:"blocked"`
 }
@@ -285,7 +285,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 			Hidden:      snap.Summary.Hidden,
 			GPU:         snap.Summary.GPU,
 			GPUWaiting:  snap.Summary.GPUWaiting,
-			GPUIdle:     snap.Summary.GPUIdle,
+			GPUStopped:  snap.Summary.GPUStopped,
 			Blocked:     snap.Summary.Blocked,
 		}
 		resp.Sources = sources(snap)
@@ -452,8 +452,8 @@ func gpuAlloc(svc status.Service) *gpuAllocJSON {
 	switch {
 	case g.Waiting():
 		state = "waiting"
-	case g.Idle():
-		state = "idle"
+	case g.ScaledToZero():
+		state = "scaled-to-zero"
 	}
 	return &gpuAllocJSON{
 		PerReplica: g.PerReplica, Desired: g.Desired,

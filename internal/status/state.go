@@ -84,8 +84,12 @@ type GPUAllocation struct {
 // because it is mid-rollout, which still shows here and is worth seeing.
 func (g GPUAllocation) Waiting() bool { return g.Desired > 0 && g.Ready < g.Desired }
 
-// Idle reports a service parked at zero replicas. Its GPUs are free for others.
-func (g GPUAllocation) Idle() bool { return g.Desired == 0 }
+// ScaledToZero reports a service asking for no replicas. Deliberately not called
+// "idle": that word describes a device that is allocated and doing no work, which is a
+// utilisation fact this project cannot see. What is known here is only that nothing is
+// running, and whether that is a deliberate stop or an autoscaler at rest is not
+// visible from the workload alone.
+func (g GPUAllocation) ScaledToZero() bool { return g.Desired == 0 }
 
 // Unmeasured reports a service that reaches a device without requesting it, so the
 // API cannot say how much it holds.
@@ -139,10 +143,10 @@ type Summary struct {
 	Suspended   int
 	Hidden      int
 	GPU         int
-	// GPUWaiting asked for a device and has not got one; GPUIdle is parked at zero.
-	// Split out because a boolean GPU count hides both.
+	// GPUWaiting asked for a device and has not got one. GPUStopped is asking for no
+	// replicas at all. Split out because a boolean GPU count hides both.
 	GPUWaiting int
-	GPUIdle    int
+	GPUStopped int
 	// Blocked counts services the scheduler could not place.
 	Blocked int
 }
