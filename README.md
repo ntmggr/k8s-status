@@ -872,6 +872,11 @@ string and renders as no revision.
 | `data is Ns stale` banner | The last refresh failed; you are seeing the previous snapshot | Look at the error banner beside it |
 | Pod restarts in a loop | Should not happen from a cluster read, `/healthz` never touches the API | Check the pod logs and the image |
 
+## Contributing
+
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for how to build it, what CI checks, and what an acceptable change looks like.
+
 ## Security
 
 **There is no authentication.** Anyone who can reach the URL sees the page.
