@@ -51,6 +51,8 @@ func main() {
 	pendingReasons := envBool("PENDING_REASONS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
+	meshMTLS := envBool("MESH_MTLS", false)
+	meshNamespace := env("MESH_NAMESPACE", "istio-system")
 	cacheTTL := time.Duration(envInt("CACHE_TTL_SECONDS", 15)) * time.Second
 	refresh := envInt("REFRESH_SECONDS", 30)
 	port := env("PORT", "8080")
@@ -112,6 +114,17 @@ func main() {
 		collector.WithUnmanaged(workloadLister)
 	}
 
+	if meshMTLS {
+		meshLister, merr := buildMeshLister()
+		if merr != nil {
+			log.Printf("mesh mtls enabled but the mesh client is unavailable: %v", merr)
+			meshLister = failingMeshLister{err: merr}
+		} else {
+			probeIstio(meshLister)
+		}
+		collector.WithMesh(meshLister, meshNamespace)
+	}
+
 	srv, err := web.NewServer(web.Config{
 		LocalMode:      os.Getenv("KUBE_API_URL") != "",
 		EnvName:        envName,
@@ -127,8 +140,8 @@ func main() {
 		log.Fatalf("build server: %v", err)
 	}
 
-	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v",
-		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS)
+	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v meshMTLS=%t meshNamespace=%q",
+		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS, meshMTLS, meshNamespace)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + port,
@@ -227,6 +240,33 @@ func buildWorkloadLister() (status.WorkloadLister, error) {
 	return c, nil
 }
 
+// buildMeshLister is only called when MESH_MTLS is on. DetectIstio reads discovery,
+// which needs no extra RBAC; MeshPolicy is a single-object namespaced read.
+func buildMeshLister() (status.MeshLister, error) {
+	c, err := buildKubeClient()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// probeIstio logs whether the cluster serves Istio's PeerAuthentication CRD, the same
+// way detectSources logs its own discovery probes. This is a one-off startup log; the
+// collector re-probes on every refresh, so a mesh installed later is still found.
+func probeIstio(ml status.MeshLister) {
+	ctx, cancel := context.WithTimeout(context.Background(), kube.RequestTimeout)
+	defer cancel()
+
+	switch gv, err := ml.DetectIstio(ctx); {
+	case err != nil:
+		log.Printf("MESH_MTLS: istio discovery failed: %v", err)
+	case gv == "":
+		log.Print("MESH_MTLS: no Istio PeerAuthentication CRD found, mesh gauge will show \"no service mesh detected\"")
+	default:
+		log.Printf("MESH_MTLS: found Istio PeerAuthentication CRD at %s", gv)
+	}
+}
+
 type failingLister struct{ err error }
 
 func (f failingLister) ListApplications(context.Context) (*argocd.ApplicationList, error) {
@@ -248,6 +288,14 @@ func (f failingNodeLister) ListNodes(context.Context) (*kube.NodeList, error) {
 type failingWorkloadLister struct{ err error }
 
 func (f failingWorkloadLister) ListWorkloads(context.Context) (*kube.WorkloadList, error) {
+	return nil, f.err
+}
+
+type failingMeshLister struct{ err error }
+
+func (f failingMeshLister) DetectIstio(context.Context) (string, error) { return "", f.err }
+
+func (f failingMeshLister) MeshPolicy(context.Context, string, string) (*kube.PeerAuthentication, error) {
 	return nil, f.err
 }
 

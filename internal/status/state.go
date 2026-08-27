@@ -192,7 +192,9 @@ type Snapshot struct {
 	// Unmanaged is nil unless UNMANAGED is enabled.
 	Unmanaged *Unmanaged
 	// Flux is nil unless flux is one of SOURCES.
-	Flux      *FluxSection
+	Flux *FluxSection
+	// Mesh is nil unless MESH_MTLS is enabled.
+	Mesh      *MeshSection
 	CheckedAt time.Time
 	Stale     bool
 }

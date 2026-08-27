@@ -4,8 +4,8 @@
 #   ./scripts/local-test.sh cluster <context>   live, via kubectl proxy (kube context is required)
 #
 # Deployment-specific values are not baked in. Override ENV_NAME, ENV_TYPE, REGION,
-# CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED and
-# UNMANAGED_IGNORE_NS in the environment as needed.
+# CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED,
+# UNMANAGED_IGNORE_NS, MESH_MTLS and MESH_NAMESPACE in the environment as needed.
 set -euo pipefail
 
 MODE="${1:-fixture}"
@@ -28,12 +28,19 @@ case "$MODE" in
     FAKE_DIR="$(mktemp -d)"
     mkdir -p "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd"
     mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1"
+    mkdir -p "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications"
     cp testdata/applications.json "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd/applications"
     cp testdata/nodes.json        "$FAKE_DIR/api/v1/nodes"
     cp testdata/pods.json         "$FAKE_DIR/api/v1/pods"
     cp testdata/deployments.json  "$FAKE_DIR/apis/apps/v1/deployments"
     cp testdata/statefulsets.json "$FAKE_DIR/apis/apps/v1/statefulsets"
     cp testdata/daemonsets.json   "$FAKE_DIR/apis/apps/v1/daemonsets"
+    # The discovery document and the object collection both live under
+    # .../security.istio.io/v1, so the discovery doc is served as index.html: a GET
+    # with no trailing slash 301s to the directory, which python's http.server then
+    # answers from index.html. Go's http.Client follows that redirect transparently.
+    cp testdata/istio-discovery.json "$FAKE_DIR/apis/security.istio.io/v1/index.html"
+    cp testdata/peerauthentication.json "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications/default"
     ( cd "$FAKE_DIR" && python3 -m http.server "$PROXY_PORT" >/dev/null 2>&1 ) &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
@@ -41,6 +48,7 @@ case "$MODE" in
     NODE_STATS_DEFAULT=true
     ENV_NAME_DEFAULT=local
     UNMANAGED_DEFAULT=true
+    MESH_MTLS_DEFAULT=true
     echo "mode: fixture (offline, synthetic data)"
     ;;
   cluster)
@@ -69,6 +77,9 @@ case "$MODE" in
     # Your kubeconfig can already read nodes and workloads, so show both by default locally.
     NODE_STATS_DEFAULT=true
     UNMANAGED_DEFAULT=true
+    # Degrades to "no service mesh detected" on a cluster without Istio, so it is safe
+    # to default on here too.
+    MESH_MTLS_DEFAULT=true
     # Show which cluster you are actually pointed at, not a generic label.
     ENV_NAME_DEFAULT="$CONTEXT"
     ;;
@@ -82,6 +93,7 @@ CLUSTER_NAME="${CLUSTER_NAME:-}" ROOT_APP_NAME="$ROOT_APP" \
 ARGOCD_UI_BASE="${ARGOCD_UI_BASE:-}" \
 IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-$NODE_STATS_DEFAULT}" \
 PENDING_REASONS="${PENDING_REASONS:-$UNMANAGED_DEFAULT}" UNMANAGED="${UNMANAGED:-$UNMANAGED_DEFAULT}" UNMANAGED_IGNORE_NS="${UNMANAGED_IGNORE_NS:-}" \
+MESH_MTLS="${MESH_MTLS:-$MESH_MTLS_DEFAULT}" MESH_NAMESPACE="${MESH_NAMESPACE:-istio-system}" \
 PORT="$PORT" \
 /tmp/k8s-status-local &
 PIDS+=($!)

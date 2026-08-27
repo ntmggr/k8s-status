@@ -36,6 +36,9 @@ rbac:
   # when config.unmanaged is on, and get/list on helmreleases and kustomizations when
   # config.sources includes flux. Nothing cluster-scoped is rendered while this is false.
   clusterRole: false
+  # Namespace holding the Istio PeerAuthentication object read by config.meshMTLS; a
+  # namespaced Role and RoleBinding are created here, independent of clusterRole above.
+  istioNamespace: istio-system
 
 # Application configuration; each key maps 1:1 to an environment variable.
 config:
@@ -75,6 +78,10 @@ config:
   unmanaged: false
   # UNMANAGED_IGNORE_NS - comma-separated namespace globs excluded from that list.
   unmanagedIgnoreNamespaces: ""
+  # MESH_MTLS - show the cluster-wide Istio mTLS gauge. Reads one named
+  # PeerAuthentication object via a namespaced Role in rbac.istioNamespace, independent
+  # of rbac.clusterRole.
+  meshMTLS: false
   # PORT - container listen port.
   port: 8080
 

@@ -38,6 +38,13 @@ type FluxLister interface {
 	ListFlux(ctx context.Context) (*kube.FluxList, error)
 }
 
+// MeshLister is optional, for the mesh mTLS gauge. It is only wired up when MESH_MTLS
+// is enabled, so the default deployment never touches Istio's CRDs.
+type MeshLister interface {
+	DetectIstio(ctx context.Context) (string, error)
+	MeshPolicy(ctx context.Context, groupVersion, namespace string) (*kube.PeerAuthentication, error)
+}
+
 // Collector caches one Snapshot for a TTL. The mutex is deliberately held across
 // the upstream fetch so a burst of concurrent callers collapses into one request.
 type Collector struct {
@@ -52,6 +59,10 @@ type Collector struct {
 	pending   PendingLister
 	workloads WorkloadLister
 	flux      FluxLister
+	mesh      MeshLister
+	// meshNamespace is where the mesh-wide PeerAuthentication lives; set alongside mesh
+	// by WithMesh.
+	meshNamespace string
 
 	nodeStats *NodeStats
 	nodesAt   time.Time
@@ -63,6 +74,9 @@ type Collector struct {
 	unmanaged    *Unmanaged
 	unmanagedAt  time.Time
 	workloadList *kube.WorkloadList
+
+	meshSection *MeshSection
+	meshAt      time.Time
 }
 
 func NewCollector(lister Lister, opts Options, ttl time.Duration) *Collector {
@@ -102,6 +116,17 @@ func (c *Collector) WithFlux(fl FluxLister) *Collector {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.flux = fl
+	return c
+}
+
+// WithMesh enables the mesh mTLS gauge. Not called means Istio's APIs are never
+// queried and Snapshot.Mesh stays nil. namespace is where the mesh-wide
+// PeerAuthentication lives, normally "istio-system".
+func (c *Collector) WithMesh(ml MeshLister, namespace string) *Collector {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.mesh = ml
+	c.meshNamespace = namespace
 	return c
 }
 
@@ -155,6 +180,7 @@ func (c *Collector) decorate(ctx context.Context, snap Snapshot) *Snapshot {
 	c.attachNodes(ctx, &snap)
 	c.attachUnmanaged(ctx, &snap)
 	c.attachPending(ctx, &snap)
+	c.attachMesh(ctx, &snap)
 	return &snap
 }
 
@@ -207,6 +233,13 @@ func (c *Collector) refreshSources(ctx context.Context) {
 			c.fetchPending(ctx)
 		}()
 	}
+	if c.mesh != nil && stale(c.meshAt, c.meshSection == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchMesh(ctx)
+		}()
+	}
 	wg.Wait()
 }
 
@@ -252,6 +285,33 @@ func (c *Collector) fetchPending(ctx context.Context) {
 	c.pendingAt = c.now()
 }
 
+// fetchMesh detects Istio and, only when present, reads the mesh-wide
+// PeerAuthentication. Detection runs on every refresh rather than once at startup: a
+// cluster can gain or lose Istio without a restart.
+func (c *Collector) fetchMesh(ctx context.Context) {
+	gv, derr := c.mesh.DetectIstio(ctx)
+	if abandoned(derr) {
+		return // keep whatever was cached; a cancelled read says nothing about the cluster
+	}
+	// A discovery failure degrades to "not installed", the same fallback detectSources
+	// already uses for its own probes: a transient API hiccup must not render the mesh
+	// gauge as broken.
+	installed := derr == nil && gv != ""
+
+	var pa *kube.PeerAuthentication
+	var perr error
+	if installed {
+		pa, perr = c.mesh.MeshPolicy(ctx, gv, c.meshNamespace)
+		if abandoned(perr) {
+			return
+		}
+	}
+
+	sec := BuildMesh(installed, gv, pa, perr)
+	c.meshSection = &sec
+	c.meshAt = c.now()
+}
+
 func (c *Collector) attachNodes(_ context.Context, snap *Snapshot) {
 	if c.nodes == nil {
 		return
@@ -281,4 +341,11 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
+}
+
+func (c *Collector) attachMesh(_ context.Context, snap *Snapshot) {
+	if c.mesh == nil {
+		return
+	}
+	snap.Mesh = c.meshSection
 }

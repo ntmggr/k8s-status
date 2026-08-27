@@ -398,6 +398,32 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </section>
 {{end}}
 
+{{if and $.HasData $.Snapshot.Mesh}}
+<section class="capacity">
+  <div class="cap-head">Mesh mTLS<span class="cap-sub">cluster-wide only, not per-service</span></div>
+  {{- with $.Snapshot.Mesh}}{{if not .Error}}
+  <div class="cap-group">
+    <div class="cap-lead">{{icon "mesh"}}<span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
+      {{- if eq .Effective "strict"}}STRICT mTLS
+      {{- else if eq .Effective "permissive"}}PERMISSIVE (no cluster-wide enforcement)
+      {{- else if eq .Effective "disabled"}}mTLS disabled
+      {{- else}}No service mesh detected{{end -}}
+    </span></span></div>
+    {{- if .Scoped}}
+    <div class="cap-of"><span class="cap-part is-warn" title="The default PeerAuthentication object carries a selector, so it applies to one workload, not the whole mesh.">{{icon "warn"}}policy is workload-scoped, not mesh-wide</span></div>
+    {{- end}}
+  </div>
+  <div class="cap-note">Mesh-wide policy only. Namespace and workload PeerAuthentications can override this for individual services and are not read.</div>
+  {{- end}}{{end}}
+  {{- with $.Snapshot.Mesh}}{{if .Error}}
+  <div class="cap-note">
+    {{- if .Denied}}mesh mTLS needs a Role granting <span class="mono">get</span> on the <span class="mono">default</span> <span class="mono">peerauthentications.security.istio.io</span> object in the Istio namespace; the default install grants nothing there.
+    {{- else}}the mesh mTLS read did not complete, so this may be out of date.{{end}} ({{.Error}})
+  </div>
+  {{- end}}{{end}}
+</section>
+{{end}}
+
 <details class="legend">
   <summary>What these states mean</summary>
   <div class="legend-grid">
@@ -415,6 +441,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
+    <div class="legend-row">{{icon "mesh"}}<span>Cluster-wide Istio mTLS only. Mesh-wide policy only: namespace and workload PeerAuthentications can override this for individual services and are not read.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 

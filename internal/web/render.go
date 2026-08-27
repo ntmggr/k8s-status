@@ -392,6 +392,8 @@ func icon(name string) template.HTML {
 		body = `<path d="M8 2.2 1.6 13.2h12.8L8 2.2Z"/><path d="M8 6.4v3.1M8 11.4h.01"/>`
 	case "unmanaged": // broken link: running, but outside gitops
 		body = `<path d="M6.5 9.5L4.8 11.2a2.4 2.4 0 0 1-3.4-3.4L3.1 6.1"/><path d="M9.5 6.5l1.7-1.7a2.4 2.4 0 0 1 3.4 3.4l-1.7 1.7"/><path d="M6 10L10 6"/>`
+	case "mesh": // shield outline, for the mTLS gauge
+		body = `<path d="M8 2 2.5 4v3.8c0 3.6 2.3 6.2 5.5 6.7 3.2-.5 5.5-3.1 5.5-6.7V4L8 2Z"/>`
 	default:
 		return ""
 	}
