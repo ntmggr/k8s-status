@@ -165,6 +165,7 @@ type componentJSON struct {
 // nodesJSON is omitted entirely when NODE_STATS is off.
 type nodesJSON struct {
 	Total       int `json:"total"`
+	NotReady    int `json:"notReady"`
 	CPUNodes    int `json:"cpuNodes"`
 	GPUNodes    int `json:"gpuNodes"`
 	GPUs        int `json:"gpus"`
@@ -282,26 +283,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		resp.Message = snap.Message
 		resp.LastDeployedAt = snap.LastDeployedAt
 		resp.LastDeployID = snap.LastDeployID
-		resp.Summary = summaryJSON{
-			Total:            snap.Summary.Total,
-			OK:               snap.Summary.OK,
-			Degraded:         snap.Summary.Degraded,
-			Warning:          snap.Summary.Warning,
-			Progressing:      snap.Summary.Progressing,
-			Drift:            snap.Summary.Drift,
-			Prune:            snap.Summary.Prune,
-			Suspended:        snap.Summary.Suspended,
-			Hidden:           snap.Summary.Hidden,
-			GPU:              snap.Summary.GPU,
-			GPURunning:       snap.Summary.GPURunning,
-			GPUUnmeasured:    snap.Summary.GPUUnmeasured,
-			GPUWaiting:       snap.Summary.GPUWaiting,
-			GPUStopped:       snap.Summary.GPUStopped,
-			Blocked:          snap.Summary.Blocked,
-			BlockedGPU:       snap.Summary.BlockedGPU,
-			BlockedCPU:       snap.Summary.BlockedCPU,
-			BlockedPlacement: snap.Summary.BlockedPlacement,
-		}
+		resp.Summary = summaryOf(snap)
 		resp.Sources = sources(snap)
 		resp.Nodes = nodes(snap)
 		resp.Unmanaged = unmanaged(snap)
@@ -393,6 +375,7 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 	n := snap.Nodes
 	out := &nodesJSON{
 		Total:                 n.Total,
+		NotReady:              n.NotReady,
 		CPUNodes:              n.CPUNodes,
 		GPUNodes:              n.GPUNodes,
 		GPUs:                  n.GPUs,
@@ -486,5 +469,30 @@ func blocked(svc status.Service) *blockedJSON {
 	return &blockedJSON{
 		Reason: b.Reason(), Kind: b.Kind(), Resources: b.Resources,
 		NoNodeMatched: b.NoNodeMatched, Pods: b.Pods,
+	}
+}
+
+// summaryOf maps the snapshot counters onto the response. Kept as its own function
+// so a test can check that every one of them is actually assigned.
+func summaryOf(snap *status.Snapshot) summaryJSON {
+	return summaryJSON{
+		Total:            snap.Summary.Total,
+		OK:               snap.Summary.OK,
+		Degraded:         snap.Summary.Degraded,
+		Warning:          snap.Summary.Warning,
+		Progressing:      snap.Summary.Progressing,
+		Drift:            snap.Summary.Drift,
+		Prune:            snap.Summary.Prune,
+		Suspended:        snap.Summary.Suspended,
+		Hidden:           snap.Summary.Hidden,
+		GPU:              snap.Summary.GPU,
+		GPURunning:       snap.Summary.GPURunning,
+		GPUUnmeasured:    snap.Summary.GPUUnmeasured,
+		GPUWaiting:       snap.Summary.GPUWaiting,
+		GPUStopped:       snap.Summary.GPUStopped,
+		Blocked:          snap.Summary.Blocked,
+		BlockedGPU:       snap.Summary.BlockedGPU,
+		BlockedCPU:       snap.Summary.BlockedCPU,
+		BlockedPlacement: snap.Summary.BlockedPlacement,
 	}
 }

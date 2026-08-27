@@ -28,7 +28,15 @@ type NodeMetadata struct {
 	Labels map[string]string `json:"labels"`
 }
 
+type NodeCondition struct {
+	Type   string `json:"type"`
+	Status string `json:"status"`
+}
+
 type NodeStatus struct {
+	// Conditions carry readiness. A node the cloud provider has shut down lingers in
+	// the list as NotReady, and counting it as capacity overstates what the cluster has.
+	Conditions []NodeCondition `json:"conditions"`
 	// Capacity is decoded whole rather than field by field. Which accelerator a
 	// cluster advertises is not knowable in advance: NVIDIA full cards, NVIDIA MIG
 	// slices, AMD, Intel, AWS Neuron and TPUs all use different resource names.
@@ -70,4 +78,15 @@ func (c *Client) ListNodes(ctx context.Context) (*NodeList, error) {
 		return nil, err
 	}
 	return &list, nil
+}
+
+// Ready reports the kubelet's own verdict. Anything other than an explicit True, which
+// includes the Unknown a shut-down node reports, is not ready.
+func (n Node) Ready() bool {
+	for _, c := range n.Status.Conditions {
+		if c.Type == "Ready" {
+			return c.Status == "True"
+		}
+	}
+	return false
 }
