@@ -30,7 +30,7 @@ case "$MODE" in
     mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1"
     cp testdata/applications.json "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd/applications"
     cp testdata/nodes.json        "$FAKE_DIR/api/v1/nodes"
-    cp testdata/events.json       "$FAKE_DIR/api/v1/events"
+    cp testdata/pods.json         "$FAKE_DIR/api/v1/pods"
     cp testdata/deployments.json  "$FAKE_DIR/apis/apps/v1/deployments"
     cp testdata/statefulsets.json "$FAKE_DIR/apis/apps/v1/statefulsets"
     cp testdata/daemonsets.json   "$FAKE_DIR/apis/apps/v1/daemonsets"

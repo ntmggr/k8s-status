@@ -53,13 +53,13 @@ rules:
     verbs: ["get", "list"]
   {{- end }}
   {{- if .Values.config.pendingReasons }}
-  {{- /* Events, not pods. A pod would give the scheduler's verdict directly, and would
-         also mean read access to every pod spec in the cluster, where environment
-         values live. An Event carries a reference, a reason and a message. The usual
-         objection, the one-hour TTL, does not bite: the scheduler refreshes the event
-         on every retry, so a pod that is genuinely stuck keeps a current one. */}}
+  {{- /* The widest grant this chart makes, which is why it is opt-in. The scheduler's
+         verdict lives on the pod, and it is current: an Event outlives the problem it
+         describes by up to an hour and reported shortages that were already over. The
+         read is filtered to Pending pods and the app decodes only metadata and status,
+         never a spec. */}}
   - apiGroups: [""]
-    resources: ["events"]
+    resources: ["pods"]
     verbs: ["get", "list"]
   {{- end }}
   {{- if has "flux" $sources }}
