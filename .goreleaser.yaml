@@ -41,6 +41,30 @@ checksum:
   name_template: checksums.txt
   algorithm: sha256
 
+# Sign the checksum file rather than each archive: it lists every asset's hash, so one
+# signature covers the whole release and verifying it proves nothing was swapped.
+#
+# Keyless, so there is no private key to store or rotate. cosign exchanges the workflow's
+# OIDC token for a short-lived certificate, and the signature is recorded in the public
+# Rekor transparency log. Verification needs no key either, only the identity that signed:
+#
+#   cosign verify-blob checksums.txt \
+#     --signature checksums.txt.sig --certificate checksums.txt.pem \
+#     --certificate-identity-regexp 'https://github.com/ntmggr/k8s-status/.*' \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
 snapshot:
   version_template: "{{ incpatch .Version }}-snapshot"
 

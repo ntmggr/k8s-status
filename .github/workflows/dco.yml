@@ -1,0 +1,52 @@
+name: dco
+
+# Every commit must carry a Signed-off-by line, which is the contributor asserting they
+# are entitled to submit the change under the project licence. See CONTRIBUTING.md.
+#
+# Only commits in the pull request are checked. History before this workflow existed is
+# left alone rather than rewritten, because rewriting a published branch is worse than
+# an unsigned commit from before the rule existed.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Every commit is signed off
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          fail=0
+          for sha in $(git rev-list "$BASE..$HEAD"); do
+            author="$(git log -1 --format='%an' "$sha")"
+            # Bots sign off already, or cannot. Dependabot does; a merge commit has no
+            # single author asserting anything.
+            case "$author" in
+              *"[bot]"*) continue ;;
+            esac
+            if [ "$(git rev-list --parents -n1 "$sha" | wc -w)" -gt 2 ]; then
+              continue   # merge commit
+            fi
+            if ! git log -1 --format='%B' "$sha" | grep -qi '^Signed-off-by: .\+ <.\+@.\+>'; then
+              echo "::error::commit $sha is missing a Signed-off-by line"
+              git log -1 --format='       %h %s' "$sha"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "Sign off your commits with 'git commit -s'. To fix the ones above:"
+            echo "  git rebase --signoff $BASE"
+            exit 1
+          fi
+          echo "all commits signed off"

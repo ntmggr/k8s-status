@@ -877,6 +877,26 @@ string and renders as no revision.
 Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
 for how to build it, what CI checks, and what an acceptable change looks like.
 
+## Verifying a release
+
+Release archives are listed in `checksums.txt`, and that file is signed with
+[cosign](https://github.com/sigstore/cosign) using keyless signing. There is no public
+key to fetch: the signature is tied to the workflow that produced it and recorded in the
+public Rekor transparency log.
+
+```sh
+cosign verify-blob checksums.txt \
+  --signature checksums.txt.sig \
+  --certificate checksums.txt.pem \
+  --certificate-identity-regexp 'https://github.com/ntmggr/k8s-status/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+sha256sum -c checksums.txt --ignore-missing
+```
+
+The first command proves the checksum file came from this project's release workflow.
+The second proves the archive you downloaded matches it.
+
 ## Security
 
 **There is no authentication.** Anyone who can reach the URL sees the page.

@@ -70,3 +70,43 @@ a decision rather than restate the code: what happens with an empty nodegroup, a
 that reaches a device without requesting one, a cancelled request. Several of those were
 written after a real bug and are commented with what went wrong, which is a good pattern
 to follow.
+
+## Signing off your commits
+
+Every commit needs a `Signed-off-by` line. It is the
+[Developer Certificate of Origin](https://developercertificate.org/): you are stating
+that you wrote the change, or otherwise have the right to submit it under this project's
+licence.
+
+Git adds the line for you:
+
+```sh
+git commit -s -m "fix: ..."
+```
+
+If you forget on a branch you have already committed to:
+
+```sh
+git rebase --signoff origin/main
+```
+
+CI checks this on every pull request. Commits from bots are skipped, since Dependabot
+already signs off its own.
+
+## How dependencies are chosen and tracked
+
+The project has none, and that is deliberate: `go.mod` has no require block and the
+standard library has covered everything so far, including the Prometheus endpoint and
+the Kubernetes API client. A pull request that adds a dependency should explain in the
+description why the standard library will not do.
+
+What the project does depend on is tracked and updated automatically:
+
+- **Go toolchain** and any future modules, through Dependabot on the `gomod` ecosystem.
+- **Container base images**, pinned by digest, through Dependabot on `docker`.
+- **GitHub Actions**, pinned by commit SHA, through Dependabot on `github-actions`.
+
+Dependabot runs weekly. Minor and patch updates are grouped and merge themselves once
+CI passes; a major version waits for a human, because a major is where behaviour changes.
+Every update still goes through the full pipeline, including govulncheck, Trivy and
+CodeQL.
