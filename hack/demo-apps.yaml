@@ -101,7 +101,7 @@ status:
       status: OutOfSync
       requiresPruning: true
 ---
-# DEGRADED — health Degraded (rule 2).
+# DEGRADED, health Degraded (rule 2).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -132,7 +132,7 @@ status:
       - registry.example.invalid/platform/payments-api:4.2.0
       - registry.example.invalid/istio/proxyv2:1.30.1
 ---
-# OK — healthy and Synced (rule 7).
+# OK, healthy and Synced (rule 7).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -163,7 +163,7 @@ status:
       - registry.example.invalid/platform/orders-api:2.4.1
       - registry.example.invalid/istio/proxyv2:1.30.1
 ---
-# OK — a second healthy row, so the OK tile is not a count of one.
+# OK, a second healthy row, so the OK tile is not a count of one.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -224,7 +224,7 @@ status:
     images:
       - registry.example.invalid/platform/transcode-gpu:0.9.3
 ---
-# DRIFT — Healthy but OutOfSync while the root app has settled (rule 6).
+# DRIFT, Healthy but OutOfSync while the root app has settled (rule 6).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -267,7 +267,7 @@ status:
       namespace: search
       status: OutOfSync
 ---
-# PROGRESSING — health Progressing (rule 4), which outranks the OutOfSync that
+# PROGRESSING, health Progressing (rule 4), which outranks the OutOfSync that
 # would otherwise read as DRIFT.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -299,7 +299,7 @@ status:
       - registry.example.invalid/platform/checkout-web:3.0.0-rc.4
       - registry.example.invalid/istio/proxyv2:1.30.1
 ---
-# WARNING — ArgoCD cannot determine health (rule 3).
+# WARNING, ArgoCD cannot determine health (rule 3).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -329,7 +329,7 @@ status:
     images:
       - registry.example.invalid/platform/metrics-relay:1.4.7
 ---
-# SUSPENDED — deliberately paused (rule 5). A suspended CronJob, not an outage.
+# SUSPENDED, deliberately paused (rule 5). A suspended CronJob, not an outage.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -359,7 +359,7 @@ status:
     images:
       - registry.example.invalid/platform/nightly-report:2.0.1
 ---
-# PRUNE — flagged requiresPruning by the root app (rule 1). Health is Missing, so
+# PRUNE, flagged requiresPruning by the root app (rule 1). Health is Missing, so
 # this row also proves prune is checked before health: it must read PRUNE, not
 # DEGRADED.
 apiVersion: argoproj.io/v1alpha1

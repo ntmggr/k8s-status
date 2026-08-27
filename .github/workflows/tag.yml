@@ -1,7 +1,7 @@
 name: tag
 
 # Auto-tag on merge to main. The tag then triggers release.yml, which builds and
-# publishes the image — so a merge is the only manual step in a release.
+# publishes the image, so a merge is the only manual step in a release.
 #
 # Version bump is derived from Conventional Commit subjects:
 #   feat:            -> minor

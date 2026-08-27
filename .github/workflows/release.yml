@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # create the GitHub release and upload artifacts
+      id-token: write   # keyless signing: cosign exchanges this for a short-lived cert
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -102,11 +103,14 @@ jobs:
       # artifacts to attach: the cross-platform archives and checksums.txt.
       # softprops/action-gh-release previously did this and has been removed.
       #
-      # The image is built and pushed above, not here — .goreleaser.yaml configures
+      # The image is built and pushed above, not here, .goreleaser.yaml configures
       # no `dockers:` block on purpose. IMAGE_REPO is passed through so the release
       # notes name the image this same run pushed.
       #
       - name: Release binaries and GitHub release
+      - name: Install cosign
+        uses: sigstore/cosign-installer@1aa8e0f2454b781fbf0fbf306a4c9533a0c57409 # v4.1.2
+
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
           distribution: goreleaser

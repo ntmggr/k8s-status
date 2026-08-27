@@ -1,4 +1,4 @@
-# k8s-status — self-contained install.
+# k8s-status, self-contained install.
 #
 #   kubectl apply -f deploy/install.yaml
 #
