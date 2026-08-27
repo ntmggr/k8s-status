@@ -68,25 +68,24 @@ func (b Blocked) Reason() string {
 
 // FillPending marks services whose pods the scheduler has refused to place, and why.
 //
-// The verdict comes from the scheduler's own FailedScheduling events rather than from
-// pod objects. Reading pods would need list access over every pod in the cluster, and a
-// pod spec carries environment values that are routinely credentials; no amount of
-// careful parsing narrows a grant that wide. An Event carries an object reference, a
-// reason and a message.
+// The verdict is the pod's own PodScheduled condition, read from pods still in Pending.
 //
-// The usual objection to events is the one-hour TTL. It does not bite here: the
-// scheduler retries a pending pod with backoff and refreshes the event each time, so a
-// pod that is actually stuck keeps a current event. Measured on a live cluster, every
-// unschedulable pod had an event under two minutes old.
+// FailedScheduling events were tried first, to avoid the wider permission that reading
+// pods needs. They are wrong often enough to matter: an event outlives the problem it
+// describes by up to an hour, so on one cluster every pod of a service was Running
+// while stale events still reported a cpu shortage, and the page showed a service as
+// blocked that was serving traffic. A condition on a pending pod cannot say that,
+// because the pod stops being pending.
 //
-// Events name a pod, not a workload, so it is matched back by name prefix within its
-// namespace, longest match first: "api" does not claim a pod belonging to
+// A pod is matched back to its service through ownerReferences where possible, since a
+// Deployment's pod is owned by a ReplicaSet named "<deployment>-<hash>". Name prefix is
+// the fallback, longest match first, so "api" does not claim a pod belonging to
 // "api-canary".
-func FillPending(snap *Snapshot, events *kube.EventList, workloads *kube.WorkloadList) {
+func FillPending(snap *Snapshot, pods *kube.PodList, workloads *kube.WorkloadList) {
 	if snap == nil {
 		return
 	}
-	if events == nil || len(events.Items) == 0 {
+	if pods == nil || len(pods.Items) == 0 {
 		for i := range snap.Services {
 			snap.Services[i].Blocked = nil
 		}
@@ -115,17 +114,12 @@ func FillPending(snap *Snapshot, events *kube.EventList, workloads *kube.Workloa
 	snap.Summary.BlockedCPU, snap.Summary.BlockedPlacement = 0, 0
 
 	acc := map[int]*Blocked{}
-	for _, e := range events.Items {
-		io := e.InvolvedObject
-		if io.Kind != "Pod" {
+	for _, pod := range pods.Items {
+		msg, stuck := pod.Unschedulable()
+		if !stuck {
 			continue
 		}
-		ns := io.Namespace
-		if ns == "" {
-			ns = e.Metadata.Namespace
-		}
-		msg := e.Message
-		bestIdx := prefixOwner(byNS[ns], io.Name)
+		bestIdx := ownerIndex(byNS[pod.Metadata.Namespace], pod)
 		if bestIdx < 0 {
 			continue
 		}
@@ -173,8 +167,27 @@ func FillPending(snap *Snapshot, events *kube.EventList, workloads *kube.Workloa
 	}
 }
 
-// prefixOwner resolves which service a pod belongs to by name, longest match first, so
-// "api" does not claim a pod that belongs to "api-canary".
+// ownerIndex resolves which service a pod belongs to. A Deployment's pod is owned by a
+// ReplicaSet called "<deployment>-<hash>", so trimming the last segment names the
+// workload exactly. StatefulSets and DaemonSets own their pods directly. Name prefix is
+// the fallback for anything else, longest match first.
+func ownerIndex(owners []owner, pod kube.Pod) int {
+	for _, ref := range pod.Metadata.OwnerReferences {
+		want := ref.Name
+		if ref.Kind == "ReplicaSet" {
+			if i := strings.LastIndex(want, "-"); i > 0 {
+				want = want[:i]
+			}
+		}
+		for _, o := range owners {
+			if o.name == want {
+				return o.idx
+			}
+		}
+	}
+	return prefixOwner(owners, pod.Metadata.Name)
+}
+
 func prefixOwner(owners []owner, podName string) int {
 	best, bestIdx := "", -1
 	for _, o := range owners {

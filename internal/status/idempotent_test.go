@@ -12,7 +12,7 @@ func TestFillsAreIdempotent(t *testing.T) {
 	snap := &Snapshot{}
 	snap.addService(blockedSvc("svc", "ml", "worker"))
 	wl := &kube.WorkloadList{Items: []kube.Workload{replicaWorkload("Deployment", "ml", "worker", 1, 2, 2)}}
-	ev := &kube.EventList{Items: []kube.Event{schedEvent("ml", "worker-1-a", "0/5 nodes are available: 5 Insufficient cpu.")}}
+	ev := &kube.PodList{Items: []kube.Pod{pendingPod("ml", "worker-1-a", "0/5 nodes are available: 5 Insufficient cpu.")}}
 
 	for i := 0; i < 3; i++ {
 		FillGPU(snap, wl, nil, []string{kube.ResourceGPU})

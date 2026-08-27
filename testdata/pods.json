@@ -1,0 +1,71 @@
+{
+ "items": [
+  {
+   "metadata": {
+    "name": "report-runner-6b8d7f9c5-mn3qz",
+    "namespace": "report-runner",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "report-runner-6b8d7f9c5"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Pending",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "False",
+      "reason": "Unschedulable",
+      "message": "0/12 nodes are available: 4 Insufficient cpu, 2 Insufficient memory, 6 node(s) didn't match Pod's node affinity/selector."
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "cache-shim-7d9f4c8b6-x2k4p",
+    "namespace": "cache-shim",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "cache-shim-7d9f4c8b6"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Pending",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "False",
+      "reason": "Unschedulable",
+      "message": "0/12 nodes are available: 12 node(s) didn't match Pod's node affinity/selector."
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "admin-ui-5c7d8f9b4-qq21x",
+    "namespace": "admin-ui",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "admin-ui-5c7d8f9b4"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Pending",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  }
+ ]
+}
