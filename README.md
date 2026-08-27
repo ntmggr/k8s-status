@@ -4,7 +4,9 @@
 
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
 [![Docker Hub](https://img.shields.io/docker/image-size/ntmggr/k8s-status/latest?logo=docker&logoColor=white&label=image)](https://hub.docker.com/r/ntmggr/k8s-status)
+[![Docker Pulls](https://img.shields.io/docker/pulls/ntmggr/k8s-status?logo=docker&logoColor=white&label=pulls)](https://hub.docker.com/r/ntmggr/k8s-status)
 [![OpenSSF Scorecard](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.scorecard.dev%2Fprojects%2Fgithub.com%2Fntmggr%2Fk8s-status&query=%24.score&label=openssf%20scorecard)](https://scorecard.dev/viewer/?uri=github.com/ntmggr/k8s-status)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14260/badge)](https://www.bestpractices.dev/projects/14260)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
@@ -303,7 +305,18 @@ Every key is in [Settings](#settings).
 ### 2. Helm chart
 
 The chart lives in `charts/k8s-status/` and has its own
-[README](charts/k8s-status/README.md) with a full values table.
+[README](charts/k8s-status/README.md) with a full values table. Each release also
+publishes it as an OCI artifact, so a checkout is not required:
+
+```sh
+helm upgrade --install k8s-status oci://ghcr.io/ntmggr/charts/k8s-status \
+  --version <released version, e.g. 0.12.5> \
+  --namespace k8s-status --create-namespace \
+  --set config.envName=<env> \
+  --set config.clusterName=<cluster>
+```
+
+Or from a checkout, with a specific image build:
 
 ```sh
 helm upgrade --install k8s-status charts/k8s-status \

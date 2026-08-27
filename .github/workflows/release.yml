@@ -22,6 +22,7 @@ jobs:
     permissions:
       contents: write   # create the GitHub release and upload artifacts
       id-token: write   # keyless signing: cosign exchanges this for a short-lived cert
+      packages: write   # push the packaged Helm chart to ghcr.io as an OCI artifact
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -107,6 +108,18 @@ jobs:
       # no `dockers:` block on purpose. IMAGE_REPO is passed through so the release
       # notes name the image this same run pushed.
       #
+      # Published as an OCI artifact rather than a classic index.yaml repo, so
+      # Artifact Hub and `helm install` need no gh-pages branch or extra infra.
+      # ghcr.io keeps this off Docker Hub's flat namespace: a chart named
+      # k8s-status pushed there would collide with the image repo above.
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      - name: Push chart to ghcr.io
+        run: |
+          helm registry login ghcr.io -u ${{ github.actor }} --password-stdin <<< "${{ secrets.GITHUB_TOKEN }}"
+          helm package charts/k8s-status --destination /tmp
+          helm push "/tmp/k8s-status-${{ steps.v.outputs.version }}.tgz" oci://ghcr.io/ntmggr/charts
+
       - name: Install cosign
         uses: sigstore/cosign-installer@1aa8e0f2454b781fbf0fbf306a4c9533a0c57409 # v4.1.2
 

@@ -1,0 +1,6 @@
+# Ownership claim for artifacthub.io. The signed-in email must match one
+# listed here; it is an identity check, not a secret.
+# https://artifacthub.io/docs/topics/repositories/
+owners:
+  - name: ntmggr
+    email: ntmggr@users.noreply.github.com
