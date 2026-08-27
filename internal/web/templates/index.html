@@ -156,6 +156,9 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-item .ck { font-size: .72rem; color: var(--muted); }
 .cap-item.is-gpu .cv { color: var(--gpu-fg); }
 .cap-note { margin-top: .4rem; font-size: .74rem; color: var(--muted); }
+.health-lead.is-ok .cv { color: var(--ok-fg); }
+.health-lead.is-warning .cv { color: var(--warn-fg); }
+.health-lead.is-degraded .cv { color: var(--deg-fg); }
 
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
@@ -356,6 +359,28 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{- end}}
 </div>
 
+{{with $.Snapshot.Summary.Health}}
+{{/* Deliberately not a tile: the tiles are a closed, mutually-exclusive set that sums
+     to Total (see README.md, "arithmetic"), and this percentage is a derived view over
+     that set, not a member of it. */}}
+<section class="capacity health">
+  <div class="cap-head">Health<span class="cap-sub">share of counted services that are OK right now</span></div>
+  <div class="cap-group">
+    {{if .Known}}
+    <div class="cap-lead health-lead is-{{lower (printf "%s" .State)}}"><span class="cv">{{.Percent}}</span><span class="ck">% healthy</span></div>
+    <div class="cap-of">
+      <span class="cap-part">{{.OK}} of {{.Counted}} counted{{if .Excluded}}<i>&middot;</i>{{.Excluded}} excluded{{end}}</span>
+    </div>
+    {{else}}
+    <div class="cap-lead health-lead"><span class="cv">&mdash;</span><span class="ck">healthy</span></div>
+    <div class="cap-of">
+      <span class="cap-part">no services counted</span>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
 {{if and $.HasData $.Snapshot.Nodes}}
 <section class="capacity">
   <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
@@ -415,6 +440,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
+    <div class="legend-row"><span class="health-lead is-degraded"><span class="cv">55</span><span class="ck">% healthy</span></span><span>Share of counted services that are <em>OK</em> right now. <em>Prune</em> and <em>suspended</em> rows are excluded from the count; <em>progressing</em> and <em>drift</em> still count as not-OK. Shows &mdash; when nothing is left to count.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 
