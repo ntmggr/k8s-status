@@ -339,7 +339,7 @@ func hasSource(sources []status.Source, want status.Source) bool {
 }
 
 // stateGlyph pairs every state with a shape so the pill never relies on color
-// alone — required for colorblind readers and for forced-colors mode.
+// alone, required for colorblind readers and for forced-colors mode.
 func stateGlyph(state string) string {
 	switch state {
 	case "OK":

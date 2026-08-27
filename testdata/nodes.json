@@ -1,0 +1,334 @@
+{
+ "items": [
+  {
+   "metadata": {
+    "name": "node-a1",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-a2",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-a3",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-a4",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-a5",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-a6",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-a7",
+    "labels": {
+     "kubernetes.io/arch": "arm64",
+     "pool": "general",
+     "node.kubernetes.io/instance-type": "m7g.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "arm64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-x1",
+    "labels": {
+     "kubernetes.io/arch": "amd64",
+     "pool": "general-x86",
+     "node.kubernetes.io/instance-type": "m7i.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "amd64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-x2",
+    "labels": {
+     "kubernetes.io/arch": "amd64",
+     "pool": "general-x86",
+     "node.kubernetes.io/instance-type": "m7i.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "amd64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-x3",
+    "labels": {
+     "kubernetes.io/arch": "amd64",
+     "pool": "general-x86",
+     "node.kubernetes.io/instance-type": "m7i.xlarge"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi"
+    },
+    "nodeInfo": {
+     "architecture": "amd64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-g1",
+    "labels": {
+     "kubernetes.io/arch": "amd64",
+     "pool": "gpu",
+     "node.kubernetes.io/instance-type": "g5.xlarge",
+     "nvidia.com/gpu.present": "true"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi",
+     "nvidia.com/gpu": "2"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi",
+     "nvidia.com/gpu": "2"
+    },
+    "nodeInfo": {
+     "architecture": "amd64"
+    }
+   }
+  },
+  {
+   "metadata": {
+    "name": "node-g2",
+    "labels": {
+     "kubernetes.io/arch": "amd64",
+     "pool": "gpu",
+     "node.kubernetes.io/instance-type": "g5.xlarge",
+     "nvidia.com/gpu.present": "true"
+    }
+   },
+   "status": {
+    "capacity": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi",
+     "nvidia.com/gpu": "2"
+    },
+    "allocatable": {
+     "cpu": "4",
+     "memory": "16Gi",
+     "pods": "58",
+     "ephemeral-storage": "100Gi",
+     "nvidia.com/gpu": "2"
+    },
+    "nodeInfo": {
+     "architecture": "amd64"
+    }
+   }
+  }
+ ]
+}

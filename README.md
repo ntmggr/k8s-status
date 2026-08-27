@@ -24,10 +24,18 @@ anything in the cluster, run it on your own machine against a cluster you can al
 read:
 
 ```console
+$ git clone https://github.com/ntmggr/k8s-status && cd k8s-status
 $ ./scripts/local-test.sh cluster <your-kube-context>
 ```
 
-That uses your kubeconfig, changes nothing, and installs nothing. It is the fastest way
+Then open http://127.0.0.1:8080/k8s-status/. No cluster? Try it with no cluster at all:
+
+```console
+$ ./scripts/local-test.sh fixture
+```
+
+Both need Go and `kubectl`. The cluster mode uses your kubeconfig, changes nothing, and
+installs nothing. It is the fastest way
 to decide whether the tool is worth deploying, and it is a reasonable permanent answer
 for a cluster you only look at occasionally. Deploy it when you want the page to be
 there for everyone, on a URL, without anyone needing cluster access.
@@ -48,7 +56,14 @@ each one. ArgoCD alone is the default; see [`SOURCES`](#choosing-the-source).
 
 ![k8s-status](docs/screenshot.png)
 
-<sub>Screenshot uses made-up data from `testdata/`. There is also a dark theme
+Reading across a row: the service, the version running, whether it is healthy, and
+whether that matches Git. Badges add what the row alone cannot say. `GPU 2` is holding
+two devices, `GPU waiting` wants one and has not got it, `GPU 0 pods` is scaled to zero.
+`arm64` means it can only run on that architecture. An amber chip means the scheduler
+could not place it, and says what ran out.
+
+<sub>Made-up data from `testdata/`, so anyone can reproduce it with
+`./scripts/local-test.sh fixture`. There is a dark theme
 ([screenshot](docs/screenshot-dark.png)) that follows your system setting.</sub>
 
 ## What access does it need?
@@ -105,7 +120,7 @@ fixture file instead.
 ./scripts/local-test.sh fixture
 ```
 
-That builds the binary, serves `testdata/applications.json` over a local port, starts the
+That builds the binary, serves the files in `testdata/` over a local port, starts the
 app, and prints:
 
 ```
@@ -117,6 +132,10 @@ mode: fixture (offline, synthetic data)
 ```
 
 Open the first URL. Press Ctrl-C to stop.
+
+The fixture covers the whole page, not just the table: node capacity, GPU allocation,
+architecture badges and two services the scheduler could not place. It is the same data
+the screenshot above was taken from.
 
 To point it at a real cluster instead, give it a kube context name:
 
@@ -142,22 +161,22 @@ fits wins.
 | 6 | `DRIFT` | orange | Pods are healthy, but the config no longer matches Git | Not urgent. |
 | 7 | `OK` | green | Healthy and matching Git | No. |
 
-`DRIFT` and `PRUNE` are ArgoCD-only. Flux rows never appear in either — see
+`DRIFT` and `PRUNE` are ArgoCD-only. Flux rows never appear in either, see
 [What Flux support does not cover](#what-flux-support-does-not-cover).
 
 A few words used above:
 
-- **Sync** — whether what is running matches what is written in Git. `Synced` means yes,
+- **Sync**, whether what is running matches what is written in Git. `Synced` means yes,
   `OutOfSync` means no.
-- **Drift** — running fine, but out of sync. Somebody changed something by hand, or a
+- **Drift**, running fine, but out of sync. Somebody changed something by hand, or a
   commit has not been applied yet.
-- **Prune** — ArgoCD still tracks the object, but nothing in Git asks for it any more. It
+- **Prune**, ArgoCD still tracks the object, but nothing in Git asks for it any more. It
   will not delete it unless automatic pruning is switched on, so it sits there reporting
   `OutOfSync` forever.
-- **Health** — the controller's own verdict on whether the pods are working.
+- **Health**, the controller's own verdict on whether the pods are working.
 
-Rows are sorted worst first — `DEGRADED`, `WARNING`, `PROGRESSING`, `DRIFT`, `PRUNE`,
-`SUSPENDED`, `OK` — then alphabetically inside each group. The ordering is stable between
+Rows are sorted worst first, `DEGRADED`, `WARNING`, `PROGRESSING`, `DRIFT`, `PRUNE`,
+`SUSPENDED`, `OK`, then alphabetically inside each group. The ordering is stable between
 refreshes and the things that need attention are always at the top.
 
 Every state also has its own symbol next to the word, so the page still reads correctly if
@@ -217,7 +236,7 @@ Conditions map like this, first match wins:
 Three of those orderings are not obvious and are all driven by what Flux actually writes:
 
 - **Suspend is read from the spec, not inferred from the status.** A suspended object
-  keeps whatever conditions it had when it was paused — and a freshly suspended one has
+  keeps whatever conditions it had when it was paused, and a freshly suspended one has
   no conditions at all. Reading the conditions would report stale news as current.
 - **`Ready=False` outranks `Reconciling=True`,** because helm-controller leaves
   `Reconciling=True` in place next to a failed `Ready` while it retries. The failure is
@@ -228,7 +247,7 @@ Three of those orderings are not obvious and are all driven by what Flux actuall
 
 `Stalled=True` means Flux has given up retrying. It is almost always reported alongside
 `Ready=False`, in which case the row is `DEGRADED` and the detail says
-`stalled, no further retries`. On its own it is `WARNING` — something to look at, not
+`stalled, no further retries`. On its own it is `WARNING`, something to look at, not
 proof of an outage.
 
 ### What Flux support does not cover
@@ -254,7 +273,7 @@ Applications in one namespace and nothing else.
 Before you start you need:
 
 - a cluster that already runs ArgoCD or Flux,
-- for ArgoCD, the name of the **root Application** — the one Application that owns all
+- for ArgoCD, the name of the **root Application**, the one Application that owns all
   the others. ArgoCD people call this pattern *app-of-apps*. The default here is
   detected automatically as the Application that owns the most others; set
   `ROOT_APP_NAME` only if your cluster has more than one app-of-apps,
@@ -397,7 +416,7 @@ apart:
 - app is down → connection refused or a 5xx
 
 `/healthz` never touches the Kubernetes API. If ArgoCD breaks or the token is revoked, the
-pod must **not** be restarted — restarting fixes neither.
+pod must **not** be restarted, restarting fixes neither.
 
 ## Filtering the table
 
@@ -486,8 +505,8 @@ can run it with none of them set.
 | `SIDECAR_IMAGES` | *(built-in list)* | Image names that never carry the service version, such as an injected proxy. Replaces the built-in list |
 | `PENDING_REASONS` | `false` | Explain why a service's pods cannot be scheduled and grey the row. Reads Events. Needs a ClusterRole |
 | `ACCELERATOR_RESOURCES` | *(discovered)* | Resources that count as accelerators. Empty discovers them from what the nodes advertise |
-| `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
-| `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole — see [Optional extras](#optional-extras) |
+| `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
+| `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
 | `CACHE_TTL_SECONDS` | `15` | How long a fetched snapshot is reused |
 | `REFRESH_SECONDS` | `30` | Default page auto-refresh interval. A viewer can override it with `?refresh=` |
@@ -630,12 +649,12 @@ namespace and nothing else. That is the whole permission surface, and you can ch
 reading eight lines of YAML.
 
 Both extras read things that live outside any single namespace, which a `Role` cannot do.
-That needs a **ClusterRole** — a permission that applies cluster-wide. So each extra needs
+That needs a **ClusterRole**, a permission that applies cluster-wide. So each extra needs
 two switches flipped: the feature, and the permission.
 
 If you turn the feature on but not the permission, nothing breaks. The read is denied, that
 one section shows a short note explaining what is missing, and the rest of the page renders
-normally. An optional feature that is denied degrades — it never breaks the page.
+normally. An optional feature that is denied degrades, it never breaks the page.
 
 | Feature | Env var | Chart value | Extra permission |
 |---|---|---|---|
@@ -681,7 +700,7 @@ listed when **both** of these are true:
 1. It has no ArgoCD ownership marker. ArgoCD stamps everything it owns with at least one
    of: the `argocd.argoproj.io/tracking-id` annotation, the `app.kubernetes.io/instance`
    label, or the `argocd.argoproj.io/instance` label.
-2. It has no `metadata.ownerReferences` — nothing in the cluster created it.
+2. It has no `metadata.ownerReferences`, nothing in the cluster created it.
 
 Each row shows:
 
@@ -695,7 +714,7 @@ Each row shows:
 
 `SUSPENDED` for a 0/0 workload is not a fudge. A Windows DaemonSet on a cluster with no
 Windows nodes is legitimately 0/0 and must not show as broken. Conversely, `81/82` on a
-DaemonSet is a real signal — one node is not covered — so the comparison is exact, never
+DaemonSet is a real signal, one node is not covered, so the comparison is exact, never
 approximate.
 
 Use `UNMANAGED_IGNORE_NS` to hide namespaces you have already accepted, for example
@@ -707,7 +726,7 @@ Deployments created on demand by an operator running inside the cluster; they in
 ArgoCD label, so they look unmanaged. Adding the `ownerReferences` check removes every one
 of them, because a workload with an owner was created by something already in the cluster
 rather than installed into it. The list drops to 11, and all 11 are real infrastructure. Do
-not remove that check to simplify the code — the list becomes unreadable.
+not remove that check to simplify the code, the list becomes unreadable.
 
 The count also appears in the cluster capacity section, not in the status tiles, for the
 same arithmetic reason as GPU.
@@ -759,7 +778,7 @@ scaled to zero, and its health often reads `Degraded` or `Missing`. On one clust
 9 of 12 `OutOfSync` children.
 
 Prune is therefore checked **before** health, so an orphan is reported as an orphan even
-when it is also unhealthy. It is a housekeeping signal — "delete this Application" — not an
+when it is also unhealthy. It is a housekeeping signal, "delete this Application", not an
 outage.
 
 ### Why the root app's own health is ignored
@@ -783,13 +802,13 @@ So the root is used only for the facts it alone knows:
 - the prune flags.
 
 Every per-service verdict comes from the child Application itself. Root health and root sync
-are still shown, but only as a tooltip on the version line — context, not a verdict.
+are still shown, but only as a tooltip on the version line, context, not a verdict.
 
 The one place the root's phase does matter is rule 4 above.
 
 ### Caching
 
-One snapshot is cached for `CACHE_TTL_SECONDS`. There is no background refresh goroutine —
+One snapshot is cached for `CACHE_TTL_SECONDS`. There is no background refresh goroutine , 
 the first request after the cache expires does the work.
 
 The cache mutex is held across the upstream fetch on purpose, so a burst of concurrent
@@ -807,12 +826,12 @@ the API server with denied requests.
 
 The client is built from the standard service account mount:
 
-- **Token** — read from `/var/run/secrets/kubernetes.io/serviceaccount/token` on **every**
+- **Token**, read from `/var/run/secrets/kubernetes.io/serviceaccount/token` on **every**
   request. Projected tokens rotate, so caching the value at startup breaks the app about an
   hour in.
-- **CA** — read once from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` into an
+- **CA**, read once from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` into an
   `x509.CertPool` used as `tls.Config.RootCAs`.
-- **URL** — `https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT`.
+- **URL**, `https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT`.
 - One shared `http.Client`, 10 second request timeout, response bodies capped at 16 MiB.
 
 Endpoints read, and what each needs:
@@ -826,7 +845,7 @@ Endpoints read, and what each needs:
 The three workload kinds are fetched at the same time under one shared timeout. If one of
 them fails, the other two are still shown, with a note.
 
-Only the fields actually rendered are decoded — see `internal/argocd/types.go` and
+Only the fields actually rendered are decoded, see `internal/argocd/types.go` and
 `internal/kube/`. Some Applications report a `null` sync revision; that decodes to an empty
 string and renders as no revision.
 
@@ -843,7 +862,7 @@ string and renders as no revision.
 | Unmanaged list is enormous (hundreds of rows) | An operator in the cluster spawns owned workloads and something dropped the `ownerReferences` check | See [the section above](#workloads-that-argocd-does-not-manage) |
 | 404 behind an ingress | A rewrite rule strips `BASE_PATH` | Remove the rewrite. The app serves the prefix itself |
 | `data is Ns stale` banner | The last refresh failed; you are seeing the previous snapshot | Look at the error banner beside it |
-| Pod restarts in a loop | Should not happen from a cluster read — `/healthz` never touches the API | Check the pod logs and the image |
+| Pod restarts in a loop | Should not happen from a cluster read, `/healthz` never touches the API | Check the pod logs and the image |
 
 ## Security
 
@@ -853,7 +872,7 @@ Put it behind a VPN, an internal load balancer, or your existing SSO proxy. Do n
 it to the internet.
 
 What it does show: service names, chart and image versions, health, sync state, node counts,
-and — if you turn the extra on — infrastructure workload names. What it never shows:
+and, if you turn the extra on, infrastructure workload names. What it never shows:
 secrets, environment variables, pod logs, or the ServiceAccount token.
 
 Everything it does is read-only. It cannot change anything in the cluster, because the
@@ -883,7 +902,7 @@ to. That keeps a red build meaningful.
 ## Container hardening
 
 The runtime image is `gcr.io/distroless/static-debian12:nonroot`. It has no shell, no
-package manager, no busybox and no libc — only CA certificates, timezone data and
+package manager, no busybox and no libc, only CA certificates, timezone data and
 `/etc/passwd`.
 
 That is what makes the static `CGO_ENABLED=0` build possible: there is nothing in the image
@@ -978,5 +997,5 @@ read-only root filesystem and needs no writable volume.
 | `deploy/install.yaml` | Single-file install, no Helm |
 | `scripts/` | `install.sh`, `local-test.sh` |
 
-Standard library only. No client-go, no web framework, no JavaScript, no external assets —
+Standard library only. No client-go, no web framework, no JavaScript, no external assets , 
 the whole page is server-rendered HTML with inline CSS.

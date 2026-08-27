@@ -31,7 +31,7 @@ func TestParseFilter(t *testing.T) {
 		{name: "mixed case kept for the chip", raw: "status=degraded", want: Filter{Status: []string{"degraded"}}},
 		{name: "whitespace trimmed", raw: "status=%20DEGRADED%20,%20DRIFT", want: Filter{Status: []string{"DEGRADED", "DRIFT"}}},
 		{name: "case-insensitive dedupe", raw: "status=DEGRADED&status=degraded", want: Filter{Status: []string{"DEGRADED"}}},
-		{name: "empty values dropped", raw: "status=&status=,,&sync=", want: Filter{}, empty: true},
+		{name: "empty values dropped", raw: "status=&status=,&sync=", want: Filter{}, empty: true},
 		{name: "unknown value kept", raw: "status=BANANAS", want: Filter{Status: []string{"BANANAS"}}},
 		{name: "sync", raw: "sync=OutOfSync", want: Filter{Sync: []string{"OutOfSync"}}},
 		{name: "gpu", raw: "gpu=true", want: Filter{GPU: "true"}},

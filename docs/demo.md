@@ -20,7 +20,7 @@ a real CRD, real objects, real `kubectl proxy`, real reads.
 The script checks all four up front and names whatever is missing. It also uses
 `curl` and `python3` to wait for the port and to print the summary at the end; both
 are standard on macOS and on GitHub runners, and if either is absent the page still
-serves — you just do not get the summary.
+serves, you just do not get the summary.
 
 ## Run it
 
@@ -83,8 +83,8 @@ default `GPU_GLOBS`, which is name-based and needs no extra permissions.
 Both optional sections are on, because your kubeconfig against kind is
 cluster-admin and can read them:
 
-- **Cluster capacity** — one node, arm64 or amd64 depending on your machine, zero GPUs.
-- **Workloads ArgoCD does not manage** — four rows: `coredns`, `kindnet`,
+- **Cluster capacity**, one node, arm64 or amd64 depending on your machine, zero GPUs.
+- **Workloads ArgoCD does not manage**, four rows: `coredns`, `kindnet`,
   `kube-proxy` and `local-path-provisioner`. These are what kind installs itself, and
   nothing in the (fake) ArgoCD owns them, which is exactly the point of that section.
 
@@ -95,7 +95,7 @@ Set `NODE_STATS=false` or `UNMANAGED=false` to turn either off.
 1. Checks `kind`, `kubectl`, `docker` and `go`, and that the Docker daemon responds.
 2. Creates the kind cluster `k8s-status-demo`, or reuses it if it is already there.
 3. Applies `hack/application-crd.yaml`, then waits for it to be Established.
-4. Applies `hack/demo-apps.yaml` — the `argocd` namespace, the `platform` root app
+4. Applies `hack/demo-apps.yaml`, the `argocd` namespace, the `platform` root app
    and nine children.
 5. Reads every object back and fails loudly if any of them lost its `status`.
 6. Builds the binary, starts `kubectl proxy`, and starts `k8s-status` pointed at the
@@ -115,7 +115,7 @@ reproducing the full ArgoCD spec.
 ### Why the CRD has no status subresource
 
 This is the one non-obvious part. If a CRD declares `subresources.status`, the API
-server strips `status:` from anything written to the main resource — so a plain
+server strips `status:` from anything written to the main resource, so a plain
 `kubectl apply` of the sample objects would store the spec and silently discard the
 status. Every row would then render as `WARNING`, because an empty health string
 normalises to `Unknown`.
@@ -125,7 +125,7 @@ Two ways round it: write each status through the `/status` endpoint with
 means one `kubectl apply -f` does the whole job. Step 5 above verifies it worked
 rather than trusting it.
 
-Real ArgoCD does declare the status subresource. This CRD is for the demo only — do
+Real ArgoCD does declare the status subresource. This CRD is for the demo only, do
 not apply it to a cluster that runs ArgoCD.
 
 ## Re-running

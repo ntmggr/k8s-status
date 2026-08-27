@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {{if .RefreshSeconds}}<meta http-equiv="refresh" content="{{.RefreshSeconds}}">{{end}}
-<title>{{.EnvName}} — OCP status</title>
+<title>{{.EnvName}} k8s-status</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%20role%3D%22img%22%20aria-label%3D%22k8s-status%22%3E%3Ctitle%3Ek8s-status%3C%2Ftitle%3E%20%3Crect%20x%3D%226%22%20y%3D%2212%22%20width%3D%2252%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23e6f4ea%22%2F%3E%20%3Crect%20x%3D%226%22%20y%3D%2228%22%20width%3D%2246%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23feefc3%22%2F%3E%20%3Crect%20x%3D%226%22%20y%3D%2244%22%20width%3D%2240%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23fce8e6%22%2F%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2218%22%20r%3D%224%22%20fill%3D%22%23137333%22%2F%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2234%22%20r%3D%224%22%20fill%3D%22%23a15c00%22%2F%3E%20%3Ccircle%20cx%3D%2216%22%20cy%3D%2250%22%20r%3D%224%22%20fill%3D%22%23c5221f%22%2F%3E%20%3C%2Fsvg%3E">
 <style>
 :root {
@@ -391,7 +391,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   <summary>What these states mean</summary>
   <div class="legend-grid">
     <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>OK</span><span>Healthy and matching git.</span></div>
-    <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>DEGRADED</span><span>Genuinely broken &mdash; needs attention.</span></div>
+    <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>DEGRADED</span><span>Genuinely broken, needs attention.</span></div>
     <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>WARNING</span><span>ArgoCD cannot determine health.</span></div>
     <div class="legend-row"><span class="pill s-progressing"><span class="g">&#8635;</span>PROGRESSING</span><span>Rolling out. Not an error.</span></div>
     <div class="legend-row"><span class="pill s-drift"><span class="g">&#8800;</span>DRIFT</span><span>Pods healthy, config differs from git.</span></div>
@@ -405,7 +405,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
   </div>
   <div class="legend-note">
-    <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git &mdash;
+    <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 
     two independent things, so <em>PROGRESSING</em> beside <em>Synced</em> is normal.
     Rows are ordered worst-first. Expand a row to see which components are out of sync.
     Click a tile to filter the list to that status, and click it again to clear it.
@@ -494,7 +494,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{end}}
 </tbody>
 {{else}}
-<tbody><tr><td colspan="{{$cols}}" class="detail">{{if $.Filter.Active}}no services match the active filter &mdash; <a href="{{$.ClearHref}}">clear it</a>{{else}}no services reported{{end}}</td></tr></tbody>
+<tbody><tr><td colspan="{{$cols}}" class="detail">{{if $.Filter.Active}}no services match the active filter, <a href="{{$.ClearHref}}">clear it</a>{{else}}no services reported{{end}}</td></tr></tbody>
 {{end}}
 </table>
 </div>
@@ -509,7 +509,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 
 {{if .Filter.ShowUnmanaged}}{{with .Snapshot.Unmanaged}}
 <div class="sec-head" id="unmanaged">Not managed by ArgoCD
-  <span class="sec-sub">running in the cluster but outside GitOps &mdash; EKS addons, Terraform-installed
+  <span class="sec-sub">running in the cluster but outside GitOps, EKS addons, Terraform-installed
   components, hand-installed Helm releases. These are not services above and are not in any count there.</span>
 </div>
 <div class="card">

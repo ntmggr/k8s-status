@@ -368,8 +368,8 @@ func detailFor(app argocd.Application, st State) string {
 	if msg := strings.TrimSpace(app.Status.Health.Message); msg != "" {
 		return msg
 	}
-	// Drift means ArgoCD reports the workload Healthy — its pods pass their
-	// readiness and liveness checks — while the manifests differ from git.
+	// Drift means ArgoCD reports the workload Healthy, its pods pass their
+	// readiness and liveness checks, while the manifests differ from git.
 	// Say so explicitly, otherwise an OutOfSync row reads as an outage.
 	if st == StateDrift {
 		return "pods healthy and passing health checks; config differs from git"

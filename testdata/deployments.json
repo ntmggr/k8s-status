@@ -1,0 +1,706 @@
+{
+ "items": [
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "media-encoder",
+    "namespace": "media-encoder",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "media-encoder"
+    }
+   },
+   "spec": {
+    "replicas": 2,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "media-encoder",
+        "image": "example/img:1.4.2",
+        "resources": {
+         "limits": {
+          "nvidia.com/gpu": "1"
+         },
+         "requests": {
+          "nvidia.com/gpu": "1"
+         }
+        }
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "gpu"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 2,
+    "readyReplicas": 2
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "search-api",
+    "namespace": "search-api",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "search-api"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "search-api",
+        "image": "example/img:1.4.2",
+        "resources": {
+         "limits": {
+          "nvidia.com/gpu": "1"
+         },
+         "requests": {
+          "nvidia.com/gpu": "1"
+         }
+        }
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "gpu"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 0
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "ingest-gateway",
+    "namespace": "ingest-gateway",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "ingest-gateway"
+    }
+   },
+   "spec": {
+    "replicas": 0,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "ingest-gateway",
+        "image": "example/img:1.4.2",
+        "resources": {
+         "limits": {
+          "nvidia.com/gpu": "1"
+         },
+         "requests": {
+          "nvidia.com/gpu": "1"
+         }
+        }
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "gpu"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 0,
+    "readyReplicas": 0
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "orders-api",
+    "namespace": "orders-api",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "orders-api"
+    }
+   },
+   "spec": {
+    "replicas": 3,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "orders-api",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "general"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 3,
+    "readyReplicas": 3
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "accounts-api",
+    "namespace": "accounts-api",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "accounts-api"
+    }
+   },
+   "spec": {
+    "replicas": 2,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "accounts-api",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "general-x86"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 2,
+    "readyReplicas": 2
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "report-runner",
+    "namespace": "report-runner",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "report-runner"
+    }
+   },
+   "spec": {
+    "replicas": 2,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "report-runner",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "general"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 2,
+    "readyReplicas": 0
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "cache-shim",
+    "namespace": "cache-shim",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "cache-shim"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "cache-shim",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "batch"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 0
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "admin-ui",
+    "namespace": "admin-ui",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "admin-ui"
+    }
+   },
+   "spec": {
+    "replicas": 2,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "admin-ui",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 2,
+    "readyReplicas": 2
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "edge-proxy",
+    "namespace": "edge-proxy",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "edge-proxy"
+    }
+   },
+   "spec": {
+    "replicas": 2,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "edge-proxy",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 2,
+    "readyReplicas": 2
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "session-store",
+    "namespace": "session-store",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "session-store"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "session-store",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "general"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "log-shipper",
+    "namespace": "log-shipper",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "log-shipper"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "log-shipper",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "notify-worker",
+    "namespace": "notify-worker",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "notify-worker"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "notify-worker",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ],
+      "affinity": {
+       "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+         "nodeSelectorTerms": [
+          {
+           "matchExpressions": [
+            {
+             "key": "pool",
+             "operator": "In",
+             "values": [
+              "general"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "metrics-collector",
+    "namespace": "metrics-collector",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "metrics-collector"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "metrics-collector",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "toolbox",
+    "namespace": "toolbox",
+    "labels": {
+     "app.kubernetes.io/version": "1.4.2",
+     "app.kubernetes.io/instance": "toolbox"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "toolbox",
+        "image": "example/img:1.4.2",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "ingress-controller",
+    "namespace": "ingress",
+    "labels": {
+     "app.kubernetes.io/managed-by": "Helm",
+     "app.kubernetes.io/version": "4.11.0"
+    }
+   },
+   "spec": {
+    "replicas": 2,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "ingress-controller",
+        "image": "example/ingress-controller:4.11.0",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 2,
+    "readyReplicas": 2
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "cert-manager",
+    "namespace": "cert-manager",
+    "labels": {
+     "app.kubernetes.io/managed-by": "Helm",
+     "app.kubernetes.io/version": "1.15.3"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "cert-manager",
+        "image": "example/cert-manager:1.15.3",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "metrics-agent",
+    "namespace": "observability",
+    "labels": {
+     "app.kubernetes.io/managed-by": "terraform",
+     "app.kubernetes.io/version": "2.8.1"
+    }
+   },
+   "spec": {
+    "replicas": 3,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "metrics-agent",
+        "image": "example/metrics-agent:2.8.1",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 3,
+    "readyReplicas": 3
+   }
+  }
+ ]
+}

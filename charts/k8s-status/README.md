@@ -23,7 +23,7 @@ API.
 There is no Job, CronJob, PVC, HPA, PDB, Secret or SecretProviderClass. That is
 deliberate: the whole chart is meant to be readable end to end in a couple of minutes.
 
-## Base path — no rewrite
+## Base path, no rewrite
 
 The service serves everything under `config.basePath` (`/k8s-status`) natively. Both the
 Ingress and the VirtualService forward the path unchanged; there is **no** rewrite
@@ -97,25 +97,25 @@ for. Leave it empty.
 | `fullnameOverride` | `""` | Override the full generated resource name. |
 | `serviceAccount.create` | `true` | Create the ServiceAccount. |
 | `serviceAccount.name` | `""` | ServiceAccount name; empty uses the generated fullname. |
-| `serviceAccount.annotations` | `{}` | Deliberately empty — no IRSA role needed. |
+| `serviceAccount.annotations` | `{}` | Deliberately empty, no IRSA role needed. |
 | `rbac.create` | `true` | Create the namespaced Role and RoleBinding. |
 | `rbac.argocdNamespace` | `argocd` | Namespace the Role and RoleBinding are created in. |
 | `rbac.clusterRole` | `false` | Create the ClusterRole and ClusterRoleBinding. Needed by `config.nodeStats` and `config.unmanaged`; each contributes only its own rule. |
-| `config.envName` | `unknown` | `ENV_NAME` — environment name in the page header. |
-| `config.envType` | `""` | `ENV_TYPE` — environment class, e.g. dev / stage / prod. |
-| `config.region` | `""` | `REGION` — cloud region in the page header. |
-| `config.clusterName` | `""` | `CLUSTER_NAME` — cluster name in the page header. |
-| `config.basePath` | `/k8s-status` | `BASE_PATH` — path prefix served natively, no rewrite. |
-| `config.argocdNamespace` | `argocd` | `ARGOCD_NAMESPACE` — namespace to read Applications from. |
-| `config.rootAppName` | `""` | `ROOT_APP_NAME` — app-of-apps used to derive prune orphans. Empty detects it. |
-| `config.argocdUIBase` | `""` | `ARGOCD_UI_BASE` — ArgoCD UI base URL for deep links. |
-| `config.ignoreGlobs` | `""` | `IGNORE_GLOBS` — comma-separated globs of Application names to hide. |
-| `config.cacheTTLSeconds` | `15` | `CACHE_TTL_SECONDS` — snapshot cache TTL. |
-| `config.refreshSeconds` | `30` | `REFRESH_SECONDS` — page meta-refresh interval. |
-| `config.nodeStats` | `false` | `NODE_STATS` — render the cluster capacity section. Requires `rbac.clusterRole`. |
-| `config.unmanaged` | `false` | `UNMANAGED` — list workloads ArgoCD does not manage. Requires `rbac.clusterRole`. |
-| `config.unmanagedIgnoreNamespaces` | `""` | `UNMANAGED_IGNORE_NS` — comma-separated namespace globs excluded from that list. |
-| `config.port` | `8080` | `PORT` — container listen port. |
+| `config.envName` | `unknown` | `ENV_NAME`, environment name in the page header. |
+| `config.envType` | `""` | `ENV_TYPE`, environment class, e.g. dev / stage / prod. |
+| `config.region` | `""` | `REGION`, cloud region in the page header. |
+| `config.clusterName` | `""` | `CLUSTER_NAME`, cluster name in the page header. |
+| `config.basePath` | `/k8s-status` | `BASE_PATH`, path prefix served natively, no rewrite. |
+| `config.argocdNamespace` | `argocd` | `ARGOCD_NAMESPACE`, namespace to read Applications from. |
+| `config.rootAppName` | `""` | `ROOT_APP_NAME`, app-of-apps used to derive prune orphans. Empty detects it. |
+| `config.argocdUIBase` | `""` | `ARGOCD_UI_BASE`, ArgoCD UI base URL for deep links. |
+| `config.ignoreGlobs` | `""` | `IGNORE_GLOBS`, comma-separated globs of Application names to hide. |
+| `config.cacheTTLSeconds` | `15` | `CACHE_TTL_SECONDS`, snapshot cache TTL. |
+| `config.refreshSeconds` | `30` | `REFRESH_SECONDS`, page meta-refresh interval. |
+| `config.nodeStats` | `false` | `NODE_STATS`, render the cluster capacity section. Requires `rbac.clusterRole`. |
+| `config.unmanaged` | `false` | `UNMANAGED`, list workloads ArgoCD does not manage. Requires `rbac.clusterRole`. |
+| `config.unmanagedIgnoreNamespaces` | `""` | `UNMANAGED_IGNORE_NS`, comma-separated namespace globs excluded from that list. |
+| `config.port` | `8080` | `PORT`, container listen port. |
 | `service.type` | `ClusterIP` | Service type. |
 | `service.port` | `80` | Service port. |
 | `ingress.enabled` | `false` | Create an Ingress. |

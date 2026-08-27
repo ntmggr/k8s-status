@@ -254,8 +254,8 @@ func (f failingWorkloadLister) ListWorkloads(context.Context) (*kube.WorkloadLis
 
 // parseSources reads SOURCES: a comma-separated list of "argocd", "flux", or "auto".
 //
-// An unrecognised entry is logged and ignored rather than aborting startup — a typo in
-// one environment variable must not take the page down — and an empty result falls back
+// An unrecognised entry is logged and ignored rather than aborting startup, a typo in
+// one environment variable must not take the page down, and an empty result falls back
 // to ArgoCD. "auto" anywhere in the list asks for detection and overrides the rest.
 func parseSources(raw string) (srcs []status.Source, auto bool) {
 	seen := map[status.Source]bool{}
