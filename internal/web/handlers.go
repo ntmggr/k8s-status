@@ -95,19 +95,38 @@ type summaryJSON struct {
 	Suspended   int `json:"suspended"`
 	Hidden      int `json:"hidden"`
 	GPU         int `json:"gpu"`
+	// GPUWaiting asked for a device and has not got one. GPUIdle is parked at zero,
+	// which is deliberate and leaves its devices free.
+	GPUWaiting int `json:"gpuWaiting"`
+	GPUIdle    int `json:"gpuIdle"`
+}
+
+type gpuAllocJSON struct {
+	PerReplica int    `json:"perReplica"`
+	Desired    int    `json:"desired"`
+	Ready      int    `json:"ready"`
+	Allocated  int    `json:"allocated"`
+	State      string `json:"state"`
+	// Measured is false when the service never requests a device and reaches one
+	// through the runtime, so perReplica and allocated cannot be trusted. It is
+	// separate from State because such a service can still be stuck.
+	Measured bool `json:"measured"`
 }
 
 type serviceJSON struct {
 	Name string `json:"name"`
 	// Source is always set. Namespace and Kind are only carried by Flux rows.
-	Source     string          `json:"source,omitempty"`
-	Namespace  string          `json:"namespace,omitempty"`
-	Kind       string          `json:"kind,omitempty"`
-	Version    string          `json:"version"`
-	Revision   string          `json:"revision"`
-	RepoURL    string          `json:"repoUrl,omitempty"`
-	AppVersion string          `json:"appVersion,omitempty"`
-	GPU        bool            `json:"gpu,omitempty"`
+	Source     string `json:"source,omitempty"`
+	Namespace  string `json:"namespace,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Version    string `json:"version"`
+	Revision   string `json:"revision"`
+	RepoURL    string `json:"repoUrl,omitempty"`
+	AppVersion string `json:"appVersion,omitempty"`
+	GPU        bool   `json:"gpu,omitempty"`
+	// GPUAlloc is present only on GPU rows: what one replica asks for, how many
+	// replicas are up, and how many devices that adds up to.
+	GPUAlloc   *gpuAllocJSON   `json:"gpuAllocation,omitempty"`
 	Image      string          `json:"image,omitempty"`
 	State      string          `json:"state"`
 	Sync       string          `json:"sync"`
@@ -133,6 +152,9 @@ type nodesJSON struct {
 	// Accelerators breaks gpus down by resource name, so a consumer can tell NVIDIA
 	// cards from MIG slices or another vendor. Omitted when nothing was found.
 	Accelerators map[string]int `json:"accelerators,omitempty"`
+	// GPUsAllocated is how many of gpus a workload actually holds. The gap between
+	// the two is idle hardware.
+	GPUsAllocated int `json:"gpusAllocated"`
 	// UnschedulableGPUNodes is nonzero when a cluster has GPU hardware no device
 	// plugin is advertising, so the scheduler cannot allocate it.
 	UnschedulableGPUNodes int            `json:"unschedulableGpuNodes,omitempty"`
@@ -251,6 +273,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 			Suspended:   snap.Summary.Suspended,
 			Hidden:      snap.Summary.Hidden,
 			GPU:         snap.Summary.GPU,
+			GPUWaiting:  snap.Summary.GPUWaiting,
+			GPUIdle:     snap.Summary.GPUIdle,
 		}
 		resp.Sources = sources(snap)
 		resp.Nodes = nodes(snap)
@@ -277,6 +301,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 				RepoURL:    svc.RepoURL,
 				AppVersion: svc.AppVersion,
 				GPU:        svc.GPU,
+				GPUAlloc:   gpuAlloc(svc),
 				Image:      svc.Image,
 				State:      string(svc.State),
 				Sync:       svc.Sync,
@@ -344,6 +369,7 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 		GPUNodes:              n.GPUNodes,
 		GPUs:                  n.GPUs,
 		GPUServices:           snap.Summary.GPU,
+		GPUsAllocated:         n.GPUsAllocated,
 		UnschedulableGPUNodes: n.UnschedulableGPUNodes,
 		Error:                 n.Error,
 	}
@@ -400,4 +426,25 @@ func components(svc status.Service) []componentJSON {
 		out = append(out, componentJSON{Kind: c.Kind, Name: c.Name, Namespace: c.Namespace, Sync: c.Sync})
 	}
 	return out
+}
+
+// gpuAlloc renders the allocation block, and only for GPU rows. The state word is what
+// a reader actually wants: holding, parked, or asked and did not get.
+func gpuAlloc(svc status.Service) *gpuAllocJSON {
+	if !svc.GPU {
+		return nil
+	}
+	g := svc.GPUAlloc
+	state := "running"
+	switch {
+	case g.Waiting():
+		state = "waiting"
+	case g.Idle():
+		state = "idle"
+	}
+	return &gpuAllocJSON{
+		PerReplica: g.PerReplica, Desired: g.Desired,
+		Ready: g.Ready, Allocated: g.Allocated, State: state,
+		Measured: !g.Unmeasured(),
+	}
 }
