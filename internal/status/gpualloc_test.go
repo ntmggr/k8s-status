@@ -145,3 +145,34 @@ func TestSummaryCountsWaitingAndIdle(t *testing.T) {
 		t.Errorf("GPUStopped=%d, want 1", snap.Summary.GPUStopped)
 	}
 }
+
+// The allocated total counts only what was formally requested, so a cluster where some
+// services reach devices through the runtime is under-reported. The count of those is
+// tracked so the page can say the total is a floor instead of implying it is complete.
+func TestSummaryCountsUnmeasuredServices(t *testing.T) {
+	nodes := &kube.NodeList{Items: []kube.Node{node("gpu-1", "4", map[string]string{"k": "v"})}}
+	snap := &Snapshot{}
+	snap.addService(svcWith("asks", "ml", "asks"))
+	snap.addService(svcWith("just-pinned", "ml", "just-pinned"))
+
+	pinned := affinityTo(replicaWorkload("Deployment", "ml", "just-pinned", 0, 1, 1), "k", "v")
+	FillGPU(snap, &kube.WorkloadList{Items: []kube.Workload{
+		replicaWorkload("Deployment", "ml", "asks", 2, 1, 1),
+		pinned,
+	}}, nodes, []string{kube.ResourceGPU})
+
+	if snap.Summary.GPUUnmeasured != 1 {
+		t.Errorf("GPUUnmeasured=%d, want 1", snap.Summary.GPUUnmeasured)
+	}
+	if snap.Nodes != nil {
+		t.Fatal("guard: this test does not attach node stats")
+	}
+	// The measured one still contributes; the pinned one cannot.
+	var total int
+	for _, s := range snap.Services {
+		total += s.GPUAlloc.Allocated
+	}
+	if total != 2 {
+		t.Errorf("allocated total=%d, want 2 from the measured service only", total)
+	}
+}

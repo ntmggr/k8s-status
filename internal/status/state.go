@@ -150,8 +150,12 @@ type Summary struct {
 	// GPUStopped is asking for no replicas at all. Split out because a single GPU
 	// count hides all three, and the one worth leading with is what is running.
 	GPURunning int
-	GPUWaiting int
-	GPUStopped int
+	// GPUUnmeasured reach a device through the runtime without requesting one, so they
+	// contribute nothing to the allocated total. Counted so the page can say that the
+	// total is a floor rather than letting it read as the whole story.
+	GPUUnmeasured int
+	GPUWaiting    int
+	GPUStopped    int
 	// Blocked counts services the scheduler could not place, split by what ran out:
 	// an accelerator, ordinary cpu or memory, or no matching node at all.
 	Blocked          int

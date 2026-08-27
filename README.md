@@ -559,7 +559,12 @@ per-replica and allocated numbers cannot be trusted. That is separate from the s
 since such a service can still be stuck.
 
 The capacity line totals the same thing cluster-wide, as `N cards, M allocated`. The gap
-is idle hardware.
+is hardware nothing has claimed.
+
+That total is a floor rather than a complete figure. It counts devices the scheduler was
+asked for, so a service that reaches one through the runtime without requesting it adds
+nothing. Those are counted separately and shown as `N uncounted`, because a total that
+quietly omits them reads as though it were the whole story.
 
 Detection is by container resources, not by which node a pod landed on. A DaemonSet
 scheduled onto a GPU node is not a GPU workload, and a service scaled to zero still is

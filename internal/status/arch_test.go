@@ -136,3 +136,22 @@ func TestFillArchSkipsAcceleratorBackedServices(t *testing.T) {
 		}
 	}
 }
+
+// A service pinned to a nodegroup that currently has no nodes gives nothing to read an
+// architecture from, so it gets no badge rather than a guess. Guarded because the rule
+// that produces it, "exactly one architecture seen", is easy to loosen by accident.
+func TestFillArchClaimsNothingWhenNoNodeMatches(t *testing.T) {
+	nodes := &kube.NodeList{Items: []kube.Node{
+		archNode("a1", "arm64", map[string]string{"pool": "other"}),
+	}}
+	snap := &Snapshot{}
+	snap.addService(archSvc("svc", "ml", "svc"))
+	w := kube.Workload{Kind: "Deployment"}
+	w.Metadata.Namespace, w.Metadata.Name = "ml", "svc"
+
+	FillArch(snap, &kube.WorkloadList{Items: []kube.Workload{affinityTo(w, "pool", "empty-group")}}, nodes)
+
+	if got := snap.Services[0].Arch; got != "" {
+		t.Fatalf("Arch=%q, want empty: no node matched to base it on", got)
+	}
+}

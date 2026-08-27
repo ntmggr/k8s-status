@@ -370,7 +370,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- /* Without a device plugin the card count is not discoverable, so say that
                instead of printing a bare "0 cards" beside nodes that are busy. */}}
         {{- if .GPUs}}
-        <span class="cap-split" title="Total across those nodes, and how many a workload actually holds. The gap is hardware nothing has claimed.{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}<i>·</i>{{.GPUsAllocated}} allocated</span>
+        <span class="cap-split" title="Total across those nodes, and how many a workload has been given. The gap is hardware nothing has claimed.{{if $.Snapshot.Summary.GPUUnmeasured}} A floor, not a total: {{$.Snapshot.Summary.GPUUnmeasured}} service{{if ne $.Snapshot.Summary.GPUUnmeasured 1}}s{{end}} reach a device through the runtime without requesting one, so their use cannot be counted.{{end}}{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}<i>·</i>{{.GPUsAllocated}} allocated{{if $.Snapshot.Summary.GPUUnmeasured}}<i>·</i>{{$.Snapshot.Summary.GPUUnmeasured}} uncounted{{end}}</span>
         {{- end}}
         {{- if .UnschedulableGPUNodes}}
         <span class="cap-split is-warn" title="These nodes have a device but advertise none, so no device plugin is running. Workloads still reach the hardware through the container runtime and can be serving traffic, but the scheduler cannot allocate or limit it: any number of pods can land on one card, and the card count is not discoverable.">{{if eq .UnschedulableGPUNodes .GPUNodes}}no device plugin{{else}}{{.UnschedulableGPUNodes}} without a device plugin{{end}}</span>
