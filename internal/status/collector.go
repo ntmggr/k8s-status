@@ -265,7 +265,7 @@ func (c *Collector) attachPending(_ context.Context, snap *Snapshot) {
 	if c.pending == nil {
 		return
 	}
-	FillPending(snap, c.pendingPods)
+	FillPending(snap, c.pendingPods, c.workloadList)
 }
 
 func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {

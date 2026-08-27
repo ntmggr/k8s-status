@@ -24,7 +24,7 @@ func TestFillPendingResourcePressure(t *testing.T) {
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("airflow", "airflow-worker-866b459595-pgk7",
 			"0/84 nodes are available: 1 Insufficient memory, 6 Insufficient cpu, 75 node(s) didn't match Pod's node affinity/selector."),
-	}})
+	}}, nil)
 
 	b := snap.Services[0].Blocked
 	if b == nil {
@@ -49,7 +49,7 @@ func TestFillPendingNoMatchingNode(t *testing.T) {
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("tts-engine", "lily-tts-pytriton-7669bf497f-nr6t6",
 			"0/86 nodes are available: 4 node(s) had untolerated taint(s), 82 node(s) didn't match Pod's node affinity/selector."),
-	}})
+	}}, nil)
 
 	b := snap.Services[0].Blocked
 	if b == nil || b.Reason() != "no matching node" {
@@ -68,7 +68,7 @@ func TestFillPendingLongestPrefixWins(t *testing.T) {
 	snap.addService(blockedSvc("long", "tts", "tts-engine-daphne"))
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("tts", "tts-engine-daphne-6db5fc7c74-2cw52", "0/10 nodes are available: 10 Insufficient cpu."),
-	}})
+	}}, nil)
 
 	// Look rows up by name: marking a row blocked re-orders the list.
 	byName := map[string]*Service{}
@@ -89,7 +89,7 @@ func TestFillPendingRespectsNamespace(t *testing.T) {
 	snap.addService(blockedSvc("a", "ns-a", "api"))
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("ns-b", "api-1234-abcde", "0/3 nodes are available: 3 Insufficient cpu."),
-	}})
+	}}, nil)
 	if snap.Services[0].Blocked != nil {
 		t.Fatal("an event in another namespace must not block this service")
 	}
@@ -101,7 +101,7 @@ func TestFillPendingCountsPodsAndDedupesResources(t *testing.T) {
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("ml", "worker-1-a", "0/5 nodes are available: 5 Insufficient cpu."),
 		schedEvent("ml", "worker-1-b", "0/5 nodes are available: 5 Insufficient cpu, 2 Insufficient nvidia.com/gpu."),
-	}})
+	}}, nil)
 	b := snap.Services[0].Blocked
 	if b.Pods != 2 {
 		t.Errorf("Pods=%d, want 2", b.Pods)
@@ -114,8 +114,8 @@ func TestFillPendingCountsPodsAndDedupesResources(t *testing.T) {
 func TestFillPendingNoEventsIsNoop(t *testing.T) {
 	snap := &Snapshot{}
 	snap.addService(blockedSvc("svc", "ml", "worker"))
-	FillPending(snap, nil)
-	FillPending(snap, &kube.EventList{})
+	FillPending(snap, nil, nil)
+	FillPending(snap, &kube.EventList{}, nil)
 	if snap.Services[0].Blocked != nil || snap.Summary.Blocked != 0 {
 		t.Fatal("no events must mean no claims")
 	}
@@ -132,7 +132,7 @@ func TestBlockedRowsSortAboveHealthyOnes(t *testing.T) {
 	}
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("ml", "zzz-blocked-1-a", "0/5 nodes are available: 5 Insufficient cpu."),
-	}})
+	}}, nil)
 
 	if snap.Services[0].Name != "zzz-blocked" {
 		t.Fatalf("first row is %q, want the blocked one despite its name sorting last",
@@ -153,7 +153,7 @@ func TestDegradedStillOutranksBlocked(t *testing.T) {
 
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("ml", "zzz-blocked-1-a", "0/5 nodes are available: 5 Insufficient cpu."),
-	}})
+	}}, nil)
 
 	if snap.Services[0].Name != "aaa-degraded" {
 		t.Fatalf("first row is %q, want the degraded one", snap.Services[0].Name)
@@ -171,7 +171,7 @@ func TestBlockedKindSeparatesAcceleratorFromCPU(t *testing.T) {
 		schedEvent("ml", "gpu-hungry-1-a", "0/9 nodes are available: 9 Insufficient nvidia.com/gpu."),
 		schedEvent("ml", "cpu-hungry-1-a", "0/9 nodes are available: 4 Insufficient cpu, 5 Insufficient memory."),
 		schedEvent("ml", "nowhere-1-a", "0/9 nodes are available: 9 node(s) didn't match Pod's node affinity/selector."),
-	}})
+	}}, nil)
 
 	kinds := map[string]string{}
 	for _, s := range snap.Services {
@@ -201,8 +201,67 @@ func TestBlockedKindPrefersAccelerator(t *testing.T) {
 	snap.addService(blockedSvc("svc", "ml", "svc"))
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("ml", "svc-1-a", "0/9 nodes are available: 4 Insufficient cpu, 5 Insufficient nvidia.com/gpu."),
-	}})
+	}}, nil)
 	if got := snap.Services[0].Blocked.Kind(); got != "accelerator" {
 		t.Fatalf("Kind=%q, want accelerator", got)
+	}
+}
+
+// "No matching node" is true but not actionable. When the workload pins itself to one
+// nodegroup, saying which one turns it into something a reader can act on.
+func TestBlockedNamesTheEmptyNodegroup(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(blockedSvc("lily", "pytriton-server", "lily-tts-pytriton"))
+
+	w := kube.Workload{Kind: "Deployment"}
+	w.Metadata.Namespace, w.Metadata.Name = "pytriton-server", "lily-tts-pytriton"
+	w.Spec.Template.Spec.Affinity = &kube.Affinity{NodeAffinity: &kube.NodeAffinity{
+		Required: &kube.NodeSelectorSpec{NodeSelectorTerms: []kube.NodeSelectorTerm{{
+			MatchExpressions: []kube.NodeSelectorRequirement{
+				{Key: "NodeGroupType", Operator: "In", Values: []string{"pytriton-gpu"}},
+				{Key: "color", Operator: "In", Values: []string{"blue"}},
+			},
+		}}},
+	}}
+
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("pytriton-server", "lily-tts-pytriton-7669bf497f-nr6t6",
+			"0/86 nodes are available: 4 node(s) had untolerated taint(s), 82 node(s) didn't match Pod's node affinity/selector."),
+	}}, &kube.WorkloadList{Items: []kube.Workload{w}})
+
+	b := snap.Services[0].Blocked
+	if b == nil {
+		t.Fatal("service should be blocked")
+	}
+	if got := b.Reason(); got != "no blue/pytriton-gpu node" {
+		t.Fatalf("Reason=%q, want the nodegroup named", got)
+	}
+}
+
+// Without the workload list it still says something true, just less useful.
+func TestBlockedFallsBackWhenSelectorUnknown(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(blockedSvc("svc", "ml", "svc"))
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("ml", "svc-1-a", "0/9 nodes are available: 9 node(s) didn't match Pod's node affinity/selector."),
+	}}, nil)
+	if got := snap.Services[0].Blocked.Reason(); got != "no matching node" {
+		t.Fatalf("Reason=%q, want the generic fallback", got)
+	}
+}
+
+// A resource shortage keeps naming the resource; the selector is only for the case
+// where the scheduler named nothing.
+func TestBlockedSelectorDoesNotOverrideAResourceShortage(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(blockedSvc("svc", "ml", "svc"))
+	w := kube.Workload{Kind: "Deployment"}
+	w.Metadata.Namespace, w.Metadata.Name = "ml", "svc"
+	w.Spec.Template.Spec.NodeSelector = map[string]string{"pool": "big"}
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("ml", "svc-1-a", "0/9 nodes are available: 9 Insufficient cpu, 2 node(s) didn't match Pod's node affinity/selector."),
+	}}, &kube.WorkloadList{Items: []kube.Workload{w}})
+	if got := snap.Services[0].Blocked.Reason(); got != "no cpu" {
+		t.Fatalf("Reason=%q, want the resource shortage", got)
 	}
 }

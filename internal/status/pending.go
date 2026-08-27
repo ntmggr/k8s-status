@@ -27,6 +27,10 @@ type Blocked struct {
 	// than by capacity. For a workload pinned to one nodegroup that means the group is
 	// empty, which is the same problem wearing a different message.
 	NoNodeMatched bool
+	// Selector names what the workload insists on when nothing matched, taken from its
+	// required node affinity. "No matching node" is true but not actionable; "no
+	// pytriton-gpu/blue node" says which group is empty.
+	Selector string
 	// Pods is how many of the service's pods are stuck this way.
 	Pods int
 }
@@ -54,6 +58,9 @@ func (b Blocked) Reason() string {
 		return "no " + strings.Join(b.Resources, ", ")
 	}
 	if b.NoNodeMatched {
+		if b.Selector != "" {
+			return "no " + b.Selector + " node"
+		}
 		return "no matching node"
 	}
 	return "unschedulable"
@@ -75,7 +82,7 @@ func (b Blocked) Reason() string {
 // Events name a pod, not a workload, so it is matched back by name prefix within its
 // namespace, longest match first: "tts-engine" does not claim a pod belonging to
 // "tts-engine-daphne".
-func FillPending(snap *Snapshot, events *kube.EventList) {
+func FillPending(snap *Snapshot, events *kube.EventList, workloads *kube.WorkloadList) {
 	if snap == nil {
 		return
 	}
@@ -142,8 +149,12 @@ func FillPending(snap *Snapshot, events *kube.EventList) {
 		}
 	}
 
+	required := requiredSelectors(workloads)
 	for idx, b := range acc {
 		sort.Strings(b.Resources)
+		if b.NoNodeMatched && len(b.Resources) == 0 {
+			b.Selector = selectorFor(snap.Services[idx], required)
+		}
 		snap.Services[idx].Blocked = b
 		snap.Summary.Blocked++
 		switch b.Kind() {
@@ -181,4 +192,45 @@ func appendUnique(xs []string, v string) []string {
 		}
 	}
 	return append(xs, v)
+}
+
+// requiredSelectors reads what each workload insists on: the values of its required
+// node affinity, which on a labelled fleet name the nodegroup it is pinned to.
+func requiredSelectors(list *kube.WorkloadList) map[string]string {
+	out := map[string]string{}
+	if list == nil {
+		return out
+	}
+	for _, w := range list.Items {
+		ps := w.Spec.Template.Spec
+		var vals []string
+		for k, v := range ps.NodeSelector {
+			_ = k
+			vals = append(vals, v)
+		}
+		if ps.Affinity != nil && ps.Affinity.NodeAffinity != nil && ps.Affinity.NodeAffinity.Required != nil {
+			for _, t := range ps.Affinity.NodeAffinity.Required.NodeSelectorTerms {
+				for _, e := range t.MatchExpressions {
+					if e.Operator == "In" {
+						vals = append(vals, e.Values...)
+					}
+				}
+			}
+		}
+		if len(vals) == 0 {
+			continue
+		}
+		sort.Strings(vals)
+		out[w.Kind+"/"+w.Metadata.Namespace+"/"+w.Metadata.Name] = strings.Join(vals, "/")
+	}
+	return out
+}
+
+func selectorFor(svc Service, required map[string]string) string {
+	for _, r := range svc.Owned {
+		if v, ok := required[r.Kind+"/"+r.Namespace+"/"+r.Name]; ok {
+			return v
+		}
+	}
+	return ""
 }
