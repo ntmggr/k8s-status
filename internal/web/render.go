@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -290,6 +291,12 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		// ROOT_APP_NAME and hiding it would hide the diagnosis.
 		data.ShowRootLine = snap.HasRoot || hasSource(snap.Sources, status.SourceArgoCD)
 		data.Services = data.Filter.Apply(snap.Services)
+		// Looking at the accelerator view is a question about what is using devices
+		// now, so the ones that are answer it first. The global order is worst-first,
+		// which would bury them under everything merely waiting or stopped.
+		if data.Filter.GPU != "" {
+			sortRunningFirst(data.Services)
+		}
 		data.Shown = len(data.Services)
 		data.AgeSeconds = s.ageSeconds(snap)
 		data.Stale = snap.Stale
@@ -385,4 +392,24 @@ func (d pageData) AnyFilter() bool { return d.Filter.Active() || d.Filter.View !
 // brand is the logo mark, inlined so the page stays one self-contained file.
 func brand() template.HTML {
 	return template.HTML(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="19" height="19" class="brand" role="img" aria-label="k8s-status"><title>k8s-status</title> <rect x="6" y="12" width="52" height="12" rx="6" fill="#e6f4ea"/> <rect x="6" y="28" width="46" height="12" rx="6" fill="#feefc3"/> <rect x="6" y="44" width="40" height="12" rx="6" fill="#fce8e6"/> <circle cx="16" cy="18" r="4" fill="#137333"/> <circle cx="16" cy="34" r="4" fill="#a15c00"/> <circle cx="16" cy="50" r="4" fill="#c5221f"/> </svg>`)
+}
+
+// sortRunningFirst orders accelerator rows by what they are doing: holding devices,
+// then waiting for one, then stopped. Ties keep the worst-first order underneath.
+func sortRunningFirst(services []status.Service) {
+	rank := func(s status.Service) int {
+		switch {
+		case !s.GPU:
+			return 3
+		case s.GPUAlloc.Waiting():
+			return 1
+		case s.GPUAlloc.ScaledToZero():
+			return 2
+		default:
+			return 0
+		}
+	}
+	sort.SliceStable(services, func(i, j int) bool {
+		return rank(services[i]) < rank(services[j])
+	})
 }

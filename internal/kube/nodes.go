@@ -66,7 +66,7 @@ func (q *Quantity) UnmarshalJSON(b []byte) error {
 // needs a ClusterRole granting get/list on nodes.
 func (c *Client) ListNodes(ctx context.Context) (*NodeList, error) {
 	var list NodeList
-	if err := c.GetJSON(ctx, nodesPath, "node list", &list); err != nil {
+	if err := c.GetJSON(ctx, FromCache(nodesPath), "node list", &list); err != nil {
 		return nil, err
 	}
 	return &list, nil

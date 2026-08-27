@@ -149,3 +149,18 @@ func Sanitize(s string) string {
 	}
 	return string(out)
 }
+
+// FromCache appends resourceVersion=0, which asks the API server to answer from its
+// watch cache instead of doing a quorum read from etcd. On a cluster with 146 ArgoCD
+// Applications that halved the read, 1.70s to 0.85s, because these lists are large:
+// the Applications alone are 13 MB.
+//
+// The trade is that the answer can lag the very latest write by a moment. That costs
+// nothing here: the result is cached for the refresh interval anyway, and the page
+// prints how old its data is.
+func FromCache(path string) string {
+	if strings.Contains(path, "?") {
+		return path + "&resourceVersion=0"
+	}
+	return path + "?resourceVersion=0"
+}

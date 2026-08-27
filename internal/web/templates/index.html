@@ -221,6 +221,8 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
 .arch.is-arm64 { background: var(--prog-bg); color: var(--prog-fg); }
 .arch.is-amd64 { background: var(--drift-bg); color: var(--drift-fg); }
 .gpu.is-waiting { background: var(--warn-bg); color: var(--warn-fg); }
+.svc.is-dim td { color: var(--muted); }
+.svc.is-dim td.name a, .svc.is-dim td.name { color: var(--muted); }
 .gpu.is-stopped { background: var(--susp-bg); color: var(--susp-fg); }
 .gpu.is-running { background: var(--ok-bg); color: var(--ok-fg); }
 .gpu { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
@@ -335,7 +337,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 <div class="views">
   <span class="views-lab">views</span>
-  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Services backed by {{$.Snapshot.AcceleratorLabel}}">{{icon "gpu"}}{{$.Snapshot.Summary.GPU}} on {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.GPUWaiting}} <b>{{$.Snapshot.Summary.GPUWaiting}} waiting</b>{{end}}{{if $.Snapshot.Summary.GPUStopped}} <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
+  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="{{$.Snapshot.Summary.GPU}} services are backed by {{$.Snapshot.AcceleratorLabel}}: {{$.Snapshot.Summary.GPURunning}} holding devices now, {{$.Snapshot.Summary.GPUWaiting}} waiting for one, {{$.Snapshot.Summary.GPUStopped}} with no replicas.">{{icon "gpu"}}<b>{{$.Snapshot.Summary.GPURunning}} running</b>{{if $.Snapshot.Summary.GPUWaiting}} · {{$.Snapshot.Summary.GPUWaiting}} waiting{{end}}{{if $.Snapshot.Summary.GPUStopped}} · <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
     {{- range $.Snapshot.ArchCounts}}
     <a class="vchip{{if $.FilterActive "arch" .Arch}} is-on{{end}}" href="{{$.FilterHref "arch" .Arch}}" title="Services that can only run on {{.Arch}} nodes">{{.Count}} {{.Arch}} only</a>
     {{- end}}
@@ -448,7 +450,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{$ui := .ArgoCDUIBase}}
 {{$multi := .MultiSource}}
 {{range .Services}}
-<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}">
+<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}}">
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}

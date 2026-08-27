@@ -138,7 +138,7 @@ func (c *Client) ListFlux(ctx context.Context) (*FluxList, error) {
 	go func() {
 		defer wg.Done()
 		var list HelmReleaseList
-		if err := c.GetJSON(ctx, helmReleasesPath, "helmrelease list", &list); err != nil {
+		if err := c.GetJSON(ctx, FromCache(helmReleasesPath), "helmrelease list", &list); err != nil {
 			errs[0] = err
 			return
 		}
@@ -149,7 +149,7 @@ func (c *Client) ListFlux(ctx context.Context) (*FluxList, error) {
 	go func() {
 		defer wg.Done()
 		var list KustomizationList
-		if err := c.GetJSON(ctx, kustomizationsPath, "kustomization list", &list); err != nil {
+		if err := c.GetJSON(ctx, FromCache(kustomizationsPath), "kustomization list", &list); err != nil {
 			errs[1] = err
 			return
 		}

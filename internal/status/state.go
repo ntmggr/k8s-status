@@ -146,8 +146,10 @@ type Summary struct {
 	Suspended   int
 	Hidden      int
 	GPU         int
-	// GPUWaiting asked for a device and has not got one. GPUStopped is asking for no
-	// replicas at all. Split out because a boolean GPU count hides both.
+	// GPURunning holds devices right now. GPUWaiting asked and has not got one.
+	// GPUStopped is asking for no replicas at all. Split out because a single GPU
+	// count hides all three, and the one worth leading with is what is running.
+	GPURunning int
 	GPUWaiting int
 	GPUStopped int
 	// Blocked counts services the scheduler could not place, split by what ran out:

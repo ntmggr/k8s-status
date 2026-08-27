@@ -88,7 +88,7 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 
 	// addService tallied this while building, before any workload was known.
 	snap.Summary.GPU = 0
-	allocated, waiting, stopped := 0, 0, 0
+	allocated, running, waiting, stopped := 0, 0, 0, 0
 	for _, svc := range snap.Services {
 		if !svc.GPU {
 			continue
@@ -100,9 +100,12 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 			waiting++
 		case svc.GPUAlloc.ScaledToZero():
 			stopped++
+		default:
+			running++
 		}
 	}
 	snap.Summary.GPUWaiting = waiting
+	snap.Summary.GPURunning = running
 	snap.Summary.GPUStopped = stopped
 	if snap.Nodes != nil {
 		snap.Nodes.GPUsAllocated = allocated

@@ -97,6 +97,7 @@ type summaryJSON struct {
 	GPU         int `json:"gpu"`
 	// GPUWaiting asked for a device and has not got one. GPUStopped is asking for no
 	// replicas, so nothing is running and no device is held.
+	GPURunning int `json:"gpuRunning"`
 	GPUWaiting int `json:"gpuWaiting"`
 	GPUStopped int `json:"gpuStopped"`
 	// Blocked counts services the scheduler could not place, split by what ran out.

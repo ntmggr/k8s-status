@@ -37,7 +37,7 @@ type InvolvedObject struct {
 // ListFailedScheduling returns the scheduler's complaints about pods it could not place.
 func (c *Client) ListFailedScheduling(ctx context.Context) (*EventList, error) {
 	var list EventList
-	if err := c.GetJSON(ctx, failedSchedulingPath, "event list", &list); err != nil {
+	if err := c.GetJSON(ctx, FromCache(failedSchedulingPath), "event list", &list); err != nil {
 		return nil, err
 	}
 	return &list, nil

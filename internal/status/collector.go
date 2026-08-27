@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -119,8 +120,12 @@ func (c *Collector) Get(ctx context.Context) (*Snapshot, error) {
 	// empty environment, so a Flux-only deployment never touches the ArgoCD API.
 	var list *argocd.ApplicationList
 	if c.lister != nil {
+		// Detached for the same reason as the optional reads: this refresh serves
+		// every viewer, so one of them navigating away must not abort it.
+		lctx, lcancel := context.WithTimeout(context.WithoutCancel(ctx), sourceTimeout)
+		defer lcancel()
 		var err error
-		if list, err = c.lister.ListApplications(ctx); err != nil {
+		if list, err = c.lister.ListApplications(lctx); err != nil {
 			if c.snap != nil {
 				stale := *c.snap
 				stale.Stale = true
@@ -146,71 +151,130 @@ func (c *Collector) Get(ctx context.Context) (*Snapshot, error) {
 // decorate returns a copy of the snapshot carrying the optional sections, so the
 // cached snapshot is never mutated after callers have a pointer to it.
 func (c *Collector) decorate(ctx context.Context, snap Snapshot) *Snapshot {
+	c.refreshSources(ctx)
 	c.attachNodes(ctx, &snap)
 	c.attachUnmanaged(ctx, &snap)
 	c.attachPending(ctx, &snap)
 	return &snap
 }
 
-func (c *Collector) attachNodes(ctx context.Context, snap *Snapshot) {
-	if c.nodes == nil {
+// sourceTimeout bounds a refresh once it is detached from the request that started it.
+const sourceTimeout = 25 * time.Second
+
+// abandoned reports a read that was cut short rather than answered. Caching one would
+// store "node stats unavailable" for the whole interval because a viewer navigated
+// away, which is what it looked like: the page went blank until the cache expired.
+func abandoned(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+// refreshSources fetches the optional reads at the same time instead of one after
+// another. They are independent, and run in series they added up: a cold request took
+// nearly three seconds against a cluster where each read alone is well under one, and
+// with a 15 second cache that landed on a real viewer several times a minute.
+//
+// Each goroutine owns its own fields, and the wait finishes before anything reads them,
+// so the attach functions below still see a settled cache and stay unchanged.
+func (c *Collector) refreshSources(ctx context.Context) {
+	// Detach from the request. A viewer clicking to another view cancels their HTTP
+	// request, and with a shared cache that cancellation would otherwise kill a
+	// refresh every other viewer is waiting on, then be stored as though the cluster
+	// had failed. The refresh keeps its own deadline instead.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sourceTimeout)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	stale := func(at time.Time, empty bool) bool { return empty || c.now().Sub(at) >= c.ttl }
+
+	if c.nodes != nil && stale(c.nodesAt, c.nodeStats == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchNodes(ctx)
+		}()
+	}
+	if c.workloads != nil && stale(c.unmanagedAt, c.unmanaged == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchWorkloads(ctx)
+		}()
+	}
+	if c.pending != nil && stale(c.pendingAt, c.pendingPods == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchPending(ctx)
+		}()
+	}
+	wg.Wait()
+}
+
+func (c *Collector) fetchNodes(ctx context.Context) {
+	list, err := c.nodes.ListNodes(ctx)
+	if abandoned(err) {
+		return // keep whatever was cached; a cancelled read says nothing about the cluster
+	}
+	var stats NodeStats
+	if err != nil {
+		stats = nodeStatsError(err)
+	} else {
+		stats = BuildNodeStats(list, DiscoverAccelerators(list, c.opts.AcceleratorResources))
+	}
+	c.nodeStats = &stats
+	c.nodesAt = c.now()
+	c.nodeList = list
+}
+
+func (c *Collector) fetchWorkloads(ctx context.Context) {
+	list, err := c.workloads.ListWorkloads(ctx)
+	if abandoned(err) {
 		return
 	}
-	// A node list changes slowly, and a denied read is cached too so an operator who
-	// enabled the flag without the ClusterRole does not hammer the API server.
-	if c.nodeStats == nil || c.now().Sub(c.nodesAt) >= c.ttl {
-		list, err := c.nodes.ListNodes(ctx)
-		var stats NodeStats
-		if err != nil {
-			stats = nodeStatsError(err)
-		} else {
-			stats = BuildNodeStats(list, DiscoverAccelerators(list, c.opts.AcceleratorResources))
-		}
-		c.nodeStats = &stats
-		c.nodesAt = c.now()
-		c.nodeList = list
+	u := BuildUnmanaged(list, c.opts)
+	if err != nil {
+		u = unmanagedError(u, err)
+	}
+	c.unmanaged = &u
+	c.unmanagedAt = c.now()
+	c.workloadList = list
+}
+
+func (c *Collector) fetchPending(ctx context.Context) {
+	list, err := c.pending.ListFailedScheduling(ctx)
+	if abandoned(err) {
+		return
+	}
+	if err != nil {
+		list = &kube.EventList{}
+	}
+	c.pendingPods = list
+	c.pendingAt = c.now()
+}
+
+func (c *Collector) attachNodes(_ context.Context, snap *Snapshot) {
+	if c.nodes == nil {
+		return
 	}
 	snap.Nodes = c.nodeStats
 }
 
-// attachPending explains pods the scheduler refused. A failed read is swallowed: the
-// note is an extra, and losing it must not take the page down.
-func (c *Collector) attachPending(ctx context.Context, snap *Snapshot) {
+// attachPending explains pods the scheduler refused. A failed read is swallowed
+// upstream: the note is an extra, and losing it must not take the page down.
+func (c *Collector) attachPending(_ context.Context, snap *Snapshot) {
 	if c.pending == nil {
 		return
-	}
-	if c.pendingPods == nil || c.now().Sub(c.pendingAt) >= c.ttl {
-		list, err := c.pending.ListFailedScheduling(ctx)
-		if err != nil {
-			list = &kube.EventList{}
-		}
-		c.pendingPods = list
-		c.pendingAt = c.now()
 	}
 	FillPending(snap, c.pendingPods)
 }
 
-func (c *Collector) attachUnmanaged(ctx context.Context, snap *Snapshot) {
+func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	if c.workloads == nil {
 		return
 	}
-	// Same TTL and same reasoning as the nodes read: workloads outside GitOps change
-	// slowly, and a denied read is cached so the flag without the ClusterRole does not
-	// hammer the API server.
-	if c.unmanaged == nil || c.now().Sub(c.unmanagedAt) >= c.ttl {
-		list, err := c.workloads.ListWorkloads(ctx)
-		u := BuildUnmanaged(list, c.opts)
-		if err != nil {
-			// A partial read keeps the kinds that did succeed and notes the rest.
-			u = unmanagedError(u, err)
-		}
-		c.unmanaged = &u
-		c.unmanagedAt = c.now()
-		c.workloadList = list
-	}
 	snap.Unmanaged = c.unmanaged
-	// The same workload list also recovers app versions ArgoCD did not report, and
-	// tells us which services actually ask for a GPU.
+	// The same workload list recovers app versions ArgoCD did not report, says which
+	// services actually ask for a device, and which are pinned to one architecture.
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
