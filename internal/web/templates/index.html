@@ -128,6 +128,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-lead .cv { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .cap-lead .ck { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .cap-lead .cv { font-size: 1.05rem; }
+.cap-of .ck { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .cap-of { display: flex; gap: .9rem; align-items: baseline; color: var(--ink-2); font-size: .8rem; }
 .cap-of .cap-part { display: inline-flex; align-items: baseline; gap: .3rem; }
 .cap-of .is-gpu { color: var(--gpu-fg); }
@@ -375,11 +376,17 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- if .UnschedulableGPUNodes}}
         <span class="cap-split is-warn" title="These nodes have a device but advertise none, so no device plugin is running. Workloads still reach the hardware through the container runtime and can be serving traffic, but the scheduler cannot allocate or limit it: any number of pods can land on one card, and the card count is not discoverable.">{{if eq .UnschedulableGPUNodes .GPUNodes}}no device plugin{{else}}{{.UnschedulableGPUNodes}} without a device plugin{{end}}</span>
         {{- end}}</span>
-        {{- if $.Snapshot.Summary.Blocked}}
-        <span class="cap-part is-warn" title="Services the scheduler could not place. They are not broken; there is nowhere to run them right now.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} waiting for room
-          <span class="cap-split">{{if $.Snapshot.Summary.BlockedCPU}}{{$.Snapshot.Summary.BlockedCPU}} cpu or memory{{end}}{{if and $.Snapshot.Summary.BlockedCPU (or $.Snapshot.Summary.BlockedGPU $.Snapshot.Summary.BlockedPlacement)}}<i>·</i>{{end}}{{if $.Snapshot.Summary.BlockedGPU}}{{$.Snapshot.Summary.BlockedGPU}} {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.BlockedPlacement}}<i>·</i>{{end}}{{end}}{{if $.Snapshot.Summary.BlockedPlacement}}{{$.Snapshot.Summary.BlockedPlacement}} no node{{end}}</span></span>
-        {{- end}}
     </div>
+      {{- if $.Snapshot.Summary.Blocked}}
+      {{- /* Its own row, and labelled. This counts services while everything above
+             counts machines; run together on one line the numbers read as though they
+             belonged to the gpu figure beside them. */}}
+      <div class="cap-of">
+        <span class="ck">waiting for room</span>
+        <span class="cap-part is-warn" title="Services the scheduler could not place. They are not broken; there is nowhere to run them right now.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} service{{if ne $.Snapshot.Summary.Blocked 1}}s{{end}}
+          <span class="cap-split">{{if $.Snapshot.Summary.BlockedCPU}}{{$.Snapshot.Summary.BlockedCPU}} short of cpu or memory{{end}}{{if and $.Snapshot.Summary.BlockedCPU (or $.Snapshot.Summary.BlockedGPU $.Snapshot.Summary.BlockedPlacement)}}<i>·</i>{{end}}{{if $.Snapshot.Summary.BlockedGPU}}{{$.Snapshot.Summary.BlockedGPU}} short of {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.BlockedPlacement}}<i>·</i>{{end}}{{end}}{{if $.Snapshot.Summary.BlockedPlacement}}{{$.Snapshot.Summary.BlockedPlacement}} with no node to run on{{end}}</span></span>
+      </div>
+      {{- end}}
   </div>
   {{- end}}{{end}}
   {{- with $.Snapshot.Nodes}}{{if .Error}}

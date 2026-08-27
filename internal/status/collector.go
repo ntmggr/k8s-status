@@ -20,10 +20,10 @@ type NodeLister interface {
 	ListNodes(ctx context.Context) (*kube.NodeList, error)
 }
 
-// PendingLister reads the scheduler's placement failures. Optional, like the others:
+// PendingLister reads pods the scheduler has not placed. Optional, like the others:
 // without it the page simply does not say why anything is pending.
 type PendingLister interface {
-	ListFailedScheduling(ctx context.Context) (*kube.EventList, error)
+	ListPendingPods(ctx context.Context) (*kube.PodList, error)
 }
 
 // WorkloadLister is optional in the same way, for UNMANAGED. Listing workloads in
@@ -57,7 +57,7 @@ type Collector struct {
 	nodesAt   time.Time
 	nodeList  *kube.NodeList
 
-	pendingPods *kube.EventList
+	pendingPods *kube.PodList
 	pendingAt   time.Time
 
 	unmanaged    *Unmanaged
@@ -241,12 +241,12 @@ func (c *Collector) fetchWorkloads(ctx context.Context) {
 }
 
 func (c *Collector) fetchPending(ctx context.Context) {
-	list, err := c.pending.ListFailedScheduling(ctx)
+	list, err := c.pending.ListPendingPods(ctx)
 	if abandoned(err) {
 		return
 	}
 	if err != nil {
-		list = &kube.EventList{}
+		list = &kube.PodList{}
 	}
 	c.pendingPods = list
 	c.pendingAt = c.now()
