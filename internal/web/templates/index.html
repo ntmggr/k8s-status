@@ -337,7 +337,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 <div class="views">
   <span class="views-lab">views</span>
-  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="{{$.Snapshot.Summary.GPU}} services are backed by {{$.Snapshot.AcceleratorLabel}}: {{$.Snapshot.Summary.GPURunning}} holding devices now, {{$.Snapshot.Summary.GPUWaiting}} waiting for one, {{$.Snapshot.Summary.GPUStopped}} with no replicas.">{{icon "gpu"}}<b>{{$.Snapshot.Summary.GPURunning}} running</b>{{if $.Snapshot.Summary.GPUWaiting}} · {{$.Snapshot.Summary.GPUWaiting}} waiting{{end}}{{if $.Snapshot.Summary.GPUStopped}} · <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
+  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Counts services, not devices. {{$.Snapshot.Summary.GPU}} are backed by {{$.Snapshot.AcceleratorLabel}}: {{$.Snapshot.Summary.GPURunning}} holding one now, {{$.Snapshot.Summary.GPUWaiting}} waiting for one, {{$.Snapshot.Summary.GPUStopped}} with no replicas. The cluster line below counts the devices themselves.">{{icon "gpu"}}<b>{{$.Snapshot.Summary.GPURunning}} running on {{$.Snapshot.AcceleratorLabel}}</b>{{if $.Snapshot.Summary.GPUWaiting}} · {{$.Snapshot.Summary.GPUWaiting}} waiting{{end}}{{if $.Snapshot.Summary.GPUStopped}} · <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
     {{- range $.Snapshot.ArchCounts}}
     <a class="vchip{{if $.FilterActive "arch" .Arch}} is-on{{end}}" href="{{$.FilterHref "arch" .Arch}}" title="Services that can only run on {{.Arch}} nodes">{{.Count}} {{.Arch}} only</a>
     {{- end}}
@@ -362,7 +362,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
        rather than as five unrelated numbers sitting in a row. */}}
   <div class="cap-group">
-    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span></div>
+    <div class="cap-lead">{{icon "node"}}<span class="cv">{{.Total}}</span><span class="ck">nodes</span>{{if .NotReady}}<span class="cap-part is-warn" title="Not reporting Ready. A node the cloud provider has shut down stays in the list like this until something removes it, and it is not usable capacity.">{{icon "warn"}}{{.NotReady}} not ready</span>{{end}}</div>
     <div class="cap-of">
       <span class="cap-part">{{.CPUNodes}} cpu
         {{- if .Arch}}<span class="cap-split">{{range $i, $a := .Arch}}{{if $i}}<i>·</i>{{end}}{{$a.Count}} {{$a.Arch}}{{end}}</span>{{end}}</span>
@@ -370,11 +370,15 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- /* Without a device plugin the card count is not discoverable, so say that
                instead of printing a bare "0 cards" beside nodes that are busy. */}}
         {{- if .GPUs}}
-        <span class="cap-split" title="Total across those nodes, and how many a workload has been given. The gap is hardware nothing has claimed.{{if $.Snapshot.Summary.GPUUnmeasured}} A floor, not a total: {{$.Snapshot.Summary.GPUUnmeasured}} service{{if ne $.Snapshot.Summary.GPUUnmeasured 1}}s{{end}} reach a device through the runtime without requesting one, so their use cannot be counted.{{end}}{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}}<i>·</i>{{.GPUsAllocated}} allocated{{if $.Snapshot.Summary.GPUUnmeasured}}<i>·</i>{{$.Snapshot.Summary.GPUUnmeasured}} uncounted{{end}}</span>
+        <span class="cap-split" title="Counts devices, not services: how many the nodes have in total and how many the scheduler has handed to a workload. The gap is hardware nothing has claimed.{{if $.Snapshot.Summary.GPUUnmeasured}} A floor, not a total: {{$.Snapshot.Summary.GPUUnmeasured}} service{{if ne $.Snapshot.Summary.GPUUnmeasured 1}}s{{end}} reach a device through the runtime without requesting one, so their use cannot be counted.{{end}}{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}} total<i>·</i>{{.GPUsAllocated}} handed out</span>
         {{- end}}
         {{- if .UnschedulableGPUNodes}}
         <span class="cap-split is-warn" title="These nodes have a device but advertise none, so no device plugin is running. Workloads still reach the hardware through the container runtime and can be serving traffic, but the scheduler cannot allocate or limit it: any number of pods can land on one card, and the card count is not discoverable.">{{if eq .UnschedulableGPUNodes .GPUNodes}}no device plugin{{else}}{{.UnschedulableGPUNodes}} without a device plugin{{end}}</span>
         {{- end}}</span>
+        {{- if $.Snapshot.Summary.Blocked}}
+        <span class="cap-part is-warn" title="Services the scheduler could not place. They are not broken; there is nowhere to run them right now.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} waiting for room
+          <span class="cap-split">{{if $.Snapshot.Summary.BlockedCPU}}{{$.Snapshot.Summary.BlockedCPU}} cpu or memory{{end}}{{if and $.Snapshot.Summary.BlockedCPU (or $.Snapshot.Summary.BlockedGPU $.Snapshot.Summary.BlockedPlacement)}}<i>·</i>{{end}}{{if $.Snapshot.Summary.BlockedGPU}}{{$.Snapshot.Summary.BlockedGPU}} {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.BlockedPlacement}}<i>·</i>{{end}}{{end}}{{if $.Snapshot.Summary.BlockedPlacement}}{{$.Snapshot.Summary.BlockedPlacement}} no node{{end}}</span></span>
+        {{- end}}
     </div>
   </div>
   {{- end}}{{end}}
@@ -400,6 +404,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="arch is-arm64">arm64</span><span>Can only run on arm64 nodes, which on AWS are Graviton.</span></div>
     <div class="legend-row"><span class="arch is-amd64">amd64</span><span>Can only run on amd64 nodes. No badge means it can run on either.</span></div>
     <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} 2</span><span>Holding that many {{$.Snapshot.AcceleratorLabel}} devices right now.</span></div>
+    <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} ?</span><span>Holding one, but how many is unknown: it never requests a device, so the API cannot count it.</span></div>
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
@@ -461,8 +466,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- /* Three situations a single badge used to hide: holding devices, waiting for
            one, and parked at zero. Each gets its own colour and its own word. */}}
     <span class="gpu{{if $g.Waiting}} is-waiting{{else if $g.ScaledToZero}} is-stopped{{else}} is-running{{end}}"
-      title="{{if $g.Unmeasured}}Reaches a device through the runtime without requesting one, so how much it holds is not knowable from the API. {{else}}{{$g.PerReplica}} per replica, {{$g.Ready}} of {{$g.Desired}} replicas ready, {{$g.Allocated}} allocated. {{end}}{{if $g.Waiting}}Asked for {{$.Snapshot.AcceleratorLabel}} and has not got {{if eq $g.Desired 1}}it{{else}}them{{end}}.{{else if $g.ScaledToZero}}No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held. Whether that is a deliberate stop or an autoscaler at rest is not visible from the workload.{{else}}Running.{{end}}"
-      >{{$.Snapshot.AcceleratorBadge}}{{if $g.Waiting}} waiting{{else if $g.ScaledToZero}} 0 pods{{else if and (not $g.Unmeasured) $g.Allocated}} {{$g.Allocated}}{{end}}</span>{{end}}</td>
+      title="{{if $g.Unmeasured}}Holding a device, but how many is unknown: it reaches one through the runtime without ever requesting it, so the API cannot say. That is what the question mark means. {{else}}{{$g.PerReplica}} per replica, {{$g.Ready}} of {{$g.Desired}} replicas ready, {{$g.Allocated}} allocated. {{end}}{{if $g.Waiting}}Asked for {{$.Snapshot.AcceleratorLabel}} and has not got {{if eq $g.Desired 1}}it{{else}}them{{end}}.{{else if $g.ScaledToZero}}No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held. Whether that is a deliberate stop or an autoscaler at rest is not visible from the workload.{{else}}Running.{{end}}"
+      >{{$.Snapshot.AcceleratorBadge}}{{if $g.Waiting}} waiting{{else if $g.ScaledToZero}} 0 pods{{else if $g.Unmeasured}} ?{{else}} {{$g.Allocated}}{{end}}</span>{{end}}</td>
   {{if $multi}}<td class="hide-sm"><span class="src" title="{{if .Kind}}{{.Kind}}{{else}}ArgoCD Application{{end}}">{{.Source}}</span></td>{{end}}
   <td class="appver">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>
   <td class="chartver hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">

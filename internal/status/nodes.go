@@ -19,7 +19,11 @@ type ArchCount struct {
 // NodeStats describes the cluster's compute, not the health of any service.
 // Error is set when the nodes read failed; the rest of the page is unaffected.
 type NodeStats struct {
-	Total    int
+	Total int
+	// NotReady counts nodes the kubelet is not reporting as ready, including ones the
+	// cloud provider has shut down but not yet removed. They still appear in the node
+	// list, so leaving them out of the total would overstate nothing but hide them.
+	NotReady int
 	CPUNodes int
 	GPUNodes int
 	// GPUs counts allocatable devices only. Without a device plugin the number of
@@ -62,6 +66,9 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 	perRes := map[string][2]int{} // resource -> {nodes, devices}
 	for _, n := range list.Items {
 		stats.Total++
+		if !n.Ready() {
+			stats.NotReady++
+		}
 
 		// A node with a device is a GPU node whether or not the scheduler can hand it
 		// out. Counting only allocatable ones reports "0 gpu" on a cluster whose GPUs
