@@ -7,6 +7,7 @@
 [![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
 [![Docker Hub](https://img.shields.io/docker/image-size/ntmggr/k8s-status/latest?logo=docker&logoColor=white&label=image)](https://hub.docker.com/r/ntmggr/k8s-status)
 [![Docker Pulls](https://img.shields.io/docker/pulls/ntmggr/k8s-status?logo=docker&logoColor=white&label=pulls)](https://hub.docker.com/r/ntmggr/k8s-status)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/k8s-status)](https://artifacthub.io/packages/helm/k8s-status/k8s-status)
 [![OpenSSF Scorecard](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.scorecard.dev%2Fprojects%2Fgithub.com%2Fntmggr%2Fk8s-status&query=%24.score&label=openssf%20scorecard)](https://scorecard.dev/viewer/?uri=github.com/ntmggr/k8s-status)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14260/badge)](https://www.bestpractices.dev/projects/14260)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
