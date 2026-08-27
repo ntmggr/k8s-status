@@ -66,6 +66,138 @@
      }
     ]
    }
+  },
+  {
+   "metadata": {
+    "name": "search-api-7a8b9c0d1-rzz11",
+    "namespace": "search-api",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "search-api-7a8b9c0d1"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.11",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "search-api-7a8b9c0d1-rzz12",
+    "namespace": "search-api",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "search-api-7a8b9c0d1"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.12",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "media-encoder-8b9c0d1e2-mzz21",
+    "namespace": "media-encoder",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "media-encoder-8b9c0d1e2"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.13",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "media-encoder-8b9c0d1e2-mzz22",
+    "namespace": "media-encoder",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "media-encoder-8b9c0d1e2"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.16",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "media-encoder-8b9c0d1e2-mzz23",
+    "namespace": "media-encoder",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "media-encoder-8b9c0d1e2"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.20",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "admin-ui-9c0d1e2f3-azz31",
+    "namespace": "admin-ui",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "admin-ui-9c0d1e2f3"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.21",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
   }
  ]
 }

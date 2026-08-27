@@ -75,6 +75,10 @@ config:
   unmanaged: false
   # UNMANAGED_IGNORE_NS - comma-separated namespace globs excluded from that list.
   unmanagedIgnoreNamespaces: ""
+  # AZ_SPREAD - show how many availability zones each service's running pods actually
+  # sit in. Requires config.nodeStats and rbac.clusterRole; reads Running pods under the
+  # same pods grant as pendingReasons.
+  azSpread: false
   # PORT - container listen port.
   port: 8080
 

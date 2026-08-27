@@ -51,6 +51,10 @@ func main() {
 	pendingReasons := envBool("PENDING_REASONS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
+	// AZ_SPREAD needs the node list to resolve a pod's zone, which only NODE_STATS
+	// fetches. Without it there are no zone labels to join against, so it is left
+	// unwired below rather than rendering a section of all-dashes.
+	azSpread := envBool("AZ_SPREAD", false)
 	cacheTTL := time.Duration(envInt("CACHE_TTL_SECONDS", 15)) * time.Second
 	refresh := envInt("REFRESH_SECONDS", 30)
 	port := env("PORT", "8080")
@@ -112,6 +116,19 @@ func main() {
 		collector.WithUnmanaged(workloadLister)
 	}
 
+	if azSpread {
+		if !nodeStats {
+			log.Print("AZ_SPREAD is enabled but NODE_STATS is not: zone labels come from the node list, so the AZ-spread section is left disabled rather than rendering with no zones to join against")
+		} else {
+			runningLister, rerr := buildRunningLister()
+			if rerr != nil {
+				log.Printf("az spread enabled but the pods client is unavailable: %v", rerr)
+				runningLister = failingRunningLister{err: rerr}
+			}
+			collector.WithZones(runningLister)
+		}
+	}
+
 	srv, err := web.NewServer(web.Config{
 		LocalMode:      os.Getenv("KUBE_API_URL") != "",
 		EnvName:        envName,
@@ -127,8 +144,8 @@ func main() {
 		log.Fatalf("build server: %v", err)
 	}
 
-	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v",
-		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS)
+	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v azSpread=%t",
+		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS, azSpread)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + port,
@@ -227,6 +244,17 @@ func buildWorkloadLister() (status.WorkloadLister, error) {
 	return c, nil
 }
 
+// buildRunningLister is only called when AZ_SPREAD is on (and NODE_STATS is also on):
+// listing running pods cluster-wide is the same permission PENDING_REASONS already
+// needs, widened from Pending to Running pods.
+func buildRunningLister() (status.RunningLister, error) {
+	c, err := buildKubeClient()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 type failingLister struct{ err error }
 
 func (f failingLister) ListApplications(context.Context) (*argocd.ApplicationList, error) {
@@ -248,6 +276,12 @@ func (f failingNodeLister) ListNodes(context.Context) (*kube.NodeList, error) {
 type failingWorkloadLister struct{ err error }
 
 func (f failingWorkloadLister) ListWorkloads(context.Context) (*kube.WorkloadList, error) {
+	return nil, f.err
+}
+
+type failingRunningLister struct{ err error }
+
+func (f failingRunningLister) ListRunningPods(context.Context) (*kube.PodList, error) {
 	return nil, f.err
 }
 

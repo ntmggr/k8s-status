@@ -52,12 +52,13 @@ rules:
     resources: ["deployments", "statefulsets", "daemonsets"]
     verbs: ["get", "list"]
   {{- end }}
-  {{- if .Values.config.pendingReasons }}
+  {{- if or .Values.config.pendingReasons .Values.config.azSpread }}
   {{- /* The widest grant this chart makes, which is why it is opt-in. The scheduler's
          verdict lives on the pod, and it is current: an Event outlives the problem it
          describes by up to an hour and reported shortages that were already over. The
          read is filtered to Pending pods and the app decodes only metadata and status,
-         never a spec. */}}
+         never a spec. AZ_SPREAD widens the same read to Running pods, to join a pod's
+         hostIP against a node's zone; it still decodes no pod spec, only status.hostIP. */}}
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]

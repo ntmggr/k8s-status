@@ -221,6 +221,10 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
        font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
 .arch.is-arm64 { background: var(--prog-bg); color: var(--prog-fg); }
 .arch.is-amd64 { background: var(--drift-bg); color: var(--drift-fg); }
+.az { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
+       font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.az.is-single { background: var(--warn-bg); color: var(--warn-fg); }
+.az.is-multi  { background: var(--ok-bg);   color: var(--ok-fg); }
 .gpu.is-waiting { background: var(--warn-bg); color: var(--warn-fg); }
 .svc.is-dim td { color: var(--muted); }
 .svc.is-dim td.name a, .svc.is-dim td.name { color: var(--muted); }
@@ -379,6 +383,9 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
       {{- if .Zones}}<span class="cap-part">{{icon "zone"}}{{len .Zones}} zone{{if ne (len .Zones) 1}}s{{end}}
         <span class="cap-split">{{range $i, $z := .Zones}}{{if $i}}<i>·</i>{{end}}{{$z.Zone}} {{$z.Nodes}}{{end}}</span></span>
       {{- end}}
+      {{- if $.Snapshot.Summary.Zoned}}<span class="cap-part" title="Services with running pods placed into a known zone. A service in one zone loses all its replicas if that zone goes down.">{{$.Snapshot.Summary.MultiZone}} multi-zone
+        <span class="cap-split{{if $.Snapshot.Summary.SingleZone}} is-warn{{end}}">{{if $.Snapshot.Summary.SingleZone}}{{$.Snapshot.Summary.SingleZone}} single-zone{{end}}</span></span>
+      {{- end}}
     </div>
       {{- if $.Snapshot.Summary.Blocked}}
       {{- /* Its own row, and labelled. This counts services while everything above
@@ -398,6 +405,13 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- else}}node stats unavailable.{{end}} ({{.Error}})
   </div>
   {{- end}}{{end}}
+  {{- with $.Snapshot.ZoneRead}}
+  <div class="cap-note">
+    {{- if .Denied}}az spread needs a ClusterRole granting <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">pods</span>; the default install is namespaced-Role-only.
+    {{- else if .TooLarge}}az spread is disabled: this cluster has more running pods than one read can page through safely.
+    {{- else}}az spread unavailable.{{end}} ({{.Error}})
+  </div>
+  {{- end}}
 </section>
 {{end}}
 
@@ -418,6 +432,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
+    <div class="legend-row"><span class="az is-multi">az 2</span><span>Running pods sit in this many availability zones right now.</span></div>
+    <div class="legend-row"><span class="az is-single">az 1</span><span>All running pods sit in one zone: that zone going down takes the whole service with it.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 
@@ -471,6 +487,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
     {{- with .Blocked}}<span class="blocked is-{{.Kind}}" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
     {{- with .Arch}}<span class="arch is-{{.}}" title="Every node this service may run on is {{.}}{{if eq . "arm64"}}, which on AWS means Graviton{{end}}. Services free to run on either architecture carry no badge.">{{.}}</span>{{end}}
+    {{- if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for

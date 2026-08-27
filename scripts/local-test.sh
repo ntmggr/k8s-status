@@ -4,8 +4,8 @@
 #   ./scripts/local-test.sh cluster <context>   live, via kubectl proxy (kube context is required)
 #
 # Deployment-specific values are not baked in. Override ENV_NAME, ENV_TYPE, REGION,
-# CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED and
-# UNMANAGED_IGNORE_NS in the environment as needed.
+# CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED,
+# UNMANAGED_IGNORE_NS and AZ_SPREAD in the environment as needed.
 set -euo pipefail
 
 MODE="${1:-fixture}"
@@ -82,6 +82,7 @@ CLUSTER_NAME="${CLUSTER_NAME:-}" ROOT_APP_NAME="$ROOT_APP" \
 ARGOCD_UI_BASE="${ARGOCD_UI_BASE:-}" \
 IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-$NODE_STATS_DEFAULT}" \
 PENDING_REASONS="${PENDING_REASONS:-$UNMANAGED_DEFAULT}" UNMANAGED="${UNMANAGED:-$UNMANAGED_DEFAULT}" UNMANAGED_IGNORE_NS="${UNMANAGED_IGNORE_NS:-}" \
+AZ_SPREAD="${AZ_SPREAD:-$UNMANAGED_DEFAULT}" \
 PORT="$PORT" \
 /tmp/k8s-status-local &
 PIDS+=($!)

@@ -38,6 +38,13 @@ type FluxLister interface {
 	ListFlux(ctx context.Context) (*kube.FluxList, error)
 }
 
+// RunningLister reads running pods for the AZ-spread section. Optional, like the
+// others: only wired up when AZ_SPREAD is enabled, and only meaningful alongside a
+// node lister since zone labels come from the node list.
+type RunningLister interface {
+	ListRunningPods(ctx context.Context) (*kube.PodList, error)
+}
+
 // Collector caches one Snapshot for a TTL. The mutex is deliberately held across
 // the upstream fetch so a burst of concurrent callers collapses into one request.
 type Collector struct {
@@ -63,6 +70,11 @@ type Collector struct {
 	unmanaged    *Unmanaged
 	unmanagedAt  time.Time
 	workloadList *kube.WorkloadList
+
+	running     RunningLister
+	runningAt   time.Time
+	runningPods *kube.PodList
+	zoneRead    *ZoneError
 }
 
 func NewCollector(lister Lister, opts Options, ttl time.Duration) *Collector {
@@ -102,6 +114,17 @@ func (c *Collector) WithFlux(fl FluxLister) *Collector {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.flux = fl
+	return c
+}
+
+// WithZones enables the per-service AZ-spread section. Not called means the running
+// pods API is never queried and no Service ever gets a Zones answer. Only meaningful
+// alongside WithNodes: zone labels come from the node list, which is the caller's
+// responsibility to have wired up too.
+func (c *Collector) WithZones(rl RunningLister) *Collector {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.running = rl
 	return c
 }
 
@@ -155,6 +178,9 @@ func (c *Collector) decorate(ctx context.Context, snap Snapshot) *Snapshot {
 	c.attachNodes(ctx, &snap)
 	c.attachUnmanaged(ctx, &snap)
 	c.attachPending(ctx, &snap)
+	// After attachUnmanaged: FillOwnedFromLabels there populates svc.Owned, and
+	// attachZones needs it for the same owner-matching machinery attachPending uses.
+	c.attachZones(ctx, &snap)
 	return &snap
 }
 
@@ -207,6 +233,13 @@ func (c *Collector) refreshSources(ctx context.Context) {
 			c.fetchPending(ctx)
 		}()
 	}
+	if c.running != nil && stale(c.runningAt, c.runningPods == nil && c.zoneRead == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchRunning(ctx)
+		}()
+	}
 	wg.Wait()
 }
 
@@ -252,6 +285,27 @@ func (c *Collector) fetchPending(ctx context.Context) {
 	c.pendingAt = c.now()
 }
 
+// fetchRunning reads every running pod for the AZ-spread section. Unlike
+// fetchPending, a failed read here is kept and surfaced as ZoneRead rather than
+// swallowed: a denied or too-large read must produce a visible note, not a silently
+// empty section.
+func (c *Collector) fetchRunning(ctx context.Context) {
+	list, err := c.running.ListRunningPods(ctx)
+	if abandoned(err) {
+		return // keep whatever was cached; a cancelled read says nothing about the cluster
+	}
+	if err != nil {
+		c.runningPods = nil
+		zr := zoneReadError(err)
+		c.zoneRead = zr
+		c.runningAt = c.now()
+		return
+	}
+	c.runningPods = list
+	c.zoneRead = nil
+	c.runningAt = c.now()
+}
+
 func (c *Collector) attachNodes(_ context.Context, snap *Snapshot) {
 	if c.nodes == nil {
 		return
@@ -281,4 +335,15 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
+}
+
+// attachZones fills each service's AZ spread. Must run after attachUnmanaged:
+// FillOwnedFromLabels there populates svc.Owned, which the owner-matching this reuses
+// from FillPending depends on, the same ordering FillGPU and FillArch already rely on.
+func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
+	if c.running == nil {
+		return
+	}
+	snap.ZoneRead = c.zoneRead
+	FillZones(snap, c.runningPods, c.nodeList)
 }
