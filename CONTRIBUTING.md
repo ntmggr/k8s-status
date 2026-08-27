@@ -81,6 +81,13 @@ that reaches a device without requesting one, a cancelled request. Several of th
 written after a real bug and are commented with what went wrong, which is a good pattern
 to follow.
 
+## Review
+
+Pull requests are reviewed by a maintainer who did not write the change. Nobody approves
+their own work, including maintainers. See [GOVERNANCE.md](GOVERNANCE.md) for who that is.
+
+By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Signing off your commits
 
 Every commit needs a `Signed-off-by` line. It is the

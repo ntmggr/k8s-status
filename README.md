@@ -876,6 +876,8 @@ string and renders as no revision.
 
 Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
 for how to build it, what CI checks, and what an acceptable change looks like.
+Taking part means agreeing to the [Code of Conduct](CODE_OF_CONDUCT.md), and
+[GOVERNANCE.md](GOVERNANCE.md) says who maintains it.
 
 ## Verifying a release
 
