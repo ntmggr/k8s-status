@@ -99,12 +99,16 @@ type summaryJSON struct {
 	// replicas, so nothing is running and no device is held.
 	GPUWaiting int `json:"gpuWaiting"`
 	GPUStopped int `json:"gpuStopped"`
-	// Blocked counts services the scheduler could not place.
-	Blocked int `json:"blocked"`
+	// Blocked counts services the scheduler could not place, split by what ran out.
+	Blocked          int `json:"blocked"`
+	BlockedGPU       int `json:"blockedAccelerator"`
+	BlockedCPU       int `json:"blockedCpu"`
+	BlockedPlacement int `json:"blockedPlacement"`
 }
 
 type blockedJSON struct {
 	Reason        string   `json:"reason"`
+	Kind          string   `json:"kind"`
 	Resources     []string `json:"resources,omitempty"`
 	NoNodeMatched bool     `json:"noNodeMatched,omitempty"`
 	Pods          int      `json:"pods"`
@@ -276,19 +280,22 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		resp.LastDeployedAt = snap.LastDeployedAt
 		resp.LastDeployID = snap.LastDeployID
 		resp.Summary = summaryJSON{
-			Total:       snap.Summary.Total,
-			OK:          snap.Summary.OK,
-			Degraded:    snap.Summary.Degraded,
-			Warning:     snap.Summary.Warning,
-			Progressing: snap.Summary.Progressing,
-			Drift:       snap.Summary.Drift,
-			Prune:       snap.Summary.Prune,
-			Suspended:   snap.Summary.Suspended,
-			Hidden:      snap.Summary.Hidden,
-			GPU:         snap.Summary.GPU,
-			GPUWaiting:  snap.Summary.GPUWaiting,
-			GPUStopped:  snap.Summary.GPUStopped,
-			Blocked:     snap.Summary.Blocked,
+			Total:            snap.Summary.Total,
+			OK:               snap.Summary.OK,
+			Degraded:         snap.Summary.Degraded,
+			Warning:          snap.Summary.Warning,
+			Progressing:      snap.Summary.Progressing,
+			Drift:            snap.Summary.Drift,
+			Prune:            snap.Summary.Prune,
+			Suspended:        snap.Summary.Suspended,
+			Hidden:           snap.Summary.Hidden,
+			GPU:              snap.Summary.GPU,
+			GPUWaiting:       snap.Summary.GPUWaiting,
+			GPUStopped:       snap.Summary.GPUStopped,
+			Blocked:          snap.Summary.Blocked,
+			BlockedGPU:       snap.Summary.BlockedGPU,
+			BlockedCPU:       snap.Summary.BlockedCPU,
+			BlockedPlacement: snap.Summary.BlockedPlacement,
 		}
 		resp.Sources = sources(snap)
 		resp.Nodes = nodes(snap)
@@ -472,7 +479,7 @@ func blocked(svc status.Service) *blockedJSON {
 	}
 	b := svc.Blocked
 	return &blockedJSON{
-		Reason: b.Reason(), Resources: b.Resources,
+		Reason: b.Reason(), Kind: b.Kind(), Resources: b.Resources,
 		NoNodeMatched: b.NoNodeMatched, Pods: b.Pods,
 	}
 }
