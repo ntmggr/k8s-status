@@ -84,8 +84,12 @@ type GPUAllocation struct {
 // because it is mid-rollout, which still shows here and is worth seeing.
 func (g GPUAllocation) Waiting() bool { return g.Desired > 0 && g.Ready < g.Desired }
 
-// Idle reports a service parked at zero replicas. Its GPUs are free for others.
-func (g GPUAllocation) Idle() bool { return g.Desired == 0 }
+// ScaledToZero reports a service asking for no replicas. Deliberately not called
+// "idle": that word describes a device that is allocated and doing no work, which is a
+// utilisation fact this project cannot see. What is known here is only that nothing is
+// running, and whether that is a deliberate stop or an autoscaler at rest is not
+// visible from the workload alone.
+func (g GPUAllocation) ScaledToZero() bool { return g.Desired == 0 }
 
 // Unmeasured reports a service that reaches a device without requesting it, so the
 // API cannot say how much it holds.
@@ -112,6 +116,12 @@ type Service struct {
 	AppVersion string
 	Image      string
 	GPU        bool
+	// Blocked is set when the scheduler could not place this service's pods. Nil for
+	// everything else, which is almost every row.
+	Blocked *Blocked
+	// Arch is set only when every node this service may run on shares one CPU
+	// architecture. Empty means it can go either way, which is the common case.
+	Arch string
 	// GPUAlloc describes what this service asks of the accelerators and what it
 	// actually holds. Only meaningful when GPU is set.
 	GPUAlloc   GPUAllocation
@@ -136,13 +146,28 @@ type Summary struct {
 	Suspended   int
 	Hidden      int
 	GPU         int
-	// GPUWaiting asked for a device and has not got one; GPUIdle is parked at zero.
-	// Split out because a boolean GPU count hides both.
-	GPUWaiting int
-	GPUIdle    int
+	// GPURunning holds devices right now. GPUWaiting asked and has not got one.
+	// GPUStopped is asking for no replicas at all. Split out because a single GPU
+	// count hides all three, and the one worth leading with is what is running.
+	GPURunning int
+	// GPUUnmeasured reach a device through the runtime without requesting one, so they
+	// contribute nothing to the allocated total. Counted so the page can say that the
+	// total is a floor rather than letting it read as the whole story.
+	GPUUnmeasured int
+	GPUWaiting    int
+	GPUStopped    int
+	// Blocked counts services the scheduler could not place, split by what ran out:
+	// an accelerator, ordinary cpu or memory, or no matching node at all.
+	Blocked          int
+	BlockedGPU       int
+	BlockedCPU       int
+	BlockedPlacement int
 }
 
 type Snapshot struct {
+	// ArchCounts tallies services pinned to a single CPU architecture. Kept here
+	// rather than on Summary so Summary stays a comparable value.
+	ArchCounts []ArchCount
 	// Sources are the GitOps controllers this snapshot was read from, in the order
 	// SOURCES named them. The Source column is only rendered when there is more than
 	// one, so a single-source cluster keeps the uncluttered table.
@@ -287,14 +312,26 @@ func (s *Snapshot) addService(svc Service) {
 	}
 }
 
+// rank is a row's place in the worst-first order. It is the state's severity, except
+// that a service the scheduler cannot place never sorts below a warning: its pods are
+// not running and no state field says so. ArgoCD called one such service Healthy while
+// several of its pods could not be scheduled, and it sat far down the list.
+func rank(s Service) int {
+	r := severity[s.State]
+	if s.Blocked != nil && r > severity[StateWarning] {
+		return severity[StateWarning]
+	}
+	return r
+}
+
 // sortServices orders rows worst-first, then alphabetically. Source and namespace are
 // the last tiebreakers: two sources can each own a row of the same name, and the order
 // has to stay stable between refreshes.
 func sortServices(services []Service) {
 	sort.Slice(services, func(i, j int) bool {
 		a, b := services[i], services[j]
-		if severity[a.State] != severity[b.State] {
-			return severity[a.State] < severity[b.State]
+		if rank(a) != rank(b) {
+			return rank(a) < rank(b)
 		}
 		if a.Name != b.Name {
 			return a.Name < b.Name

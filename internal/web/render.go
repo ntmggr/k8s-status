@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -154,25 +155,45 @@ func setList(q url.Values, key string, values []string) {
 	}
 }
 
+// allFilters is every parameter that narrows the page. Clearing, the chip row and the
+// active check all read this one list. They each used to spell it out separately and
+// drifted apart: "services" stopped clearing an architecture because that filter was
+// added in one place and not the other two.
+var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView}
+
+// viewChips are the single-value chips in the views row. Exactly one can be active.
+var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked}
+
+func isViewChip(kind string) bool {
+	for _, k := range viewChips {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
 // FilterHref toggles one selection: clicking an active tile clears it, clicking an
 // inactive one adds it. Everything else in the query, refresh included, is preserved.
 func (d pageData) FilterHref(kind, value string) string {
 	q := d.query()
-	// "view" selects a different section; the row filters select rows within the
-	// services table. Combining them is meaningless, so choosing one clears the other
-	// rather than leaving a half-applied state the user cannot see.
-	if kind == filterGPU || kind == filterView {
+	// The chips in the views row answer different questions about the same table, and
+	// stacking them produced intersections nobody asked for: picking an architecture
+	// while "on gpu" was active quietly showed only GPU services of that architecture.
+	// They behave as one exclusive group, so a click always means "show me this".
+	if isViewChip(kind) {
 		if strings.EqualFold(q.Get(kind), value) {
-			q.Del(kind)
-		} else {
-			q.Set(kind, value)
-			if kind == filterView {
-				q.Del(filterGPU)
-				q.Del(filterStatus)
-				q.Del(filterSync)
-			} else {
-				q.Del(filterView)
-			}
+			q.Del(kind) // clicking the active chip clears it
+			return d.href(q)
+		}
+		for _, k := range viewChips {
+			q.Del(k)
+		}
+		q.Set(kind, value)
+		if kind == filterView {
+			// A different section entirely, so the row filters go too.
+			q.Del(filterStatus)
+			q.Del(filterSync)
 		}
 		return d.href(q)
 	}
@@ -194,8 +215,8 @@ func (d pageData) FilterActive(kind, value string) bool {
 
 func (d pageData) removeHref(kind, value string) string {
 	q := d.query()
-	if kind == filterGPU {
-		q.Del(filterGPU)
+	if isViewChip(kind) {
+		q.Del(kind)
 		return d.href(q)
 	}
 	setList(q, kind, removeFold(d.Filter.list(kind), value))
@@ -205,9 +226,9 @@ func (d pageData) removeHref(kind, value string) string {
 // ClearHref drops every filter but keeps the viewer's refresh choice.
 func (d pageData) ClearHref() string {
 	q := d.query()
-	q.Del(filterStatus)
-	q.Del(filterSync)
-	q.Del(filterGPU)
+	for _, k := range allFilters {
+		q.Del(k)
+	}
 	return d.href(q)
 }
 
@@ -224,6 +245,12 @@ func (d pageData) Chips() []Chip {
 	}
 	if d.Filter.GPU != "" {
 		add(filterGPU, d.Filter.GPU)
+	}
+	if d.Filter.Arch != "" {
+		add(filterArch, d.Filter.Arch)
+	}
+	if d.Filter.Blocked != "" {
+		add(filterBlocked, d.Filter.Blocked)
 	}
 	return out
 }
@@ -276,6 +303,12 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		// ROOT_APP_NAME and hiding it would hide the diagnosis.
 		data.ShowRootLine = snap.HasRoot || hasSource(snap.Sources, status.SourceArgoCD)
 		data.Services = data.Filter.Apply(snap.Services)
+		// Looking at the accelerator view is a question about what is using devices
+		// now, so the ones that are answer it first. The global order is worst-first,
+		// which would bury them under everything merely waiting or stopped.
+		if data.Filter.GPU != "" {
+			sortRunningFirst(data.Services)
+		}
 		data.Shown = len(data.Services)
 		data.AgeSeconds = s.ageSeconds(snap)
 		data.Stale = snap.Stale
@@ -371,4 +404,24 @@ func (d pageData) AnyFilter() bool { return d.Filter.Active() || d.Filter.View !
 // brand is the logo mark, inlined so the page stays one self-contained file.
 func brand() template.HTML {
 	return template.HTML(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="19" height="19" class="brand" role="img" aria-label="k8s-status"><title>k8s-status</title> <rect x="6" y="12" width="52" height="12" rx="6" fill="#e6f4ea"/> <rect x="6" y="28" width="46" height="12" rx="6" fill="#feefc3"/> <rect x="6" y="44" width="40" height="12" rx="6" fill="#fce8e6"/> <circle cx="16" cy="18" r="4" fill="#137333"/> <circle cx="16" cy="34" r="4" fill="#a15c00"/> <circle cx="16" cy="50" r="4" fill="#c5221f"/> </svg>`)
+}
+
+// sortRunningFirst orders accelerator rows by what they are doing: holding devices,
+// then waiting for one, then stopped. Ties keep the worst-first order underneath.
+func sortRunningFirst(services []status.Service) {
+	rank := func(s status.Service) int {
+		switch {
+		case !s.GPU:
+			return 3
+		case s.GPUAlloc.Waiting():
+			return 1
+		case s.GPUAlloc.ScaledToZero():
+			return 2
+		default:
+			return 0
+		}
+	}
+	sort.SliceStable(services, func(i, j int) bool {
+		return rank(services[i]) < rank(services[j])
+	})
 }

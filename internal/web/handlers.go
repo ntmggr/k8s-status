@@ -95,10 +95,26 @@ type summaryJSON struct {
 	Suspended   int `json:"suspended"`
 	Hidden      int `json:"hidden"`
 	GPU         int `json:"gpu"`
-	// GPUWaiting asked for a device and has not got one. GPUIdle is parked at zero,
-	// which is deliberate and leaves its devices free.
-	GPUWaiting int `json:"gpuWaiting"`
-	GPUIdle    int `json:"gpuIdle"`
+	// GPUWaiting asked for a device and has not got one. GPUStopped is asking for no
+	// replicas, so nothing is running and no device is held.
+	GPURunning int `json:"gpuRunning"`
+	// GPUUnmeasured contribute nothing to gpusAllocated, so that figure is a floor.
+	GPUUnmeasured int `json:"gpuUnmeasured"`
+	GPUWaiting    int `json:"gpuWaiting"`
+	GPUStopped    int `json:"gpuStopped"`
+	// Blocked counts services the scheduler could not place, split by what ran out.
+	Blocked          int `json:"blocked"`
+	BlockedGPU       int `json:"blockedAccelerator"`
+	BlockedCPU       int `json:"blockedCpu"`
+	BlockedPlacement int `json:"blockedPlacement"`
+}
+
+type blockedJSON struct {
+	Reason        string   `json:"reason"`
+	Kind          string   `json:"kind"`
+	Resources     []string `json:"resources,omitempty"`
+	NoNodeMatched bool     `json:"noNodeMatched,omitempty"`
+	Pods          int      `json:"pods"`
 }
 
 type gpuAllocJSON struct {
@@ -124,6 +140,10 @@ type serviceJSON struct {
 	RepoURL    string `json:"repoUrl,omitempty"`
 	AppVersion string `json:"appVersion,omitempty"`
 	GPU        bool   `json:"gpu,omitempty"`
+	// Blocked is present only when the scheduler refused to place this service.
+	Blocked *blockedJSON `json:"blocked,omitempty"`
+	// Arch is set only when the service can run on one CPU architecture.
+	Arch string `json:"arch,omitempty"`
 	// GPUAlloc is present only on GPU rows: what one replica asks for, how many
 	// replicas are up, and how many devices that adds up to.
 	GPUAlloc   *gpuAllocJSON   `json:"gpuAllocation,omitempty"`
@@ -263,18 +283,24 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		resp.LastDeployedAt = snap.LastDeployedAt
 		resp.LastDeployID = snap.LastDeployID
 		resp.Summary = summaryJSON{
-			Total:       snap.Summary.Total,
-			OK:          snap.Summary.OK,
-			Degraded:    snap.Summary.Degraded,
-			Warning:     snap.Summary.Warning,
-			Progressing: snap.Summary.Progressing,
-			Drift:       snap.Summary.Drift,
-			Prune:       snap.Summary.Prune,
-			Suspended:   snap.Summary.Suspended,
-			Hidden:      snap.Summary.Hidden,
-			GPU:         snap.Summary.GPU,
-			GPUWaiting:  snap.Summary.GPUWaiting,
-			GPUIdle:     snap.Summary.GPUIdle,
+			Total:            snap.Summary.Total,
+			OK:               snap.Summary.OK,
+			Degraded:         snap.Summary.Degraded,
+			Warning:          snap.Summary.Warning,
+			Progressing:      snap.Summary.Progressing,
+			Drift:            snap.Summary.Drift,
+			Prune:            snap.Summary.Prune,
+			Suspended:        snap.Summary.Suspended,
+			Hidden:           snap.Summary.Hidden,
+			GPU:              snap.Summary.GPU,
+			GPURunning:       snap.Summary.GPURunning,
+			GPUUnmeasured:    snap.Summary.GPUUnmeasured,
+			GPUWaiting:       snap.Summary.GPUWaiting,
+			GPUStopped:       snap.Summary.GPUStopped,
+			Blocked:          snap.Summary.Blocked,
+			BlockedGPU:       snap.Summary.BlockedGPU,
+			BlockedCPU:       snap.Summary.BlockedCPU,
+			BlockedPlacement: snap.Summary.BlockedPlacement,
 		}
 		resp.Sources = sources(snap)
 		resp.Nodes = nodes(snap)
@@ -302,6 +328,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 				AppVersion: svc.AppVersion,
 				GPU:        svc.GPU,
 				GPUAlloc:   gpuAlloc(svc),
+				Blocked:    blocked(svc),
+				Arch:       svc.Arch,
 				Image:      svc.Image,
 				State:      string(svc.State),
 				Sync:       svc.Sync,
@@ -439,12 +467,24 @@ func gpuAlloc(svc status.Service) *gpuAllocJSON {
 	switch {
 	case g.Waiting():
 		state = "waiting"
-	case g.Idle():
-		state = "idle"
+	case g.ScaledToZero():
+		state = "scaled-to-zero"
 	}
 	return &gpuAllocJSON{
 		PerReplica: g.PerReplica, Desired: g.Desired,
 		Ready: g.Ready, Allocated: g.Allocated, State: state,
 		Measured: !g.Unmeasured(),
+	}
+}
+
+// blocked renders the scheduling failure, and only for rows that have one.
+func blocked(svc status.Service) *blockedJSON {
+	if svc.Blocked == nil {
+		return nil
+	}
+	b := svc.Blocked
+	return &blockedJSON{
+		Reason: b.Reason(), Kind: b.Kind(), Resources: b.Resources,
+		NoNodeMatched: b.NoNodeMatched, Pods: b.Pods,
 	}
 }

@@ -68,6 +68,9 @@ config:
   refreshSeconds: 30
   # NODE_STATS - render the cluster capacity section. Requires rbac.clusterRole.
   nodeStats: false
+  # PENDING_REASONS - explain why a service's pods cannot be scheduled, and grey the
+  # row. Reads Events, not pods. Requires rbac.clusterRole.
+  pendingReasons: false
   # UNMANAGED - list workloads that ArgoCD does not manage. Requires rbac.clusterRole.
   unmanaged: false
   # UNMANAGED_IGNORE_NS - comma-separated namespace globs excluded from that list.

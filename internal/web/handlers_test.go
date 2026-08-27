@@ -620,7 +620,9 @@ func TestPageNamesNonNvidiaAccelerators(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	for _, want := range []string{"1 mig", "7 devices", "on mig", "nvidia.com/mig-1g.5gb 7"} {
+	// The chip leads with the running count rather than the label, so the accelerator
+	// name is asserted where it still belongs: the capacity line and its tooltip.
+	for _, want := range []string{"1 mig", "7 devices", "nvidia.com/mig-1g.5gb 7"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q for a MIG cluster", want)
 		}
