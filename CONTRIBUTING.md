@@ -50,6 +50,16 @@ and should say so in the pull request.
 **No installation-specific names.** This runs on other people's clusters. Examples in
 code, tests and docs use generic names rather than services from any particular estate.
 
+## What CI does and does not run
+
+The image build is skipped when a change touches no code. Documentation, charts and
+manifests cannot alter the image, so building it would only burn a couple of minutes per
+pull request. It is skipped rather than filtered out at the workflow level, because a
+required check that never runs leaves a pull request waiting forever.
+
+Releases work the same way. A `docs:`, `ci:` or `chore:` commit produces no version bump,
+so merging documentation does not publish anything.
+
 ## Commits and releases
 
 Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/),
