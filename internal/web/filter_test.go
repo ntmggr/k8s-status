@@ -266,3 +266,44 @@ func TestViewWinsOverRowFiltersInAHandWrittenURL(t *testing.T) {
 		t.Error("with only a view set, no row filter should report active")
 	}
 }
+
+// Clicking the services tile means "show me everything". It cleared only the filters
+// that existed when it was written, so selecting an architecture and then clicking it
+// left the page still narrowed.
+func TestClearHrefDropsEveryFilter(t *testing.T) {
+	for _, q := range []string{
+		"status=DEGRADED", "sync=OutOfSync", "gpu=true",
+		"arch=amd64", "blocked=cpu", "view=unmanaged",
+		"arch=arm64&status=OK&blocked=placement",
+	} {
+		u, err := url.Parse("/k8s-status/?" + q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d := pageData{BasePath: "/k8s-status", Filter: ParseFilter(u.Query())}
+		got := d.ClearHref()
+		cleared, err := url.Parse(got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f := ParseFilter(cleared.Query()); f.Active() || f.View != "" {
+			t.Errorf("ClearHref on %q gave %q, which is still filtered", q, got)
+		}
+	}
+}
+
+// Every active filter has to appear as a removable chip, or it cannot be undone
+// without editing the URL.
+func TestChipsCoverEveryFilter(t *testing.T) {
+	u, _ := url.Parse("/k8s-status/?gpu=true&arch=amd64&blocked=cpu&status=OK")
+	d := pageData{BasePath: "/k8s-status", Filter: ParseFilter(u.Query())}
+	// gpu and arch and blocked are one exclusive group in the UI, but ParseFilter
+	// accepts them together, so all four should be listed.
+	if n := len(d.Chips()); n != 4 {
+		labels := []string{}
+		for _, c := range d.Chips() {
+			labels = append(labels, c.Label)
+		}
+		t.Fatalf("got %d chips %v, want one per active filter", n, labels)
+	}
+}

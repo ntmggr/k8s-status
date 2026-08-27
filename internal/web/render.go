@@ -155,6 +155,12 @@ func setList(q url.Values, key string, values []string) {
 	}
 }
 
+// allFilters is every parameter that narrows the page. Clearing, the chip row and the
+// active check all read this one list. They each used to spell it out separately and
+// drifted apart: "services" stopped clearing an architecture because that filter was
+// added in one place and not the other two.
+var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView}
+
 // viewChips are the single-value chips in the views row. Exactly one can be active.
 var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked}
 
@@ -220,9 +226,9 @@ func (d pageData) removeHref(kind, value string) string {
 // ClearHref drops every filter but keeps the viewer's refresh choice.
 func (d pageData) ClearHref() string {
 	q := d.query()
-	q.Del(filterStatus)
-	q.Del(filterSync)
-	q.Del(filterGPU)
+	for _, k := range allFilters {
+		q.Del(k)
+	}
 	return d.href(q)
 }
 
@@ -239,6 +245,12 @@ func (d pageData) Chips() []Chip {
 	}
 	if d.Filter.GPU != "" {
 		add(filterGPU, d.Filter.GPU)
+	}
+	if d.Filter.Arch != "" {
+		add(filterArch, d.Filter.Arch)
+	}
+	if d.Filter.Blocked != "" {
+		add(filterBlocked, d.Filter.Blocked)
 	}
 	return out
 }
