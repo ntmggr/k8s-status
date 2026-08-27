@@ -95,7 +95,10 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 		}
 		snap.Summary.GPU++
 		allocated += svc.GPUAlloc.Allocated
-		if svc.GPUAlloc.Unmeasured() {
+		// Only a running one is actually using a device we cannot count. A service
+		// with no replicas consumes nothing, and counting those read as though most
+		// of the cluster's usage were invisible.
+		if svc.GPUAlloc.Unmeasured() && !svc.GPUAlloc.ScaledToZero() && !svc.GPUAlloc.Waiting() {
 			unmeasured++
 		}
 		switch {

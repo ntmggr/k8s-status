@@ -164,6 +164,16 @@ func TestSummaryCountsUnmeasuredServices(t *testing.T) {
 	if snap.Summary.GPUUnmeasured != 1 {
 		t.Errorf("GPUUnmeasured=%d, want 1", snap.Summary.GPUUnmeasured)
 	}
+	// A service with no replicas uses nothing, so it is not an uncounted user even
+	// though its usage would be unmeasurable if it ran.
+	snap2 := &Snapshot{}
+	snap2.addService(svcWith("parked", "ml", "parked"))
+	FillGPU(snap2, &kube.WorkloadList{Items: []kube.Workload{
+		affinityTo(replicaWorkload("Deployment", "ml", "parked", 0, 0, 0), "k", "v"),
+	}}, nodes, []string{kube.ResourceGPU})
+	if snap2.Summary.GPUUnmeasured != 0 {
+		t.Errorf("a parked service counted as uncounted usage: %d", snap2.Summary.GPUUnmeasured)
+	}
 	if snap.Nodes != nil {
 		t.Fatal("guard: this test does not attach node stats")
 	}

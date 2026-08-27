@@ -293,6 +293,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 			Suspended:        snap.Summary.Suspended,
 			Hidden:           snap.Summary.Hidden,
 			GPU:              snap.Summary.GPU,
+			GPURunning:       snap.Summary.GPURunning,
+			GPUUnmeasured:    snap.Summary.GPUUnmeasured,
 			GPUWaiting:       snap.Summary.GPUWaiting,
 			GPUStopped:       snap.Summary.GPUStopped,
 			Blocked:          snap.Summary.Blocked,
