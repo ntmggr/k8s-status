@@ -29,7 +29,7 @@ type Blocked struct {
 	NoNodeMatched bool
 	// Selector names what the workload insists on when nothing matched, taken from its
 	// required node affinity. "No matching node" is true but not actionable; "no
-	// pytriton-gpu/blue node" says which group is empty.
+	// gpu-pool/blue node" says which group is empty.
 	Selector string
 	// Pods is how many of the service's pods are stuck this way.
 	Pods int
@@ -80,8 +80,8 @@ func (b Blocked) Reason() string {
 // unschedulable pod had an event under two minutes old.
 //
 // Events name a pod, not a workload, so it is matched back by name prefix within its
-// namespace, longest match first: "tts-engine" does not claim a pod belonging to
-// "tts-engine-daphne".
+// namespace, longest match first: "api" does not claim a pod belonging to
+// "api-canary".
 func FillPending(snap *Snapshot, events *kube.EventList, workloads *kube.WorkloadList) {
 	if snap == nil {
 		return
@@ -174,7 +174,7 @@ func FillPending(snap *Snapshot, events *kube.EventList, workloads *kube.Workloa
 }
 
 // prefixOwner resolves which service a pod belongs to by name, longest match first, so
-// "tts-engine" does not claim a pod that belongs to "tts-engine-daphne".
+// "api" does not claim a pod that belongs to "api-canary".
 func prefixOwner(owners []owner, podName string) int {
 	best, bestIdx := "", -1
 	for _, o := range owners {

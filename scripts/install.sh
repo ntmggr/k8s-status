@@ -24,8 +24,8 @@ RELEASE="k8s-status"
 
 if [[ -z "$CONTEXT" || -z "$IMAGE" ]]; then
   echo "usage: $0 [--helm|--manifest] <kube-context> <image> [env-name]" >&2
-  echo "   eg: $0 k8s-dev registry.example.com/k8s-status:0.1.0" >&2
-  echo "   eg: $0 --helm k8s-dev registry.example.com/k8s-status:0.1.0 dev" >&2
+  echo "   eg: $0 my-cluster registry.example.com/k8s-status:0.1.0" >&2
+  echo "   eg: $0 --helm my-cluster registry.example.com/k8s-status:0.1.0 dev" >&2
   exit 2
 fi
 

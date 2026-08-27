@@ -151,9 +151,8 @@ func Sanitize(s string) string {
 }
 
 // FromCache appends resourceVersion=0, which asks the API server to answer from its
-// watch cache instead of doing a quorum read from etcd. On a cluster with 146 ArgoCD
-// Applications that halved the read, 1.70s to 0.85s, because these lists are large:
-// the Applications alone are 13 MB.
+// watch cache instead of doing a quorum read from etcd. These lists run to megabytes
+// on a busy cluster, and skipping the quorum read roughly halved the time they took.
 //
 // The trade is that the answer can lag the very latest write by a moment. That costs
 // nothing here: the result is cached for the refresh interval anyway, and the page

@@ -315,7 +315,7 @@ func (s *Snapshot) addService(svc Service) {
 // rank is a row's place in the worst-first order. It is the state's severity, except
 // that a service the scheduler cannot place never sorts below a warning: its pods are
 // not running and no state field says so. ArgoCD called one such service Healthy while
-// six of its pods could not be scheduled, and it sat at row 57 of 146.
+// several of its pods could not be scheduled, and it sat far down the list.
 func rank(s Service) int {
 	r := severity[s.State]
 	if s.Blocked != nil && r > severity[StateWarning] {

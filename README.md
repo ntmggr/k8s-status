@@ -529,7 +529,7 @@ secrets. An Event carries an object reference, a reason and a message, and nothi
 worth protecting.
 
 Events name a pod, so it is matched back to a workload by name prefix within its
-namespace, longest match first. `tts-engine` and `tts-engine-daphne` both prefix a daphne
+namespace, longest match first. `api` and `api-canary` both prefix a daphne
 pod and only the longer one owns it.
 
 Every GPU row also carries what it asks for and what it holds: devices per replica,
@@ -544,7 +544,7 @@ things a boolean marker hides, which is the point of it:
 
 A badge with no number is a service that reaches a device through the runtime without
 requesting one, so the count is not knowable. The three states are coloured apart rather
-than left to a tooltip, because on a real cluster 14 of 19 GPU services had no pods and
+than left to a tooltip, because on a real cluster most GPU services had no pods and
 one was stuck, and a single badge said the same thing about all of them.
 
 The zero-replica case is deliberately not called "idle". Idle describes a device that is
@@ -578,7 +578,7 @@ allocatable still count as GPU nodes, and the page says `no device plugin` inste
 printing a card count it cannot know. Services pinned to them are marked as GPU-backed,
 because the runtime does hand them the device.
 
-This matters more than it sounds. A production cluster running 38 GPU nodes that serve
+This matters more than it sounds. A production cluster running dozens of GPU nodes that serve
 live traffic reported `0 gpu, 0 cards` under the earlier rule, because it counted only
 what the scheduler could allocate. The card count genuinely is not discoverable without
 a plugin, but the nodes are unmistakably there.

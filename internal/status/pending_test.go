@@ -23,7 +23,7 @@ func TestFillPendingResourcePressure(t *testing.T) {
 	snap.addService(blockedSvc("airflow", "airflow", "airflow-worker"))
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
 		schedEvent("airflow", "airflow-worker-866b459595-pgk7",
-			"0/84 nodes are available: 1 Insufficient memory, 6 Insufficient cpu, 75 node(s) didn't match Pod's node affinity/selector."),
+			"0/12 nodes are available: 1 Insufficient memory, 6 Insufficient cpu, 5 node(s) didn't match Pod's node affinity/selector."),
 	}}, nil)
 
 	b := snap.Services[0].Blocked
@@ -45,10 +45,10 @@ func TestFillPendingResourcePressure(t *testing.T) {
 // simply excluded. It is still blocked, and the reason has to say something useful.
 func TestFillPendingNoMatchingNode(t *testing.T) {
 	snap := &Snapshot{}
-	snap.addService(blockedSvc("tts", "tts-engine", "lily-tts-pytriton"))
+	snap.addService(blockedSvc("tts", "api", "inference"))
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
-		schedEvent("tts-engine", "lily-tts-pytriton-7669bf497f-nr6t6",
-			"0/86 nodes are available: 4 node(s) had untolerated taint(s), 82 node(s) didn't match Pod's node affinity/selector."),
+		schedEvent("api", "inference-7d9f4c8b6-x2k4p",
+			"0/12 nodes are available: 2 node(s) had untolerated taint(s), 10 node(s) didn't match Pod's node affinity/selector."),
 	}}, nil)
 
 	b := snap.Services[0].Blocked
@@ -60,14 +60,14 @@ func TestFillPendingNoMatchingNode(t *testing.T) {
 	}
 }
 
-// "tts-engine" and "tts-engine-daphne" both prefix a daphne pod. Only the longer one
+// "api" and "api-canary" both prefix a daphne pod. Only the longer one
 // owns it, otherwise a stuck pod greys out the wrong row.
 func TestFillPendingLongestPrefixWins(t *testing.T) {
 	snap := &Snapshot{}
-	snap.addService(blockedSvc("short", "tts", "tts-engine"))
-	snap.addService(blockedSvc("long", "tts", "tts-engine-daphne"))
+	snap.addService(blockedSvc("short", "tts", "api"))
+	snap.addService(blockedSvc("long", "tts", "api-canary"))
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
-		schedEvent("tts", "tts-engine-daphne-6db5fc7c74-2cw52", "0/10 nodes are available: 10 Insufficient cpu."),
+		schedEvent("tts", "api-canary-6b8d7f9c5-mn3qz", "0/10 nodes are available: 10 Insufficient cpu."),
 	}}, nil)
 
 	// Look rows up by name: marking a row blocked re-orders the list.
@@ -122,7 +122,7 @@ func TestFillPendingNoEventsIsNoop(t *testing.T) {
 }
 
 // A blocked service must not sit below healthy rows. ArgoCD reported one as Healthy
-// while six of its pods could not be scheduled, and it sorted to row 57 of 146.
+// while several of its pods could not be scheduled, and it sorted far down the list.
 func TestBlockedRowsSortAboveHealthyOnes(t *testing.T) {
 	snap := &Snapshot{}
 	for _, n := range []string{"aaa-ok", "bbb-ok", "zzz-blocked"} {
@@ -211,29 +211,29 @@ func TestBlockedKindPrefersAccelerator(t *testing.T) {
 // nodegroup, saying which one turns it into something a reader can act on.
 func TestBlockedNamesTheEmptyNodegroup(t *testing.T) {
 	snap := &Snapshot{}
-	snap.addService(blockedSvc("lily", "pytriton-server", "lily-tts-pytriton"))
+	snap.addService(blockedSvc("lily", "inference-ns", "inference"))
 
 	w := kube.Workload{Kind: "Deployment"}
-	w.Metadata.Namespace, w.Metadata.Name = "pytriton-server", "lily-tts-pytriton"
+	w.Metadata.Namespace, w.Metadata.Name = "inference-ns", "inference"
 	w.Spec.Template.Spec.Affinity = &kube.Affinity{NodeAffinity: &kube.NodeAffinity{
 		Required: &kube.NodeSelectorSpec{NodeSelectorTerms: []kube.NodeSelectorTerm{{
 			MatchExpressions: []kube.NodeSelectorRequirement{
-				{Key: "NodeGroupType", Operator: "In", Values: []string{"pytriton-gpu"}},
+				{Key: "NodeGroupType", Operator: "In", Values: []string{"gpu-pool"}},
 				{Key: "color", Operator: "In", Values: []string{"blue"}},
 			},
 		}}},
 	}}
 
 	FillPending(snap, &kube.EventList{Items: []kube.Event{
-		schedEvent("pytriton-server", "lily-tts-pytriton-7669bf497f-nr6t6",
-			"0/86 nodes are available: 4 node(s) had untolerated taint(s), 82 node(s) didn't match Pod's node affinity/selector."),
+		schedEvent("inference-ns", "inference-7d9f4c8b6-x2k4p",
+			"0/12 nodes are available: 2 node(s) had untolerated taint(s), 10 node(s) didn't match Pod's node affinity/selector."),
 	}}, &kube.WorkloadList{Items: []kube.Workload{w}})
 
 	b := snap.Services[0].Blocked
 	if b == nil {
 		t.Fatal("service should be blocked")
 	}
-	if got := b.Reason(); got != "no blue/pytriton-gpu node" {
+	if got := b.Reason(); got != "no blue/gpu-pool node" {
 		t.Fatalf("Reason=%q, want the nodegroup named", got)
 	}
 }
