@@ -180,7 +180,10 @@ type nodesJSON struct {
 	// plugin is advertising, so the scheduler cannot allocate it.
 	UnschedulableGPUNodes int            `json:"unschedulableGpuNodes,omitempty"`
 	Arch                  map[string]int `json:"arch,omitempty"`
-	Error                 string         `json:"error,omitempty"`
+	// Zones breaks node count down by availability zone, so a consumer can see the
+	// spread without reaching for the cloud provider's own inventory.
+	Zones map[string]int `json:"zones,omitempty"`
+	Error string         `json:"error,omitempty"`
 }
 
 // unmanagedJSON is omitted entirely when UNMANAGED is off. These are workloads running
@@ -394,6 +397,12 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 		out.Arch = make(map[string]int, len(n.Arch))
 		for _, a := range n.Arch {
 			out.Arch[a.Arch] = a.Count
+		}
+	}
+	if len(n.Zones) > 0 {
+		out.Zones = make(map[string]int, len(n.Zones))
+		for _, z := range n.Zones {
+			out.Zones[z.Zone] = z.Nodes
 		}
 	}
 	return out

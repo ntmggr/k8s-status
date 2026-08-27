@@ -376,6 +376,9 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- if .UnschedulableGPUNodes}}
         <span class="cap-split is-warn" title="These nodes have a device but advertise none, so no device plugin is running. Workloads still reach the hardware through the container runtime and can be serving traffic, but the scheduler cannot allocate or limit it: any number of pods can land on one card, and the card count is not discoverable.">{{if eq .UnschedulableGPUNodes .GPUNodes}}no device plugin{{else}}{{.UnschedulableGPUNodes}} without a device plugin{{end}}</span>
         {{- end}}</span>
+      {{- if .Zones}}<span class="cap-part">{{icon "zone"}}{{len .Zones}} zone{{if ne (len .Zones) 1}}s{{end}}
+        <span class="cap-split">{{range $i, $z := .Zones}}{{if $i}}<i>·</i>{{end}}{{$z.Zone}} {{$z.Nodes}}{{end}}</span></span>
+      {{- end}}
     </div>
       {{- if $.Snapshot.Summary.Blocked}}
       {{- /* Its own row, and labelled. This counts services while everything above

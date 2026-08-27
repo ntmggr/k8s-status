@@ -388,6 +388,8 @@ func icon(name string) template.HTML {
 		body = `<rect x="2" y="5.5" width="9" height="6" rx="1"/><path d="M5 3.5h9a1 1 0 0 1 1 1v6"/>`
 	case "arch": // two blocks, for the architecture split
 		body = `<rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/>`
+	case "zone": // globe outline, for the availability zone split
+		body = `<circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2.2 2 2.2 10 0 12M8 2c-2.2 2-2.2 10 0 12"/>`
 	case "warn": // triangle with a bang
 		body = `<path d="M8 2.2 1.6 13.2h12.8L8 2.2Z"/><path d="M8 6.4v3.1M8 11.4h.01"/>`
 	case "unmanaged": // broken link: running, but outside gitops
