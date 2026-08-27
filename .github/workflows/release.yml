@@ -103,7 +103,7 @@ jobs:
       # artifacts to attach: the cross-platform archives and checksums.txt.
       # softprops/action-gh-release previously did this and has been removed.
       #
-      # The image is built and pushed above, not here — .goreleaser.yaml configures
+      # The image is built and pushed above, not here, .goreleaser.yaml configures
       # no `dockers:` block on purpose. IMAGE_REPO is passed through so the release
       # notes name the image this same run pushed.
       #
