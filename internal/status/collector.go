@@ -275,6 +275,9 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	snap.Unmanaged = c.unmanaged
 	// The same workload list recovers app versions ArgoCD did not report, says which
 	// services actually ask for a device, and which are pinned to one architecture.
+	// ArgoCD does not always say what an Application owns. Recover that first, or
+	// everything below silently skips those services.
+	FillOwnedFromLabels(snap, c.workloadList)
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
