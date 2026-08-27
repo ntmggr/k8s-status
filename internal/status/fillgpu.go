@@ -61,6 +61,11 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 
 	for i := range snap.Services {
 		svc := &snap.Services[i]
+		// Reset before summing. A cached snapshot is decorated again on the stale
+		// path, and its Services share a backing array with the cached copy, so a
+		// bare += would keep adding to yesterday's totals: a workload asking for one
+		// device reported two.
+		svc.GPUAlloc = GPUAllocation{}
 		// A service can own more than one workload, so the totals are summed rather
 		// than taken from the first match.
 		for _, r := range svc.Owned {

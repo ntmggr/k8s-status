@@ -53,9 +53,11 @@ rules:
     verbs: ["get", "list"]
   {{- end }}
   {{- if .Values.config.pendingReasons }}
-  {{- /* Events, not pods. Answering "why is this pending" needs the scheduler's own
-         words, and a pod carries its whole spec including environment values that are
-         routinely secrets. An Event carries a reference, a reason and a message. */}}
+  {{- /* Events, not pods. A pod would give the scheduler's verdict directly, and would
+         also mean read access to every pod spec in the cluster, where environment
+         values live. An Event carries a reference, a reason and a message. The usual
+         objection, the one-hour TTL, does not bite: the scheduler refreshes the event
+         on every retry, so a pod that is genuinely stuck keeps a current one. */}}
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list"]

@@ -292,14 +292,26 @@ func (s *Snapshot) addService(svc Service) {
 	}
 }
 
+// rank is a row's place in the worst-first order. It is the state's severity, except
+// that a service the scheduler cannot place never sorts below a warning: its pods are
+// not running and no state field says so. ArgoCD called one such service Healthy while
+// six of its pods could not be scheduled, and it sat at row 57 of 146.
+func rank(s Service) int {
+	r := severity[s.State]
+	if s.Blocked != nil && r > severity[StateWarning] {
+		return severity[StateWarning]
+	}
+	return r
+}
+
 // sortServices orders rows worst-first, then alphabetically. Source and namespace are
 // the last tiebreakers: two sources can each own a row of the same name, and the order
 // has to stay stable between refreshes.
 func sortServices(services []Service) {
 	sort.Slice(services, func(i, j int) bool {
 		a, b := services[i], services[j]
-		if severity[a.State] != severity[b.State] {
-			return severity[a.State] < severity[b.State]
+		if rank(a) != rank(b) {
+			return rank(a) < rank(b)
 		}
 		if a.Name != b.Name {
 			return a.Name < b.Name

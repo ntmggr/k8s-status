@@ -45,9 +45,10 @@ func main() {
 	// Empty discovers accelerators from node capacity; set it only to override that.
 	acceleratorRes := splitGlobs(env("ACCELERATOR_RESOURCES", ""))
 	nodeStats := envBool("NODE_STATS", false)
-	// PENDING_REASONS reads scheduling failures so a stuck row can say why. Needs
-	// get/list on events, which carry an object reference and a message and nothing
-	// sensitive, unlike a pod spec.
+	// PENDING_REASONS explains why a stuck row cannot be scheduled. Needs get/list on
+	// events, which carry an object reference, a reason and a message. Reading pods
+	// would be more direct and would also grant read over every pod spec in the
+	// cluster, where environment values live.
 	pendingReasons := envBool("PENDING_REASONS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
@@ -95,11 +96,11 @@ func main() {
 	}
 
 	if pendingReasons {
-		eventLister, eerr := buildEventLister()
-		if eerr != nil {
-			log.Printf("pending reasons enabled but the events client is unavailable: %v", eerr)
+		pendingLister, perr := buildPendingLister()
+		if perr != nil {
+			log.Printf("pending reasons enabled but the events client is unavailable: %v", perr)
 		} else {
-			collector.WithEvents(eventLister)
+			collector.WithPending(pendingLister)
 		}
 	}
 
@@ -197,9 +198,9 @@ func buildNodeLister() (status.NodeLister, error) {
 	return c, nil
 }
 
-// buildEventLister is only called when PENDING_REASONS is on: events are read across
-// all namespaces, so this is a cluster-wide read.
-func buildEventLister() (status.EventLister, error) {
+// buildPendingLister is only called when PENDING_REASONS is on. Events are read across
+// all namespaces, filtered server-side to scheduling failures.
+func buildPendingLister() (status.PendingLister, error) {
 	c, err := buildKubeClient()
 	if err != nil {
 		return nil, err

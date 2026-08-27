@@ -70,10 +70,15 @@ func TestFillPendingLongestPrefixWins(t *testing.T) {
 		schedEvent("tts", "tts-engine-daphne-6db5fc7c74-2cw52", "0/10 nodes are available: 10 Insufficient cpu."),
 	}})
 
-	if snap.Services[0].Blocked != nil {
+	// Look rows up by name: marking a row blocked re-orders the list.
+	byName := map[string]*Service{}
+	for i := range snap.Services {
+		byName[snap.Services[i].Name] = &snap.Services[i]
+	}
+	if byName["short"].Blocked != nil {
 		t.Error("the shorter-named service must not be blamed")
 	}
-	if snap.Services[1].Blocked == nil {
+	if byName["long"].Blocked == nil {
 		t.Fatal("the owning service should be blocked")
 	}
 }
@@ -113,5 +118,44 @@ func TestFillPendingNoEventsIsNoop(t *testing.T) {
 	FillPending(snap, &kube.EventList{})
 	if snap.Services[0].Blocked != nil || snap.Summary.Blocked != 0 {
 		t.Fatal("no events must mean no claims")
+	}
+}
+
+// A blocked service must not sit below healthy rows. ArgoCD reported one as Healthy
+// while six of its pods could not be scheduled, and it sorted to row 57 of 146.
+func TestBlockedRowsSortAboveHealthyOnes(t *testing.T) {
+	snap := &Snapshot{}
+	for _, n := range []string{"aaa-ok", "bbb-ok", "zzz-blocked"} {
+		svc := blockedSvc(n, "ml", n)
+		svc.State = StateOK
+		snap.addService(svc)
+	}
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("ml", "zzz-blocked-1-a", "0/5 nodes are available: 5 Insufficient cpu."),
+	}})
+
+	if snap.Services[0].Name != "zzz-blocked" {
+		t.Fatalf("first row is %q, want the blocked one despite its name sorting last",
+			snap.Services[0].Name)
+	}
+}
+
+// A genuinely broken service still outranks a blocked one: DEGRADED means it is running
+// and failing, which is worse than not having started.
+func TestDegradedStillOutranksBlocked(t *testing.T) {
+	snap := &Snapshot{}
+	deg := blockedSvc("aaa-degraded", "ml", "aaa-degraded")
+	deg.State = StateDegraded
+	snap.addService(deg)
+	ok := blockedSvc("zzz-blocked", "ml", "zzz-blocked")
+	ok.State = StateOK
+	snap.addService(ok)
+
+	FillPending(snap, &kube.EventList{Items: []kube.Event{
+		schedEvent("ml", "zzz-blocked-1-a", "0/5 nodes are available: 5 Insufficient cpu."),
+	}})
+
+	if snap.Services[0].Name != "aaa-degraded" {
+		t.Fatalf("first row is %q, want the degraded one", snap.Services[0].Name)
 	}
 }

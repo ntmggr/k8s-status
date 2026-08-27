@@ -19,9 +19,9 @@ type NodeLister interface {
 	ListNodes(ctx context.Context) (*kube.NodeList, error)
 }
 
-// EventLister reads scheduling failures. Optional, like the others: without it the page
-// simply does not say why anything is pending.
-type EventLister interface {
+// PendingLister reads the scheduler's placement failures. Optional, like the others:
+// without it the page simply does not say why anything is pending.
+type PendingLister interface {
 	ListFailedScheduling(ctx context.Context) (*kube.EventList, error)
 }
 
@@ -48,7 +48,7 @@ type Collector struct {
 	mu        sync.Mutex
 	snap      *Snapshot
 	nodes     NodeLister
-	events    EventLister
+	pending   PendingLister
 	workloads WorkloadLister
 	flux      FluxLister
 
@@ -56,8 +56,8 @@ type Collector struct {
 	nodesAt   time.Time
 	nodeList  *kube.NodeList
 
-	events2  *kube.EventList
-	eventsAt time.Time
+	pendingPods *kube.EventList
+	pendingAt   time.Time
 
 	unmanaged    *Unmanaged
 	unmanagedAt  time.Time
@@ -86,12 +86,12 @@ func (c *Collector) WithUnmanaged(wl WorkloadLister) *Collector {
 	return c
 }
 
-// WithEvents enables the "why is this pending" note. Not called means the events API is
+// WithPending enables the "why is this pending" note. Not called means the pods API is
 // never queried and no row is ever marked blocked.
-func (c *Collector) WithEvents(el EventLister) *Collector {
+func (c *Collector) WithPending(pl PendingLister) *Collector {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.events = el
+	c.pending = pl
 	return c
 }
 
@@ -176,18 +176,18 @@ func (c *Collector) attachNodes(ctx context.Context, snap *Snapshot) {
 // attachPending explains pods the scheduler refused. A failed read is swallowed: the
 // note is an extra, and losing it must not take the page down.
 func (c *Collector) attachPending(ctx context.Context, snap *Snapshot) {
-	if c.events == nil {
+	if c.pending == nil {
 		return
 	}
-	if c.events2 == nil || c.now().Sub(c.eventsAt) >= c.ttl {
-		list, err := c.events.ListFailedScheduling(ctx)
+	if c.pendingPods == nil || c.now().Sub(c.pendingAt) >= c.ttl {
+		list, err := c.pending.ListFailedScheduling(ctx)
 		if err != nil {
 			list = &kube.EventList{}
 		}
-		c.events2 = list
-		c.eventsAt = c.now()
+		c.pendingPods = list
+		c.pendingAt = c.now()
 	}
-	FillPending(snap, c.events2)
+	FillPending(snap, c.pendingPods)
 }
 
 func (c *Collector) attachUnmanaged(ctx context.Context, snap *Snapshot) {
