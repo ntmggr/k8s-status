@@ -154,25 +154,39 @@ func setList(q url.Values, key string, values []string) {
 	}
 }
 
+// viewChips are the single-value chips in the views row. Exactly one can be active.
+var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked}
+
+func isViewChip(kind string) bool {
+	for _, k := range viewChips {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
 // FilterHref toggles one selection: clicking an active tile clears it, clicking an
 // inactive one adds it. Everything else in the query, refresh included, is preserved.
 func (d pageData) FilterHref(kind, value string) string {
 	q := d.query()
-	// "view" selects a different section; the row filters select rows within the
-	// services table. Combining them is meaningless, so choosing one clears the other
-	// rather than leaving a half-applied state the user cannot see.
-	if kind == filterGPU || kind == filterView {
+	// The chips in the views row answer different questions about the same table, and
+	// stacking them produced intersections nobody asked for: picking an architecture
+	// while "on gpu" was active quietly showed only GPU services of that architecture.
+	// They behave as one exclusive group, so a click always means "show me this".
+	if isViewChip(kind) {
 		if strings.EqualFold(q.Get(kind), value) {
-			q.Del(kind)
-		} else {
-			q.Set(kind, value)
-			if kind == filterView {
-				q.Del(filterGPU)
-				q.Del(filterStatus)
-				q.Del(filterSync)
-			} else {
-				q.Del(filterView)
-			}
+			q.Del(kind) // clicking the active chip clears it
+			return d.href(q)
+		}
+		for _, k := range viewChips {
+			q.Del(k)
+		}
+		q.Set(kind, value)
+		if kind == filterView {
+			// A different section entirely, so the row filters go too.
+			q.Del(filterStatus)
+			q.Del(filterSync)
 		}
 		return d.href(q)
 	}
@@ -194,8 +208,8 @@ func (d pageData) FilterActive(kind, value string) bool {
 
 func (d pageData) removeHref(kind, value string) string {
 	q := d.query()
-	if kind == filterGPU {
-		q.Del(filterGPU)
+	if isViewChip(kind) {
+		q.Del(kind)
 		return d.href(q)
 	}
 	setList(q, kind, removeFold(d.Filter.list(kind), value))

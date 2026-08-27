@@ -98,3 +98,41 @@ func TestFillArchCountsAndIsIdempotent(t *testing.T) {
 		t.Fatalf("ArchCounts=%+v, want one arm64 entry counting 2", snap.ArchCounts)
 	}
 }
+
+// Architecture is a CPU fact. Every GPU node in a fleet tends to be x86, so badging a
+// GPU service "amd64" says nothing about it and reads as if it described the device.
+func TestFillArchSkipsAcceleratorBackedServices(t *testing.T) {
+	nodes := &kube.NodeList{Items: []kube.Node{
+		archNode("x1", "amd64", map[string]string{"pool": "gpu"}),
+		archNode("g1", "arm64", map[string]string{"pool": "cpu"}),
+	}}
+	snap := &Snapshot{}
+	gpu := archSvc("inference", "ml", "inference")
+	gpu.GPU = true
+	snap.addService(gpu)
+	snap.addService(archSvc("plain", "ml", "plain"))
+
+	mk := func(n, pool string) kube.Workload {
+		w := kube.Workload{Kind: "Deployment"}
+		w.Metadata.Namespace, w.Metadata.Name = "ml", n
+		return affinityTo(w, "pool", pool)
+	}
+	FillArch(snap, &kube.WorkloadList{Items: []kube.Workload{mk("inference", "gpu"), mk("plain", "cpu")}}, nodes)
+
+	byName := map[string]string{}
+	for _, s := range snap.Services {
+		byName[s.Name] = s.Arch
+	}
+	if byName["inference"] != "" {
+		t.Errorf("a GPU service must carry no arch badge, got %q", byName["inference"])
+	}
+	if byName["plain"] != "arm64" {
+		t.Errorf("a non-GPU service should still be badged, got %q", byName["plain"])
+	}
+	// The chip counts follow the badges, so a GPU service must not inflate them.
+	for _, a := range snap.ArchCounts {
+		if a.Arch == "amd64" {
+			t.Errorf("amd64 counted %d, but only the GPU service was amd64", a.Count)
+		}
+	}
+}

@@ -9,9 +9,11 @@ import (
 // FillArch records which CPU architecture each service can run on, worked out from the
 // nodes its workloads are allowed to land on rather than from an image or a name.
 //
-// Only a service pinned to one architecture gets a badge. Most workloads are free to go
-// either way, and labelling those would be noise: what is worth seeing is the service
-// that can only ever run on one kind of machine.
+// Only a service pinned to one architecture gets a badge, and only if it is not already
+// marked as accelerator-backed. Architecture is a CPU fact: every GPU node in a fleet
+// tends to be x86, so badging a GPU service "amd64" says nothing about the service and
+// invites reading it as something to do with the device. Most workloads are free to run
+// on either architecture anyway, and labelling those would be noise.
 //
 // Reuses the node list and workload list already fetched, so it costs no extra request
 // and no extra permission.
@@ -44,6 +46,9 @@ func FillArch(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList) {
 	for i := range snap.Services {
 		svc := &snap.Services[i]
 		svc.Arch = "" // idempotent: the collector may decorate a cached snapshot twice
+		if svc.GPU {
+			continue
+		}
 		seen := map[string]bool{}
 		for _, r := range svc.Owned {
 			switch r.Kind {
