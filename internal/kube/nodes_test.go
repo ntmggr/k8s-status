@@ -83,6 +83,52 @@ func TestListNodesMalformedJSON(t *testing.T) {
 	}
 }
 
+func TestNodeZonePrefersGALabel(t *testing.T) {
+	n := Node{Metadata: NodeMetadata{Labels: map[string]string{
+		LabelZone:       "eu-west-1a",
+		LabelZoneLegacy: "eu-west-1b",
+	}}}
+	if z := n.Zone(); z != "eu-west-1a" {
+		t.Errorf("zone = %q, want eu-west-1a", z)
+	}
+}
+
+func TestNodeZoneFallsBackToLegacyLabel(t *testing.T) {
+	n := Node{Metadata: NodeMetadata{Labels: map[string]string{
+		LabelZoneLegacy: "eu-west-1b",
+	}}}
+	if z := n.Zone(); z != "eu-west-1b" {
+		t.Errorf("zone = %q, want eu-west-1b", z)
+	}
+}
+
+func TestNodeZoneEmptyWhenNeitherLabelSet(t *testing.T) {
+	n := Node{Metadata: NodeMetadata{Labels: map[string]string{"pool": "general"}}}
+	if z := n.Zone(); z != "" {
+		t.Errorf("zone = %q, want empty", z)
+	}
+}
+
+func TestNodeInternalIPsDualStack(t *testing.T) {
+	n := Node{Status: NodeStatus{Addresses: []NodeAddress{
+		{Type: "InternalIP", Address: "10.0.1.11"},
+		{Type: "InternalIP", Address: "fd00::11"},
+		{Type: "ExternalIP", Address: "203.0.113.1"},
+	}}}
+	got := n.InternalIPs()
+	want := []string{"10.0.1.11", "fd00::11"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("internal ips = %v, want %v", got, want)
+	}
+}
+
+func TestNodeInternalIPsNoneSet(t *testing.T) {
+	n := Node{Status: NodeStatus{Addresses: []NodeAddress{{Type: "ExternalIP", Address: "203.0.113.1"}}}}
+	if got := n.InternalIPs(); got != nil {
+		t.Errorf("internal ips = %v, want nil", got)
+	}
+}
+
 func TestNewRequiresClusterEnv(t *testing.T) {
 	t.Setenv("KUBERNETES_SERVICE_HOST", "")
 	if _, err := New(); err == nil {

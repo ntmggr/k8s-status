@@ -12,6 +12,11 @@ const nodesPath = "/api/v1/nodes"
 // nodegroup label because it is standard and portable across clusters.
 const ResourceGPU = "nvidia.com/gpu"
 
+// LabelZone is the GA topology label. LabelZoneLegacy is checked as a fallback for
+// pre-1.17 clusters that have not been relabelled.
+const LabelZone = "topology.kubernetes.io/zone"
+const LabelZoneLegacy = "failure-domain.beta.kubernetes.io/zone" // pre-1.17 clusters
+
 type NodeList struct {
 	Items []Node `json:"items"`
 }
@@ -33,6 +38,13 @@ type NodeCondition struct {
 	Status string `json:"status"`
 }
 
+// NodeAddress is one entry of status.addresses. Only Type and Address are decoded;
+// the rest of the object carries nothing this page renders.
+type NodeAddress struct {
+	Type    string `json:"type"`
+	Address string `json:"address"`
+}
+
 type NodeStatus struct {
 	// Conditions carry readiness. A node the cloud provider has shut down lingers in
 	// the list as NotReady, and counting it as capacity overstates what the cluster has.
@@ -42,6 +54,9 @@ type NodeStatus struct {
 	// slices, AMD, Intel, AWS Neuron and TPUs all use different resource names.
 	Capacity map[string]Quantity `json:"capacity"`
 	NodeInfo NodeInfo            `json:"nodeInfo"`
+	// Addresses carries the node's InternalIP, used elsewhere to join running pods
+	// to the node they landed on via status.hostIP.
+	Addresses []NodeAddress `json:"addresses"`
 }
 
 type NodeInfo struct {
@@ -89,4 +104,26 @@ func (n Node) Ready() bool {
 		}
 	}
 	return false
+}
+
+// Zone reports the node's availability zone, checking the GA label first and
+// falling back to the pre-1.17 label. "" means neither is set.
+func (n Node) Zone() string {
+	if z := n.Metadata.Labels[LabelZone]; z != "" {
+		return z
+	}
+	return n.Metadata.Labels[LabelZoneLegacy]
+}
+
+// InternalIPs returns every address the node advertises as InternalIP. Dual-stack
+// nodes carry more than one; ExternalIP and Hostname entries are not addresses a
+// pod's hostIP will ever match.
+func (n Node) InternalIPs() []string {
+	var ips []string
+	for _, a := range n.Status.Addresses {
+		if a.Type == "InternalIP" {
+			ips = append(ips, a.Address)
+		}
+	}
+	return ips
 }

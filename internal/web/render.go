@@ -95,6 +95,9 @@ type pageData struct {
 	// omitted rather than rendered as a row of blanks.
 	ShowRootLine bool
 	Services     []status.Service
+	// Unmanaged is Snapshot.Unmanaged.Items narrowed by the spread filter, the same
+	// relationship Services has to Snapshot.Services -- see Filter.ApplyWorkloads.
+	Unmanaged    []status.Workload
 	Filter       Filter
 	Query        url.Values
 	Shown        int
@@ -159,10 +162,10 @@ func setList(q url.Values, key string, values []string) {
 // active check all read this one list. They each used to spell it out separately and
 // drifted apart: "services" stopped clearing an architecture because that filter was
 // added in one place and not the other two.
-var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView}
+var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView, filterSpread}
 
 // viewChips are the single-value chips in the views row. Exactly one can be active.
-var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked}
+var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked, filterSpread}
 
 func isViewChip(kind string) bool {
 	for _, k := range viewChips {
@@ -355,6 +358,9 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		// ROOT_APP_NAME and hiding it would hide the diagnosis.
 		data.ShowRootLine = snap.HasRoot || hasSource(snap.Sources, status.SourceArgoCD)
 		data.Services = data.Filter.Apply(snap.Services)
+		if snap.Unmanaged != nil {
+			data.Unmanaged = data.Filter.ApplyWorkloads(snap.Unmanaged.Items)
+		}
 		// Looking at the accelerator view is a question about what is using devices
 		// now, so the ones that are answer it first. The global order is worst-first,
 		// which would bury them under everything merely waiting or stopped.
@@ -440,6 +446,8 @@ func icon(name string) template.HTML {
 		body = `<rect x="2" y="5.5" width="9" height="6" rx="1"/><path d="M5 3.5h9a1 1 0 0 1 1 1v6"/>`
 	case "arch": // two blocks, for the architecture split
 		body = `<rect x="2" y="3" width="5" height="10" rx="1"/><rect x="9" y="3" width="5" height="10" rx="1"/>`
+	case "zone": // globe outline, for the availability zone split
+		body = `<circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2.2 2 2.2 10 0 12M8 2c-2.2 2-2.2 10 0 12"/>`
 	case "warn": // triangle with a bang
 		body = `<path d="M8 2.2 1.6 13.2h12.8L8 2.2Z"/><path d="M8 6.4v3.1M8 11.4h.01"/>`
 	case "unmanaged": // broken link: running, but outside gitops

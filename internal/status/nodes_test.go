@@ -69,6 +69,29 @@ func TestBuildNodeStatsArchTally(t *testing.T) {
 	}
 }
 
+func TestBuildNodeStatsZoneTally(t *testing.T) {
+	got := buildStats(decodeNodes(t, `{"items":[
+	 {"metadata":{"name":"a","labels":{"topology.kubernetes.io/zone":"eu-west-1a"}},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
+	 {"metadata":{"name":"b","labels":{"topology.kubernetes.io/zone":"eu-west-1a"}},"status":{"conditions":[{"type":"Ready","status":"False"}]}},
+	 {"metadata":{"name":"c","labels":{"failure-domain.beta.kubernetes.io/zone":"eu-west-1b"}},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
+	 {"metadata":{"name":"d"},"status":{"conditions":[{"type":"Ready","status":"True"}]}}
+	]}`))
+
+	want := []ZoneCount{
+		{Zone: "eu-west-1a", Nodes: 2, Ready: 1},
+		{Zone: "eu-west-1b", Nodes: 1, Ready: 1},
+		{Zone: zoneUnknown, Nodes: 1, Ready: 1},
+	}
+	if len(got.Zones) != len(want) {
+		t.Fatalf("zones = %+v, want %+v", got.Zones, want)
+	}
+	for i := range want {
+		if got.Zones[i] != want[i] {
+			t.Errorf("zones[%d] = %+v, want %+v", i, got.Zones[i], want[i])
+		}
+	}
+}
+
 func TestBuildNodeStatsAcceptsBareNumberQuantity(t *testing.T) {
 	got := buildStats(decodeNodes(t,
 		`{"items":[{"metadata":{"name":"g"},"status":{"capacity":{"nvidia.com/gpu":2},"nodeInfo":{"architecture":"amd64"}}}]}`))

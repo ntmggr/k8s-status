@@ -107,12 +107,14 @@ type summaryJSON struct {
 	BlockedGPU       int `json:"blockedAccelerator"`
 	BlockedCPU       int `json:"blockedCpu"`
 	BlockedPlacement int `json:"blockedPlacement"`
-	// Health is nested rather than a flat int. TestEveryNumericSummaryFieldIsMapped
-	// fills every Summary int with a distinct non-zero seed, which can drive the
+	// Health, HA and NodeHA are all nested rather than flat ints: TestEveryNumericSummaryFieldIsMapped
+	// fills every Summary int with a distinct non-zero seed, which can drive a
 	// percent formula's denominator negative and clamp Percent to 0 — a correctly
 	// wired field that the test would then flag as "serialised as 0". A JSON object
 	// unmarshals to map[string]any, not float64, so that reflection walk skips it.
 	Health healthJSON `json:"health"`
+	HA     haJSON     `json:"ha"`
+	NodeHA haJSON     `json:"nodeHa"`
 }
 
 type healthJSON struct {
@@ -122,6 +124,14 @@ type healthJSON struct {
 	OK        int  `json:"ok"`
 	Excluded  int  `json:"excluded"`
 	Attention int  `json:"attention"`
+}
+
+type haJSON struct {
+	Percent   int  `json:"percent"`
+	Known     bool `json:"known"`
+	Eligible  int  `json:"eligible"`
+	Compliant int  `json:"compliant"`
+	AtRisk    int  `json:"atRisk"`
 }
 
 type blockedJSON struct {
@@ -195,7 +205,10 @@ type nodesJSON struct {
 	// plugin is advertising, so the scheduler cannot allocate it.
 	UnschedulableGPUNodes int            `json:"unschedulableGpuNodes,omitempty"`
 	Arch                  map[string]int `json:"arch,omitempty"`
-	Error                 string         `json:"error,omitempty"`
+	// Zones breaks node count down by availability zone, so a consumer can see the
+	// spread without reaching for the cloud provider's own inventory.
+	Zones map[string]int `json:"zones,omitempty"`
+	Error string         `json:"error,omitempty"`
 }
 
 // unmanagedJSON is omitted entirely when UNMANAGED is off. These are workloads running
@@ -411,6 +424,12 @@ func nodes(snap *status.Snapshot) *nodesJSON {
 			out.Arch[a.Arch] = a.Count
 		}
 	}
+	if len(n.Zones) > 0 {
+		out.Zones = make(map[string]int, len(n.Zones))
+		for _, z := range n.Zones {
+			out.Zones[z.Zone] = z.Nodes
+		}
+	}
 	return out
 }
 
@@ -491,6 +510,8 @@ func blocked(svc status.Service) *blockedJSON {
 // so a test can check that every one of them is actually assigned.
 func summaryOf(snap *status.Snapshot) summaryJSON {
 	h := snap.Summary.Health()
+	ha := snap.HA()
+	nodeHA := snap.NodeHA()
 	return summaryJSON{
 		Total:            snap.Summary.Total,
 		OK:               snap.Summary.OK,
@@ -517,6 +538,20 @@ func summaryOf(snap *status.Snapshot) summaryJSON {
 			OK:        h.OK,
 			Excluded:  h.Excluded,
 			Attention: h.Attention,
+		},
+		HA: haJSON{
+			Percent:   ha.Percent,
+			Known:     ha.Known,
+			Eligible:  ha.Eligible,
+			Compliant: ha.Compliant,
+			AtRisk:    ha.AtRisk,
+		},
+		NodeHA: haJSON{
+			Percent:   nodeHA.Percent,
+			Known:     nodeHA.Known,
+			Eligible:  nodeHA.Eligible,
+			Compliant: nodeHA.Compliant,
+			AtRisk:    nodeHA.AtRisk,
 		},
 	}
 }

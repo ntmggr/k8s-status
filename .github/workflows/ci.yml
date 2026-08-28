@@ -12,6 +12,10 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
+    needs: changes
+    # Skipped rather than filtered out, so the required check still reports; see the
+    # changes job's own comment for why that distinction matters.
+    if: needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -51,6 +55,8 @@ jobs:
 
   helm:
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.charts == 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
@@ -70,11 +76,14 @@ jobs:
 
   # Deciding this in its own job keeps the required checks reporting. A job skipped by
   # an `if` still reports a conclusion, whereas a workflow filtered out by `paths` never
-  # runs at all and leaves a required check pending forever.
+  # runs at all and leaves a required check pending forever. go, helm and image are all
+  # required checks, so all three are gated this way rather than with `paths:` on the
+  # workflow trigger -- a README-only PR still needs each of them to report something.
   changes:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      charts: ${{ steps.filter.outputs.charts }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -85,17 +94,26 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${BASE:-}" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            echo "code=true" >> "$GITHUB_OUTPUT"   # cannot tell, so build
+            echo "code=true" >> "$GITHUB_OUTPUT"     # cannot tell, so run everything
+            echo "charts=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           changed="$(git diff --name-only "$BASE" HEAD)"
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
-          # Anything that can alter the image. Docs, charts and manifests cannot.
+          # Anything that can alter compiled behavior or the built image. Docs, charts
+          # and manifests cannot.
           if echo "$changed" | grep -qE '^(cmd/|internal/|go\.(mod|sum)$|Dockerfile$|\.github/workflows/ci\.yml$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "no code changed, the image build will be skipped"
+            echo "no code changed, go and the image build will be skipped"
+          fi
+          # Anything that can alter the chart's rendered output.
+          if echo "$changed" | grep -qE '^(charts/|\.github/workflows/ci\.yml$)'; then
+            echo "charts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "charts=false" >> "$GITHUB_OUTPUT"
+            echo "no chart changed, helm lint/template will be skipped"
           fi
 
   image:

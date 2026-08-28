@@ -6,7 +6,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1a"
     }
    },
    "status": {
@@ -29,6 +30,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.11"
      }
     ]
    }
@@ -39,7 +46,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1a"
     }
    },
    "status": {
@@ -62,6 +70,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.12"
      }
     ]
    }
@@ -72,7 +86,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1a"
     }
    },
    "status": {
@@ -95,6 +110,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.13"
      }
     ]
    }
@@ -105,7 +126,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1a"
     }
    },
    "status": {
@@ -128,6 +150,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.14"
      }
     ]
    }
@@ -138,7 +166,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1a"
     }
    },
    "status": {
@@ -161,6 +190,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.15"
      }
     ]
    }
@@ -171,7 +206,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1b"
     }
    },
    "status": {
@@ -195,6 +231,12 @@
       "type": "Ready",
       "status": "True"
      }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.16"
+     }
     ]
    }
   },
@@ -204,7 +246,8 @@
     "labels": {
      "kubernetes.io/arch": "arm64",
      "pool": "general",
-     "node.kubernetes.io/instance-type": "m7g.xlarge"
+     "node.kubernetes.io/instance-type": "m7g.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1b"
     }
    },
    "status": {
@@ -228,6 +271,12 @@
       "type": "Ready",
       "status": "Unknown"
      }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.17"
+     }
     ]
    }
   },
@@ -237,7 +286,8 @@
     "labels": {
      "kubernetes.io/arch": "amd64",
      "pool": "general-x86",
-     "node.kubernetes.io/instance-type": "m7i.xlarge"
+     "node.kubernetes.io/instance-type": "m7i.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1b"
     }
    },
    "status": {
@@ -260,6 +310,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.18"
      }
     ]
    }
@@ -270,7 +326,8 @@
     "labels": {
      "kubernetes.io/arch": "amd64",
      "pool": "general-x86",
-     "node.kubernetes.io/instance-type": "m7i.xlarge"
+     "node.kubernetes.io/instance-type": "m7i.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1b"
     }
    },
    "status": {
@@ -294,6 +351,12 @@
       "type": "Ready",
       "status": "True"
      }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.19"
+     }
     ]
    }
   },
@@ -303,7 +366,8 @@
     "labels": {
      "kubernetes.io/arch": "amd64",
      "pool": "general-x86",
-     "node.kubernetes.io/instance-type": "m7i.xlarge"
+     "node.kubernetes.io/instance-type": "m7i.xlarge",
+     "topology.kubernetes.io/zone": "eu-west-1c"
     }
    },
    "status": {
@@ -326,6 +390,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.20"
      }
     ]
    }
@@ -337,7 +407,8 @@
      "kubernetes.io/arch": "amd64",
      "pool": "gpu",
      "node.kubernetes.io/instance-type": "g5.xlarge",
-     "nvidia.com/gpu.present": "true"
+     "nvidia.com/gpu.present": "true",
+     "topology.kubernetes.io/zone": "eu-west-1c"
     }
    },
    "status": {
@@ -363,6 +434,12 @@
       "type": "Ready",
       "status": "True"
      }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.21"
+     }
     ]
    }
   },
@@ -373,7 +450,8 @@
      "kubernetes.io/arch": "amd64",
      "pool": "gpu",
      "node.kubernetes.io/instance-type": "g5.xlarge",
-     "nvidia.com/gpu.present": "true"
+     "nvidia.com/gpu.present": "true",
+     "topology.kubernetes.io/zone": "eu-west-1c"
     }
    },
    "status": {
@@ -398,6 +476,12 @@
      {
       "type": "Ready",
       "status": "True"
+     }
+    ],
+    "addresses": [
+     {
+      "type": "InternalIP",
+      "address": "10.0.1.22"
      }
     ]
    }
