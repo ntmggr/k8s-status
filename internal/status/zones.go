@@ -193,6 +193,12 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		snap.Services[i].Zones = ZoneSpread{}
 		snap.Services[i].Nodes = NodeSpread{}
 	}
+	if snap.Unmanaged != nil {
+		for i := range snap.Unmanaged.Items {
+			snap.Unmanaged.Items[i].Zones = ZoneSpread{}
+			snap.Unmanaged.Items[i].Nodes = NodeSpread{}
+		}
+	}
 	snap.Summary.Zoned, snap.Summary.SingleZone, snap.Summary.MultiZone = 0, 0, 0
 	snap.Summary.SingleNode, snap.Summary.MultiNode = 0, 0
 
@@ -235,14 +241,15 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		nodesSeen[i] = map[string]bool{}
 	}
 
-	// A second, parallel index space for workloads no service owns. Not stored on
-	// anything -- Workload has no Zones/Nodes field, and nothing renders one -- only
-	// folded into the same Summary totals the GitOps services above contribute to.
-	var unmanagedItems int
+	// A second, parallel index space for workloads no service owns, grouped by the
+	// exact same key collapseReleases uses (Release, or a solo key of its own when
+	// there is none) -- not by raw item, or a 7-member release would count as 7
+	// separate at-risk things instead of the one row the table actually shows.
+	var groupKeys []string
+	groupIndex := map[string]int{}
 	unmanagedByNS := map[string][]owner{}
 	if workloads != nil {
-		unmanagedItems = len(workloads.Items)
-		for i, w := range workloads.Items {
+		for _, w := range workloads.Items {
 			switch w.Kind {
 			case "Deployment", "StatefulSet", "DaemonSet":
 			default:
@@ -251,11 +258,25 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			if !isUnmanaged(w) {
 				continue
 			}
-			unmanagedByNS[w.Metadata.Namespace] = append(unmanagedByNS[w.Metadata.Namespace], owner{w.Metadata.Name, i})
+			key := releaseOf(w)
+			if key == "" {
+				key = "solo:" + w.Metadata.Namespace + "/" + w.Metadata.Name
+			}
+			idx, seen := groupIndex[key]
+			if !seen {
+				idx = len(groupKeys)
+				groupIndex[key] = idx
+				groupKeys = append(groupKeys, key)
+			}
+			unmanagedByNS[w.Metadata.Namespace] = append(unmanagedByNS[w.Metadata.Namespace], owner{w.Metadata.Name, idx})
 		}
 	}
-	unmanagedZonesSeen := make([]map[string]bool, unmanagedItems)
-	unmanagedNodesSeen := make([]map[string]bool, unmanagedItems)
+	unmanagedZonesSeen := make([]map[string]bool, len(groupKeys))
+	unmanagedNodesSeen := make([]map[string]bool, len(groupKeys))
+	// Matched pods and unplaced pods, per group -- the same two counts ZoneSpread.Pods
+	// and .Unplaced hold for a service, kept separately from the seen-sets above.
+	unmanagedPods := make([]int, len(groupKeys))
+	unmanagedUnplaced := make([]int, len(groupKeys))
 	for i := range unmanagedZonesSeen {
 		unmanagedZonesSeen[i] = map[string]bool{}
 		unmanagedNodesSeen[i] = map[string]bool{}
@@ -287,12 +308,15 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			continue
 		}
 		if uidx := ownerIndex(unmanagedByNS[pod.Metadata.Namespace], pod); uidx >= 0 {
+			unmanagedPods[uidx]++
 			if nodeOK {
 				unmanagedNodesSeen[uidx][nodeName] = true
 			}
-			if placed {
-				unmanagedZonesSeen[uidx][zone] = true
+			if !placed {
+				unmanagedUnplaced[uidx]++
+				continue
 			}
+			unmanagedZonesSeen[uidx][zone] = true
 		}
 	}
 
@@ -336,21 +360,54 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	// Folded into the exact same totals as the loop above, not a separate count: the
 	// HA/NodeHA gauges read Summary directly, so this is what makes them describe the
 	// whole cluster's resiliency rather than only its GitOps-tracked slice of it.
-	for i := range unmanagedZonesSeen {
+	//
+	// Also recorded per group key (not just tallied) so the badge below can show each
+	// row exactly what made it single- or multi-zone, the same way a service's own
+	// Zones field does.
+	zonesByKey := make(map[string]ZoneSpread, len(groupKeys))
+	nodesByKey := make(map[string]NodeSpread, len(groupKeys))
+	for i, key := range groupKeys {
 		if len(unmanagedZonesSeen[i]) > 0 {
 			snap.Summary.Zoned++
-			if len(unmanagedZonesSeen[i]) == 1 {
+			zones := make([]string, 0, len(unmanagedZonesSeen[i]))
+			for z := range unmanagedZonesSeen[i] {
+				zones = append(zones, z)
+			}
+			sort.Strings(zones)
+			zonesByKey[key] = ZoneSpread{Zones: zones, Pods: unmanagedPods[i], Unplaced: unmanagedUnplaced[i]}
+			if len(zones) == 1 {
 				snap.Summary.SingleZone++
 			} else {
 				snap.Summary.MultiZone++
 			}
 		}
 		if len(unmanagedNodesSeen[i]) > 0 {
-			if len(unmanagedNodesSeen[i]) == 1 {
+			names := make([]string, 0, len(unmanagedNodesSeen[i]))
+			for n := range unmanagedNodesSeen[i] {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			nodesByKey[key] = NodeSpread{Nodes: names, Pods: unmanagedPods[i]}
+			if len(names) == 1 {
 				snap.Summary.SingleNode++
 			} else {
 				snap.Summary.MultiNode++
 			}
+		}
+	}
+
+	// Re-derive each already-collapsed row's own group key to look itself up above.
+	// Release is never rewritten by collapseReleases, so it is a stable join key for
+	// a release row; a solo row's Namespace/Name are untouched by collapsing at all.
+	if snap.Unmanaged != nil {
+		for i := range snap.Unmanaged.Items {
+			w := &snap.Unmanaged.Items[i]
+			key := w.Release
+			if key == "" {
+				key = "solo:" + w.Namespace + "/" + w.Name
+			}
+			w.Zones = zonesByKey[key]
+			w.Nodes = nodesByKey[key]
 		}
 	}
 }

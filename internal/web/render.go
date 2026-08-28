@@ -95,6 +95,9 @@ type pageData struct {
 	// omitted rather than rendered as a row of blanks.
 	ShowRootLine bool
 	Services     []status.Service
+	// Unmanaged is Snapshot.Unmanaged.Items narrowed by the spread filter, the same
+	// relationship Services has to Snapshot.Services -- see Filter.ApplyWorkloads.
+	Unmanaged    []status.Workload
 	Filter       Filter
 	Query        url.Values
 	Shown        int
@@ -355,6 +358,9 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		// ROOT_APP_NAME and hiding it would hide the diagnosis.
 		data.ShowRootLine = snap.HasRoot || hasSource(snap.Sources, status.SourceArgoCD)
 		data.Services = data.Filter.Apply(snap.Services)
+		if snap.Unmanaged != nil {
+			data.Unmanaged = data.Filter.ApplyWorkloads(snap.Unmanaged.Items)
+		}
 		// Looking at the accelerator view is a question about what is using devices
 		// now, so the ones that are answer it first. The global order is worst-first,
 		// which would bury them under everything merely waiting or stopped.

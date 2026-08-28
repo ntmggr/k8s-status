@@ -50,6 +50,12 @@ type Workload struct {
 	ReleaseVersion string
 	// Members is how many workloads the row stands for. 1 unless collapsed.
 	Members int
+	// Zones and Nodes describe where this row's running pods actually sit, filled in
+	// by FillZones (nil/zero-value when AZ_SPREAD is off). For a collapsed release
+	// row this is every member's pods combined, matching Ready/Desired's own summing:
+	// the row is one thing to know about, and "is it spread out" is one fact about it.
+	Zones ZoneSpread
+	Nodes NodeSpread
 }
 
 // Unmanaged is the set of workloads running outside GitOps. Error is set when the

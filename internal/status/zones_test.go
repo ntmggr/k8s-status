@@ -331,6 +331,67 @@ func TestFillZonesUnmanagedFoldIsIdempotent(t *testing.T) {
 	}
 }
 
+// helmWorkload builds an unmanaged workload that belongs to a Helm release, the same
+// shape collapseReleases groups by.
+func helmWorkload(ns, kind, name, release string) kube.Workload {
+	w := unmanagedWorkload(ns, kind, name)
+	w.Metadata.Labels = map[string]string{
+		labelInstance:  release,
+		labelManagedBy: "Helm",
+	}
+	return w
+}
+
+// TestFillZonesGroupsUnmanagedByReleaseNotByRawItem is the case the table's own
+// collapsing exposed: two raw Deployments belonging to the same Helm release are one
+// row in the not-in-gitops table, so they must also be one thing counted toward
+// Summary, not two -- otherwise a release with several single-zone members inflates
+// "at risk" past what the table actually shows.
+func TestFillZonesGroupsUnmanagedByReleaseNotByRawItem(t *testing.T) {
+	snap := &Snapshot{}
+	snap.Unmanaged = &Unmanaged{}
+	nodes := &kube.NodeList{Items: []kube.Node{
+		zoneNode("n1", "eu-west-1a", "10.0.1.1"),
+	}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningPod("gw", "gw-a-1", "gw-a", "10.0.1.1"),
+		zoneRunningPod("gw", "gw-b-1", "gw-b", "10.0.1.1"),
+	}}
+	workloads := &kube.WorkloadList{Items: []kube.Workload{
+		helmWorkload("gw", "Deployment", "gw-a", "gw"),
+		helmWorkload("gw", "Deployment", "gw-b", "gw"),
+	}}
+	// Mirror BuildUnmanaged's own collapsing so Unmanaged.Items has the one row
+	// FillZones must find by key, the same order attachUnmanaged/attachZones run in.
+	snap.Unmanaged.Items = collapseReleases([]Workload{
+		{Namespace: "gw", Kind: "Deployment", Name: "gw-a", Release: "gw/gw", Members: 1},
+		{Namespace: "gw", Kind: "Deployment", Name: "gw-b", Release: "gw/gw", Members: 1},
+	})
+
+	FillZones(snap, pods, nodes, workloads)
+
+	if got := len(snap.Unmanaged.Items); got != 1 {
+		t.Fatalf("collapsed rows=%d, want 1 (one release row)", got)
+	}
+	// Both members' pods sit in the same zone/node, so the one row is single-zone --
+	// counted once, not twice, even though it stands for two raw Deployments.
+	if snap.Summary.SingleZone != 1 || snap.Summary.MultiZone != 0 {
+		t.Errorf("SingleZone/MultiZone = %d/%d, want 1/0 (one release, not two members)",
+			snap.Summary.SingleZone, snap.Summary.MultiZone)
+	}
+	if snap.Summary.SingleNode != 1 || snap.Summary.MultiNode != 0 {
+		t.Errorf("SingleNode/MultiNode = %d/%d, want 1/0", snap.Summary.SingleNode, snap.Summary.MultiNode)
+	}
+	row := snap.Unmanaged.Items[0]
+	if !row.Zones.Known() || row.Zones.Count() != 1 {
+		t.Errorf("row.Zones = %+v, want a known single-zone answer", row.Zones)
+	}
+	// Both members' pods count toward the row's Pods total, not just one member's.
+	if row.Zones.Pods != 2 {
+		t.Errorf("row.Zones.Pods=%d, want 2 (both release members' pods)", row.Zones.Pods)
+	}
+}
+
 func TestZoneReadErrorClassifiesDenied(t *testing.T) {
 	err := &kube.StatusError{Code: http.StatusForbidden, Body: "forbidden"}
 	ze := zoneReadError(err)

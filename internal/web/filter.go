@@ -263,9 +263,44 @@ func (f Filter) ShowServices() bool { return f.View != "unmanaged" }
 // ShowUnmanaged reports whether the unmanaged workloads section belongs on the page.
 // It is hidden while a service filter is active: if you asked to see only DEGRADED
 // services, a second table of things that are not services at all is noise.
+//
+// Spread is the one exception: zone/node spread applies just as much to a workload
+// outside GitOps as to a service, and the HA gauge's "at risk" count already folds
+// both together (see FillZones) -- hiding this table when spread is active would
+// silently drop rows that contributed to the very number the click came from.
 func (f Filter) ShowUnmanaged() bool {
 	if f.View == "unmanaged" {
 		return true
 	}
+	if f.Spread != "" {
+		return true
+	}
 	return f.View == "" && !f.Active()
+}
+
+// ApplyWorkloads returns the not-in-gitops rows the spread filter selects. Unlike
+// Apply, only the spread axis narrows this table: a Workload has no Sync/GPU/Arch/
+// Blocked concept comparable to a Service's, so those filters intentionally leave it
+// alone -- ShowUnmanaged hides the whole table for them instead.
+func (f Filter) ApplyWorkloads(items []status.Workload) []status.Workload {
+	if f.Spread == "" {
+		return items
+	}
+	out := make([]status.Workload, 0, len(items))
+	for _, w := range items {
+		switch f.Spread {
+		case "zone":
+			if !w.Zones.Known() || w.Zones.Count() != 1 {
+				continue
+			}
+		case "node":
+			if !w.Nodes.Known() || w.Nodes.Count() != 1 {
+				continue
+			}
+		default:
+			continue
+		}
+		out = append(out, w)
+	}
+	return out
 }

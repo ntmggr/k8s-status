@@ -198,6 +198,116 @@
      }
     ]
    }
+  },
+  {
+   "metadata": {
+    "name": "ingress-controller-6f8d9c7b5-nzz41",
+    "namespace": "ingress",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "ingress-controller-6f8d9c7b5"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.14",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "ingress-controller-6f8d9c7b5-nzz42",
+    "namespace": "ingress",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "ingress-controller-6f8d9c7b5"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.15",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "cert-manager-5d7e8f9a3-czz51",
+    "namespace": "cert-manager",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "cert-manager-5d7e8f9a3"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.17",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "cert-manager-5d7e8f9a3-czz52",
+    "namespace": "cert-manager",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "cert-manager-5d7e8f9a3"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.22",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
+  },
+  {
+   "metadata": {
+    "name": "metrics-agent-4c6d7e8f2-mzz61",
+    "namespace": "observability",
+    "ownerReferences": [
+     {
+      "kind": "ReplicaSet",
+      "name": "metrics-agent-4c6d7e8f2"
+     }
+    ]
+   },
+   "status": {
+    "phase": "Running",
+    "hostIP": "10.0.1.18",
+    "conditions": [
+     {
+      "type": "PodScheduled",
+      "status": "True"
+     }
+    ]
+   }
   }
  ]
 }
