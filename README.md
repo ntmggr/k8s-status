@@ -4,6 +4,8 @@
 
 **What's actually running in your cluster — and whether Git agrees.**
 
+**Rate your cluster: health and HA, at a glance.**
+
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
