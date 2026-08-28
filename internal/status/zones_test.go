@@ -34,9 +34,9 @@ func zoneSvc(name, ns, workload string) Service {
 func TestFillZonesNilInputsAreNoop(t *testing.T) {
 	snap := &Snapshot{}
 	snap.addService(zoneSvc("svc", "ml", "worker"))
-	FillZones(nil, nil, nil)
-	FillZones(snap, nil, &kube.NodeList{})
-	FillZones(snap, &kube.PodList{}, nil)
+	FillZones(nil, nil, nil, nil)
+	FillZones(snap, nil, &kube.NodeList{}, nil)
+	FillZones(snap, &kube.PodList{}, nil, nil)
 	if snap.Services[0].Zones.Known() {
 		t.Fatal("no pods or nodes should mean no zone answer")
 	}
@@ -55,7 +55,7 @@ func TestFillZonesThreeZoneSpread(t *testing.T) {
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.2"),
 		zoneRunningPod("ml", "api-3", "api", "10.0.1.3"),
 	}}
-	FillZones(snap, pods, nodes)
+	FillZones(snap, pods, nodes, nil)
 
 	z := snap.Services[0].Zones
 	if z.Count() != 3 || z.Pods != 3 || z.Unplaced != 0 {
@@ -82,7 +82,7 @@ func TestFillZonesAllOnOneNodeIsSingleZone(t *testing.T) {
 		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.1"),
 	}}
-	FillZones(snap, pods, nodes)
+	FillZones(snap, pods, nodes, nil)
 
 	z := snap.Services[0].Zones
 	if z.Count() != 1 || z.Pods != 2 {
@@ -100,7 +100,7 @@ func TestFillZonesUnmatchedHostIPCountsAsUnplaced(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{
 		zoneRunningPod("ml", "api-1", "api", "10.0.9.99"), // no node has this IP
 	}}
-	FillZones(snap, pods, nodes)
+	FillZones(snap, pods, nodes, nil)
 
 	z := snap.Services[0].Zones
 	if z.Unplaced != 1 {
@@ -121,7 +121,7 @@ func TestFillZonesUnlabelledNodeCountsAsUnplaced(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{
 		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
 	}}
-	FillZones(snap, pods, nodes)
+	FillZones(snap, pods, nodes, nil)
 
 	z := snap.Services[0].Zones
 	if z.Unplaced != 1 || z.Count() != 0 {
@@ -136,7 +136,7 @@ func TestFillZonesIgnoresPendingPods(t *testing.T) {
 	pending := zoneRunningPod("ml", "api-1", "api", "10.0.1.1")
 	pending.Status.Phase = "Pending"
 	pods := &kube.PodList{Items: []kube.Pod{pending}}
-	FillZones(snap, pods, nodes)
+	FillZones(snap, pods, nodes, nil)
 
 	z := snap.Services[0].Zones
 	if z.Pods != 0 || z.Known() {
@@ -151,7 +151,7 @@ func TestFillZonesResetsOnRepeatedCalls(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{zoneRunningPod("ml", "api-1", "api", "10.0.1.1")}}
 
 	for i := 0; i < 3; i++ {
-		FillZones(snap, pods, nodes)
+		FillZones(snap, pods, nodes, nil)
 	}
 	z := snap.Services[0].Zones
 	if z.Pods != 1 {
@@ -184,7 +184,7 @@ func TestFillZonesTracksNodesIndependentlyOfZones(t *testing.T) {
 		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.2"),
 	}}
-	FillZones(snap, pods, nodes)
+	FillZones(snap, pods, nodes, nil)
 
 	z := snap.Services[0].Zones
 	if z.Count() != 1 {
@@ -258,6 +258,76 @@ func TestNodeHA(t *testing.T) {
 					n, tc.single+tc.multi, tc.multi, tc.single)
 			}
 		})
+	}
+}
+
+func unmanagedWorkload(ns, kind, name string) kube.Workload {
+	var w kube.Workload
+	w.Kind = kind
+	w.Metadata.Namespace, w.Metadata.Name = ns, name
+	return w
+}
+
+// TestFillZonesFoldsUnmanagedWorkloadsIntoHA is the case the "include services that
+// are not gitops in the HA" request is about: an unmanaged Deployment's pods have no
+// Service row of their own, but must still move the same Summary totals the HA/NodeHA
+// gauges read, and must not be double-counted against the GitOps service also present.
+func TestFillZonesFoldsUnmanagedWorkloadsIntoHA(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(zoneSvc("api", "ml", "api")) // GitOps service, spread across 2 zones
+	nodes := &kube.NodeList{Items: []kube.Node{
+		zoneNode("n1", "eu-west-1a", "10.0.1.1"),
+		zoneNode("n2", "eu-west-1b", "10.0.1.2"),
+	}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
+		zoneRunningPod("ml", "api-2", "api", "10.0.1.2"),
+		zoneRunningPod("batch", "worker-1", "worker", "10.0.1.1"), // unmanaged, single zone
+	}}
+	workloads := &kube.WorkloadList{Items: []kube.Workload{
+		unmanagedWorkload("batch", "Deployment", "worker"),
+	}}
+	FillZones(snap, pods, nodes, workloads)
+
+	// The GitOps service still gets its own per-item answer, unaffected by the fold.
+	if z := snap.Services[0].Zones; z.Count() != 2 {
+		t.Errorf("Services[0].Zones.Count()=%d, want 2", z.Count())
+	}
+	// Summary folds both: the service (multi-zone) and the unmanaged workload (single
+	// zone, since both its host IPs share one zone... here it's one pod on one node).
+	if snap.Summary.MultiZone != 1 {
+		t.Errorf("MultiZone=%d, want 1 (the GitOps service)", snap.Summary.MultiZone)
+	}
+	if snap.Summary.SingleZone != 1 {
+		t.Errorf("SingleZone=%d, want 1 (the folded unmanaged workload)", snap.Summary.SingleZone)
+	}
+	if snap.Summary.Zoned != 2 {
+		t.Errorf("Zoned=%d, want 2 total", snap.Summary.Zoned)
+	}
+	if snap.Summary.SingleNode != 1 || snap.Summary.MultiNode != 1 {
+		t.Errorf("SingleNode/MultiNode = %d/%d, want 1/1", snap.Summary.SingleNode, snap.Summary.MultiNode)
+	}
+}
+
+// TestFillZonesUnmanagedFoldIsIdempotent guards the same accumulation-across-repeated-
+// calls bug the GitOps path already tests for (TestFillZonesResetsOnRepeatedCalls), but
+// for the unmanaged fold's own local maps.
+func TestFillZonesUnmanagedFoldIsIdempotent(t *testing.T) {
+	snap := &Snapshot{}
+	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.1.1")}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningPod("batch", "worker-1", "worker", "10.0.1.1"),
+	}}
+	workloads := &kube.WorkloadList{Items: []kube.Workload{
+		unmanagedWorkload("batch", "Deployment", "worker"),
+	}}
+
+	for i := 0; i < 3; i++ {
+		FillZones(snap, pods, nodes, workloads)
+	}
+	if snap.Summary.Zoned != 1 || snap.Summary.SingleZone != 1 {
+		t.Errorf("Zoned/SingleZone = %d/%d after 3 calls, want 1/1 (no accumulation)",
+			snap.Summary.Zoned, snap.Summary.SingleZone)
 	}
 }
 

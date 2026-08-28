@@ -173,7 +173,15 @@ func zoneReadError(err error) *ZoneError {
 // InternalIPs and zone label, from PR2), and the pod-to-service ownership machinery
 // FillPending already built. No new permission and no new fetch beyond the pods read
 // itself.
-func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList) {
+//
+// workloads is the same raw list UNMANAGED already fetches (nil when that feature is
+// off). Resiliency is a property of what is actually running, not of who deployed it:
+// a workload nobody put through GitOps is exactly as capable of going down with its
+// one zone as a tracked service is. Its pods are folded into the same Summary totals
+// the HA/NodeHA gauges read, so the percentage covers the whole cluster rather than
+// silently excluding whatever isn't in GitOps. They get no per-item Zones/Nodes field
+// of their own -- nothing today reads one for a Workload -- only the aggregate counts.
+func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList) {
 	if snap == nil || pods == nil || nodes == nil {
 		return
 	}
@@ -227,6 +235,32 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList) {
 		nodesSeen[i] = map[string]bool{}
 	}
 
+	// A second, parallel index space for workloads no service owns. Not stored on
+	// anything -- Workload has no Zones/Nodes field, and nothing renders one -- only
+	// folded into the same Summary totals the GitOps services above contribute to.
+	var unmanagedItems int
+	unmanagedByNS := map[string][]owner{}
+	if workloads != nil {
+		unmanagedItems = len(workloads.Items)
+		for i, w := range workloads.Items {
+			switch w.Kind {
+			case "Deployment", "StatefulSet", "DaemonSet":
+			default:
+				continue
+			}
+			if !isUnmanaged(w) {
+				continue
+			}
+			unmanagedByNS[w.Metadata.Namespace] = append(unmanagedByNS[w.Metadata.Namespace], owner{w.Metadata.Name, i})
+		}
+	}
+	unmanagedZonesSeen := make([]map[string]bool, unmanagedItems)
+	unmanagedNodesSeen := make([]map[string]bool, unmanagedItems)
+	for i := range unmanagedZonesSeen {
+		unmanagedZonesSeen[i] = map[string]bool{}
+		unmanagedNodesSeen[i] = map[string]bool{}
+	}
+
 	for _, pod := range pods.Items {
 		// Defensive: the server-side fieldSelector should already guarantee this, but
 		// the fixture HTTP server used by scripts/local-test.sh ignores query strings
@@ -234,22 +268,32 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList) {
 		if pod.Status.Phase != "Running" {
 			continue
 		}
-		idx := ownerIndex(byNS[pod.Metadata.Namespace], pod)
-		if idx < 0 {
+		zone, zoneOK := zoneByIP[pod.Status.HostIP]
+		placed := zoneOK && zone != zoneUnknown
+		nodeName, nodeOK := nodeNameByIP[pod.Status.HostIP]
+
+		if idx := ownerIndex(byNS[pod.Metadata.Namespace], pod); idx >= 0 {
+			svc := &snap.Services[idx]
+			svc.Zones.Pods++
+			svc.Nodes.Pods++
+			if nodeOK {
+				nodesSeen[idx][nodeName] = true
+			}
+			if !placed {
+				svc.Zones.Unplaced++
+				continue
+			}
+			zonesSeen[idx][zone] = true
 			continue
 		}
-		svc := &snap.Services[idx]
-		svc.Zones.Pods++
-		svc.Nodes.Pods++
-		if name, ok := nodeNameByIP[pod.Status.HostIP]; ok {
-			nodesSeen[idx][name] = true
+		if uidx := ownerIndex(unmanagedByNS[pod.Metadata.Namespace], pod); uidx >= 0 {
+			if nodeOK {
+				unmanagedNodesSeen[uidx][nodeName] = true
+			}
+			if placed {
+				unmanagedZonesSeen[uidx][zone] = true
+			}
 		}
-		zone, ok := zoneByIP[pod.Status.HostIP]
-		if !ok || zone == zoneUnknown {
-			svc.Zones.Unplaced++
-			continue
-		}
-		zonesSeen[idx][zone] = true
 	}
 
 	for i := range snap.Services {
@@ -282,6 +326,27 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList) {
 		}
 		if svc.Nodes.Known() {
 			if svc.Nodes.Count() == 1 {
+				snap.Summary.SingleNode++
+			} else {
+				snap.Summary.MultiNode++
+			}
+		}
+	}
+
+	// Folded into the exact same totals as the loop above, not a separate count: the
+	// HA/NodeHA gauges read Summary directly, so this is what makes them describe the
+	// whole cluster's resiliency rather than only its GitOps-tracked slice of it.
+	for i := range unmanagedZonesSeen {
+		if len(unmanagedZonesSeen[i]) > 0 {
+			snap.Summary.Zoned++
+			if len(unmanagedZonesSeen[i]) == 1 {
+				snap.Summary.SingleZone++
+			} else {
+				snap.Summary.MultiZone++
+			}
+		}
+		if len(unmanagedNodesSeen[i]) > 0 {
+			if len(unmanagedNodesSeen[i]) == 1 {
 				snap.Summary.SingleNode++
 			} else {
 				snap.Summary.MultiNode++

@@ -15,6 +15,7 @@ const (
 	filterBlocked = "blocked"
 	filterArch    = "arch"
 	filterView    = "view"
+	filterSpread  = "spread"
 )
 
 // Filter is the row selection parsed from the query string. Values are kept as the
@@ -30,6 +31,10 @@ type Filter struct {
 	// View narrows the page to one section rather than filtering rows.
 	// "unmanaged" shows only workloads ArgoCD does not manage.
 	View string
+	// Spread is "zone" or "node": services whose running pods are known but sit in
+	// only one of that kind, the exact rows a Cluster HA gauge's "at risk" count
+	// summarizes. Answers "which ones" for a number that otherwise only says "how many".
+	Spread string
 }
 
 // ParseFilter accepts both repeated parameters and comma-separated values.
@@ -41,12 +46,13 @@ func ParseFilter(q url.Values) Filter {
 		Blocked: strings.TrimSpace(q.Get(filterBlocked)),
 		Arch:    strings.TrimSpace(q.Get(filterArch)),
 		View:    strings.ToLower(strings.TrimSpace(q.Get(filterView))),
+		Spread:  strings.ToLower(strings.TrimSpace(q.Get(filterSpread))),
 	}
 	// A section view and the row filters describe different tables. The links never
 	// produce both, but a hand-written URL can, and rendering half of each state is
 	// worse than picking one. The view wins because it is the coarser choice.
 	if f.View != "" {
-		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch = nil, nil, "", "", ""
+		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch, f.Spread = nil, nil, "", "", "", ""
 	}
 	return f
 }
@@ -72,7 +78,7 @@ func parseFilterList(vals []string) []string {
 }
 
 func (f Filter) Active() bool {
-	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != ""
+	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != "" || f.Spread != ""
 }
 
 func (f Filter) list(kind string) []string {
@@ -99,6 +105,8 @@ func (f Filter) has(kind, value string) bool {
 		return strings.EqualFold(f.Arch, value)
 	case filterView:
 		return strings.EqualFold(f.View, value)
+	case filterSpread:
+		return strings.EqualFold(f.Spread, value)
 	}
 	return false
 }
@@ -141,6 +149,19 @@ func (f Filter) matches(svc status.Service) bool {
 		if !ok || svc.GPU != want {
 			return false
 		}
+	}
+	switch f.Spread {
+	case "zone":
+		if !svc.Zones.Known() || svc.Zones.Count() != 1 {
+			return false
+		}
+	case "node":
+		if !svc.Nodes.Known() || svc.Nodes.Count() != 1 {
+			return false
+		}
+	case "":
+	default:
+		return false // an unrecognised value matches nothing, per this file's own convention
 	}
 	return true
 }
