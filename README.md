@@ -189,6 +189,20 @@ you cannot distinguish the colours.
 The exact rules, and why `DRIFT` and `PRUNE` are separate states rather than red, are in
 [How it works](#how-it-works).
 
+### Health percentage
+
+Above the table sits one number: what share of services are actually `OK` right now.
+
+`PRUNE` and `SUSPENDED` rows are dropped from the count first, a cleanup backlog and a
+deliberate pause are not health problems, and then the percentage is `OK` divided by
+whatever is left. `PROGRESSING` and `DRIFT` still count as not-OK, so the number is
+honest about a rollout in progress rather than looking artificially perfect. When
+nothing is left to count (every service pruned or suspended), the page shows `—` instead
+of a `0%` or `100%` that nobody could back up.
+
+It is a derived view, not a status tile, for the same arithmetic reason as
+[GPU](#cluster-capacity): it would double-count rows the tiles already own.
+
 ## Choosing the source
 
 `SOURCES` decides which controllers are read. It defaults to `argocd`, so an existing

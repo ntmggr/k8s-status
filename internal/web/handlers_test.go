@@ -122,6 +122,10 @@ func TestAPISuccessShape(t *testing.T) {
 		Error      *string `json:"error"`
 		Summary    struct {
 			Total, OK, Degraded, Warning, Progressing, Drift, Prune, Suspended, Hidden int
+			Health                                                                     struct {
+				Percent int  `json:"percent"`
+				Known   bool `json:"known"`
+			} `json:"health"`
 		} `json:"summary"`
 		Services []struct {
 			Name  string `json:"name"`
@@ -144,6 +148,10 @@ func TestAPISuccessShape(t *testing.T) {
 	}
 	if resp.Summary.Total != 14 || resp.Summary.Degraded != 2 || resp.Summary.Warning != 1 || resp.Summary.Drift != 1 || resp.Summary.Prune != 2 {
 		t.Errorf("summary = %+v", resp.Summary)
+	}
+	// 6 OK out of (14 total - 2 prune - 1 suspended) = 11 counted, rounds to 55%.
+	if !resp.Summary.Health.Known || resp.Summary.Health.Percent != 55 {
+		t.Errorf("summary.health = %+v, want known=true percent=55", resp.Summary.Health)
 	}
 	if len(resp.Services) != 14 {
 		t.Fatalf("services = %d, want 14", len(resp.Services))

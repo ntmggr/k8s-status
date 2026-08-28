@@ -107,6 +107,21 @@ type summaryJSON struct {
 	BlockedGPU       int `json:"blockedAccelerator"`
 	BlockedCPU       int `json:"blockedCpu"`
 	BlockedPlacement int `json:"blockedPlacement"`
+	// Health is nested rather than a flat int. TestEveryNumericSummaryFieldIsMapped
+	// fills every Summary int with a distinct non-zero seed, which can drive the
+	// percent formula's denominator negative and clamp Percent to 0 — a correctly
+	// wired field that the test would then flag as "serialised as 0". A JSON object
+	// unmarshals to map[string]any, not float64, so that reflection walk skips it.
+	Health healthJSON `json:"health"`
+}
+
+type healthJSON struct {
+	Percent   int  `json:"percent"`
+	Known     bool `json:"known"`
+	Counted   int  `json:"counted"`
+	OK        int  `json:"ok"`
+	Excluded  int  `json:"excluded"`
+	Attention int  `json:"attention"`
 }
 
 type blockedJSON struct {
@@ -475,6 +490,7 @@ func blocked(svc status.Service) *blockedJSON {
 // summaryOf maps the snapshot counters onto the response. Kept as its own function
 // so a test can check that every one of them is actually assigned.
 func summaryOf(snap *status.Snapshot) summaryJSON {
+	h := snap.Summary.Health()
 	return summaryJSON{
 		Total:            snap.Summary.Total,
 		OK:               snap.Summary.OK,
@@ -494,5 +510,13 @@ func summaryOf(snap *status.Snapshot) summaryJSON {
 		BlockedGPU:       snap.Summary.BlockedGPU,
 		BlockedCPU:       snap.Summary.BlockedCPU,
 		BlockedPlacement: snap.Summary.BlockedPlacement,
+		Health: healthJSON{
+			Percent:   h.Percent,
+			Known:     h.Known,
+			Counted:   h.Counted,
+			OK:        h.OK,
+			Excluded:  h.Excluded,
+			Attention: h.Attention,
+		},
 	}
 }
