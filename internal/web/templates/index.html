@@ -160,6 +160,32 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .health-lead.is-warning .cv { color: var(--warn-fg); }
 .health-lead.is-degraded .cv { color: var(--deg-fg); }
 
+.hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
+.health-dial {
+  --pct: 0;
+  --track: var(--hair);
+  flex: none; position: relative;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: conic-gradient(var(--ok-fg) calc(var(--pct) * 1%), var(--track) 0);
+}
+.health-dial[data-state="warning"]  { background: conic-gradient(var(--warn-fg) calc(var(--pct) * 1%), var(--track) 0); }
+.health-dial[data-state="degraded"] { background: conic-gradient(var(--deg-fg) calc(var(--pct) * 1%), var(--track) 0); }
+.health-dial.is-unknown { background: var(--track); }
+.health-dial::before {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  background: var(--plane);
+}
+.health-dial .hd-num {
+  position: relative; z-index: 1;
+  font-size: .58rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.health-dial .hd-num small { font-size: .78em; font-weight: 600; margin-left: .05em; }
+.health-dial[data-state="warning"] .hd-num  { color: var(--warn-fg); }
+.health-dial[data-state="degraded"] .hd-num { color: var(--deg-fg); }
+.health-dial.is-unknown .hd-num { color: var(--muted); font-weight: 600; }
+
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
 .tile.is-on, a.cap-item.is-on {
@@ -292,10 +318,17 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
+  <div class="hdr-right">
   <div class="meta">checked {{.AgeSeconds}}s ago &middot; auto-refresh
     {{- range $i, $o := .RefreshOptions}}{{if $i}} &middot;{{end}}
     {{- if $o.Active}} <span class="sel">{{$o.Label}}</span>{{else}} <a href="{{$o.Href}}">{{$o.Label}}</a>{{end}}
     {{- end}}
+  </div>
+  {{if .HasData}}{{with .Snapshot.Summary.Health}}
+  <div class="health-dial{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}" data-state="{{lower (printf "%s" .State)}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+    <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+  </div>
+  {{end}}{{end}}
   </div>
 </header>
 
@@ -358,28 +391,6 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   <a class="vchip{{if $.FilterActive "view" "unmanaged"}} is-on{{end}}" href="{{$.FilterHref "view" "unmanaged"}}" title="Running in the cluster but outside GitOps">{{icon "unmanaged"}}{{.Count}} not in gitops</a>
   {{- end}}
 </div>
-
-{{with $.Snapshot.Summary.Health}}
-{{/* Deliberately not a tile: the tiles are a closed, mutually-exclusive set that sums
-     to Total (see README.md, "arithmetic"), and this percentage is a derived view over
-     that set, not a member of it. */}}
-<section class="capacity health">
-  <div class="cap-head">Health<span class="cap-sub">share of counted services that are OK right now</span></div>
-  <div class="cap-group">
-    {{if .Known}}
-    <div class="cap-lead health-lead is-{{lower (printf "%s" .State)}}"><span class="cv">{{.Percent}}</span><span class="ck">% healthy</span></div>
-    <div class="cap-of">
-      <span class="cap-part">{{.OK}} of {{.Counted}} counted{{if .Excluded}}<i>&middot;</i>{{.Excluded}} excluded{{end}}</span>
-    </div>
-    {{else}}
-    <div class="cap-lead health-lead"><span class="cv">&mdash;</span><span class="ck">healthy</span></div>
-    <div class="cap-of">
-      <span class="cap-part">no services counted</span>
-    </div>
-    {{end}}
-  </div>
-</section>
-{{end}}
 
 {{if and $.HasData $.Snapshot.Nodes}}
 <section class="capacity">
