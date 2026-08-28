@@ -42,8 +42,11 @@ type NodeStats struct {
 	// card and fight over its memory. Worth showing rather than silently reporting zero.
 	UnschedulableGPUNodes int
 	Arch                  []ArchCount
-	Denied                bool
-	Error                 string
+	// Zones is sorted by zone name; nodes with no zone label bucket into a single
+	// zoneUnknown entry rather than being dropped from the tally.
+	Zones  []ZoneCount
+	Denied bool
+	Error  string
 }
 
 // AcceleratorCount is one device type and how much of it the cluster has.
@@ -53,7 +56,15 @@ type AcceleratorCount struct {
 	Count    int
 }
 
+// ZoneCount is one availability zone and how many of the cluster's nodes are in it.
+type ZoneCount struct {
+	Zone  string
+	Nodes int
+	Ready int
+}
+
 const archUnknown = "unknown"
+const zoneUnknown = "unknown"
 
 // BuildNodeStats classifies nodes by accelerator capacity and tallies architectures.
 // accel is the resource list to count, normally from DiscoverAccelerators.
@@ -64,9 +75,11 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 	}
 	byArch := map[string]int{}
 	perRes := map[string][2]int{} // resource -> {nodes, devices}
+	byZone := map[string][2]int{} // zone -> {nodes, ready}
 	for _, n := range list.Items {
 		stats.Total++
-		if !n.Ready() {
+		ready := n.Ready()
+		if !ready {
 			stats.NotReady++
 		}
 
@@ -98,6 +111,17 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 			arch = archUnknown
 		}
 		byArch[arch]++
+
+		zone := n.Zone()
+		if zone == "" {
+			zone = zoneUnknown
+		}
+		e := byZone[zone]
+		e[0]++
+		if ready {
+			e[1]++
+		}
+		byZone[zone] = e
 	}
 
 	stats.Accelerators = make([]AcceleratorCount, 0, len(perRes))
@@ -117,6 +141,12 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 		}
 		return stats.Arch[i].Arch < stats.Arch[j].Arch
 	})
+
+	stats.Zones = make([]ZoneCount, 0, len(byZone))
+	for z, e := range byZone {
+		stats.Zones = append(stats.Zones, ZoneCount{Zone: z, Nodes: e[0], Ready: e[1]})
+	}
+	sort.Slice(stats.Zones, func(i, j int) bool { return stats.Zones[i].Zone < stats.Zones[j].Zone })
 	return stats
 }
 

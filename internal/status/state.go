@@ -133,6 +133,12 @@ type Service struct {
 	// Owned lists the workloads this service manages, used to recover an app version
 	// when ArgoCD did not report one. Not rendered.
 	Owned []Component
+	// Zones is set only when AZ_SPREAD is enabled. Zero value renders as unknown, not
+	// as zero zones.
+	Zones ZoneSpread
+	// Nodes is filled alongside Zones, from the same pod-to-node join. Zero value
+	// renders as unknown, not as zero nodes.
+	Nodes NodeSpread
 }
 
 type Summary struct {
@@ -162,6 +168,18 @@ type Summary struct {
 	BlockedGPU       int
 	BlockedCPU       int
 	BlockedPlacement int
+	// Zoned counts services with at least one running pod placed into a known zone.
+	// SingleZone and MultiZone split that further: exactly one zone versus two or more.
+	// Zero on all three when AZ_SPREAD is off, same as the other opt-in counters.
+	Zoned      int
+	SingleZone int
+	MultiZone  int
+	// SingleNode and MultiNode are the node-spread counterpart of SingleZone and
+	// MultiZone: a service can sit in one zone while still spanning several nodes in
+	// it, so the two splits are tracked independently. Zero on both when AZ_SPREAD is
+	// off, same as the zone counters.
+	SingleNode int
+	MultiNode  int
 }
 
 type Snapshot struct {
@@ -194,7 +212,11 @@ type Snapshot struct {
 	// Flux is nil unless flux is one of SOURCES.
 	Flux *FluxSection
 	// Mesh is nil unless MESH_MTLS is enabled.
-	Mesh      *MeshSection
+	Mesh *MeshSection
+	// ZoneRead is nil when AZ_SPREAD is off or its read succeeded; non-nil carries a
+	// denied, missing or too-large read as a visible note, the same as Nodes/Unmanaged/
+	// Flux do for their own reads.
+	ZoneRead  *ZoneError
 	CheckedAt time.Time
 	Stale     bool
 }

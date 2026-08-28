@@ -82,6 +82,10 @@ config:
   # PeerAuthentication object via a namespaced Role in rbac.istioNamespace, independent
   # of rbac.clusterRole.
   meshMTLS: false
+  # AZ_SPREAD - show how many availability zones each service's running pods actually
+  # sit in. Requires config.nodeStats and rbac.clusterRole; reads Running pods under the
+  # same pods grant as pendingReasons.
+  azSpread: false
   # PORT - container listen port.
   port: 8080
 

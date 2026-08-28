@@ -45,6 +45,15 @@ type MeshLister interface {
 	MeshPolicy(ctx context.Context, groupVersion, namespace string) (*kube.PeerAuthentication, error)
 }
 
+// RunningLister reads running pods for the AZ-spread section. Optional, like the
+// others: only wired up when AZ_SPREAD is enabled, and only meaningful alongside a
+// node lister since zone labels come from the node list. Per-service mesh sidecar
+// coverage rides along on this same read (see FillZones): it needs no lister of its
+// own.
+type RunningLister interface {
+	ListRunningPods(ctx context.Context) (*kube.PodList, error)
+}
+
 // Collector caches one Snapshot for a TTL. The mutex is deliberately held across
 // the upstream fetch so a burst of concurrent callers collapses into one request.
 type Collector struct {
@@ -77,6 +86,11 @@ type Collector struct {
 
 	meshSection *MeshSection
 	meshAt      time.Time
+
+	running     RunningLister
+	runningAt   time.Time
+	runningPods *kube.PodList
+	zoneRead    *ZoneError
 }
 
 func NewCollector(lister Lister, opts Options, ttl time.Duration) *Collector {
@@ -127,6 +141,18 @@ func (c *Collector) WithMesh(ml MeshLister, namespace string) *Collector {
 	defer c.mu.Unlock()
 	c.mesh = ml
 	c.meshNamespace = namespace
+	return c
+}
+
+// WithZones enables the per-service AZ-spread section, and along with it per-service
+// mesh sidecar coverage (see FillZones). Not called means the running pods API is
+// never queried and no Service ever gets a Zones, Nodes or Mesh answer. Only
+// meaningful alongside WithNodes: zone labels come from the node list, which is the
+// caller's responsibility to have wired up too.
+func (c *Collector) WithZones(rl RunningLister) *Collector {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.running = rl
 	return c
 }
 
@@ -181,6 +207,10 @@ func (c *Collector) decorate(ctx context.Context, snap Snapshot) *Snapshot {
 	c.attachUnmanaged(ctx, &snap)
 	c.attachPending(ctx, &snap)
 	c.attachMesh(ctx, &snap)
+	// After attachUnmanaged: FillOwnedFromLabels there populates svc.Owned, and
+	// attachZones needs it for the same owner-matching machinery attachPending uses.
+	// FillZones also tallies per-service mesh sidecar coverage in the same pass.
+	c.attachZones(ctx, &snap)
 	return &snap
 }
 
@@ -238,6 +268,13 @@ func (c *Collector) refreshSources(ctx context.Context) {
 		go func() {
 			defer wg.Done()
 			c.fetchMesh(ctx)
+		}()
+	}
+	if c.running != nil && stale(c.runningAt, c.runningPods == nil && c.zoneRead == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchRunning(ctx)
 		}()
 	}
 	wg.Wait()
@@ -312,6 +349,27 @@ func (c *Collector) fetchMesh(ctx context.Context) {
 	c.meshAt = c.now()
 }
 
+// fetchRunning reads every running pod for the AZ-spread section. Unlike
+// fetchPending, a failed read here is kept and surfaced as ZoneRead rather than
+// swallowed: a denied or too-large read must produce a visible note, not a silently
+// empty section.
+func (c *Collector) fetchRunning(ctx context.Context) {
+	list, err := c.running.ListRunningPods(ctx)
+	if abandoned(err) {
+		return // keep whatever was cached; a cancelled read says nothing about the cluster
+	}
+	if err != nil {
+		c.runningPods = nil
+		zr := zoneReadError(err)
+		c.zoneRead = zr
+		c.runningAt = c.now()
+		return
+	}
+	c.runningPods = list
+	c.zoneRead = nil
+	c.runningAt = c.now()
+}
+
 func (c *Collector) attachNodes(_ context.Context, snap *Snapshot) {
 	if c.nodes == nil {
 		return
@@ -348,4 +406,16 @@ func (c *Collector) attachMesh(_ context.Context, snap *Snapshot) {
 		return
 	}
 	snap.Mesh = c.meshSection
+}
+
+// attachZones fills each service's AZ spread and mesh sidecar coverage. Must run after
+// attachUnmanaged: FillOwnedFromLabels there populates svc.Owned, which the
+// owner-matching this reuses from FillPending depends on, the same ordering FillGPU
+// and FillArch already rely on.
+func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
+	if c.running == nil {
+		return
+	}
+	snap.ZoneRead = c.zoneRead
+	FillZones(snap, c.runningPods, c.nodeList, c.workloadList)
 }

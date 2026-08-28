@@ -307,3 +307,65 @@ func TestChipsCoverEveryFilter(t *testing.T) {
 		t.Fatalf("got %d chips %v, want one per active filter", n, labels)
 	}
 }
+
+func testWorkloads() []status.Workload {
+	return []status.Workload{
+		{Name: "single-zone", Zones: status.ZoneSpread{Zones: []string{"a"}, Pods: 1}, Nodes: status.NodeSpread{Nodes: []string{"n1"}, Pods: 1}},
+		{Name: "multi-zone", Zones: status.ZoneSpread{Zones: []string{"a", "b"}, Pods: 2}, Nodes: status.NodeSpread{Nodes: []string{"n1", "n2"}, Pods: 2}},
+		{Name: "no-answer"}, // Zones/Nodes zero-value: Known() is false
+	}
+}
+
+func workloadNames(ws []status.Workload) []string {
+	out := make([]string, 0, len(ws))
+	for _, w := range ws {
+		out = append(out, w.Name)
+	}
+	return out
+}
+
+func TestApplyWorkloadsFiltersBySpreadOnly(t *testing.T) {
+	items := testWorkloads()
+	cases := []struct {
+		spread string
+		want   []string
+	}{
+		{spread: "", want: []string{"single-zone", "multi-zone", "no-answer"}},
+		{spread: "zone", want: []string{"single-zone"}},
+		{spread: "node", want: []string{"single-zone"}},
+		{spread: "bogus", want: []string{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.spread, func(t *testing.T) {
+			f := Filter{Spread: tc.spread}
+			got := workloadNames(f.ApplyWorkloads(items))
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ApplyWorkloads(spread=%q) = %v, want %v", tc.spread, got, tc.want)
+			}
+		})
+	}
+}
+
+// A row filter (status, gpu, ...) still hides the not-in-gitops table -- it has no
+// comparable concept, so a second table would be noise. Spread is the one exception:
+// see ShowUnmanaged's own comment for why.
+func TestShowUnmanagedSpreadIsAnException(t *testing.T) {
+	cases := []struct {
+		name string
+		f    Filter
+		want bool
+	}{
+		{name: "no filter", f: Filter{}, want: true},
+		{name: "spread only", f: Filter{Spread: "zone"}, want: true},
+		{name: "status filter hides it", f: Filter{Status: []string{"DEGRADED"}}, want: false},
+		{name: "spread alongside status still shows it", f: Filter{Spread: "node", Status: []string{"DEGRADED"}}, want: true},
+		{name: "view=unmanaged always shows it", f: Filter{View: "unmanaged"}, want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.f.ShowUnmanaged(); got != tc.want {
+				t.Errorf("ShowUnmanaged() = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}

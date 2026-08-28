@@ -70,6 +70,13 @@ roleRef:
 #   - apiGroups: ["apps"]
 #     resources: ["deployments", "statefulsets", "daemonsets"]
 #     verbs: ["get", "list"]
+#   # for PENDING_REASONS or AZ_SPREAD. The widest grant here: reads pods cluster-wide,
+#   # decoding only metadata and status, never a spec. PENDING_REASONS reads Pending
+#   # pods; AZ_SPREAD widens the same read to Running pods to join hostIP against a
+#   # node's zone.
+#   - apiGroups: [""]
+#     resources: ["pods"]
+#     verbs: ["get", "list"]
 #   # for SOURCES containing flux
 #   - apiGroups: ["helm.toolkit.fluxcd.io"]
 #     resources: ["helmreleases"]
@@ -157,6 +164,9 @@ data:
   # "true" also requires the Role/RoleBinding above to be uncommented.
   MESH_MTLS: "false"
   MESH_NAMESPACE: "istio-system"
+  # "true" also requires NODE_STATS: "true" and the ClusterRole above to be uncommented,
+  # with its pods rule.
+  AZ_SPREAD: "false"
   PORT: "8080"
 ---
 apiVersion: apps/v1

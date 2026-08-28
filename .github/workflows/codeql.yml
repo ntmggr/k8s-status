@@ -5,8 +5,10 @@ name: codeql
 on:
   push:
     branches: [main]
+    paths-ignore: &non-code ["**.md", "docs/**", "LICENSE", "NOTICE"]
   pull_request:
     branches: [main]
+    paths-ignore: *non-code
   schedule:
     # Weekly, so a new rule release is picked up without waiting for a commit.
     - cron: "27 4 * * 1"

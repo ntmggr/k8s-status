@@ -5,7 +5,8 @@
 #
 # Deployment-specific values are not baked in. Override ENV_NAME, ENV_TYPE, REGION,
 # CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED,
-# UNMANAGED_IGNORE_NS, MESH_MTLS and MESH_NAMESPACE in the environment as needed.
+# UNMANAGED_IGNORE_NS, MESH_MTLS, MESH_NAMESPACE and AZ_SPREAD in the environment as
+# needed.
 set -euo pipefail
 
 MODE="${1:-fixture}"
@@ -60,11 +61,18 @@ case "$MODE" in
     # a Flux-only cluster has no Applications and must still work.
     case "${SOURCES:-argocd}" in
       *argocd*|auto)
-        if ! kubectl --context "$CONTEXT" get applications.argoproj.io -n argocd >/dev/null 2>&1; then
+        # Captured, not swallowed: kubectl failing here is usually expired auth (SSO
+        # session, stale kubeconfig token), not "this cluster has no ArgoCD" -- surface
+        # its own error instead of asserting a conclusion it never actually checked.
+        if ! app_check=$(kubectl --context "$CONTEXT" get applications.argoproj.io -n argocd 2>&1); then
           if [ "${SOURCES:-argocd}" = "auto" ]; then
-            echo "note: no ArgoCD Applications found; relying on auto-detection" >&2
+            echo "note: could not read ArgoCD Applications in '$CONTEXT'; relying on auto-detection. kubectl said:" >&2
+            echo "$app_check" >&2
           else
-            echo "error: no ArgoCD Applications in '$CONTEXT' (set SOURCES=flux for a Flux cluster)" >&2
+            echo "error: could not read ArgoCD Applications in '$CONTEXT' -- this may mean the cluster" >&2
+            echo "has none (try SOURCES=flux), or that kubectl itself could not reach it (expired SSO," >&2
+            echo "stale kubeconfig). kubectl said:" >&2
+            echo "$app_check" >&2
             exit 1
           fi
         fi
@@ -94,6 +102,7 @@ ARGOCD_UI_BASE="${ARGOCD_UI_BASE:-}" \
 IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-$NODE_STATS_DEFAULT}" \
 PENDING_REASONS="${PENDING_REASONS:-$UNMANAGED_DEFAULT}" UNMANAGED="${UNMANAGED:-$UNMANAGED_DEFAULT}" UNMANAGED_IGNORE_NS="${UNMANAGED_IGNORE_NS:-}" \
 MESH_MTLS="${MESH_MTLS:-$MESH_MTLS_DEFAULT}" MESH_NAMESPACE="${MESH_NAMESPACE:-istio-system}" \
+AZ_SPREAD="${AZ_SPREAD:-$UNMANAGED_DEFAULT}" \
 PORT="$PORT" \
 /tmp/k8s-status-local &
 PIDS+=($!)

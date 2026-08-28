@@ -15,6 +15,7 @@ const (
 	filterBlocked = "blocked"
 	filterArch    = "arch"
 	filterView    = "view"
+	filterSpread  = "spread"
 )
 
 // Filter is the row selection parsed from the query string. Values are kept as the
@@ -30,6 +31,10 @@ type Filter struct {
 	// View narrows the page to one section rather than filtering rows.
 	// "unmanaged" shows only workloads ArgoCD does not manage.
 	View string
+	// Spread is "zone" or "node": services whose running pods are known but sit in
+	// only one of that kind, the exact rows a Cluster HA gauge's "at risk" count
+	// summarizes. Answers "which ones" for a number that otherwise only says "how many".
+	Spread string
 }
 
 // ParseFilter accepts both repeated parameters and comma-separated values.
@@ -41,12 +46,13 @@ func ParseFilter(q url.Values) Filter {
 		Blocked: strings.TrimSpace(q.Get(filterBlocked)),
 		Arch:    strings.TrimSpace(q.Get(filterArch)),
 		View:    strings.ToLower(strings.TrimSpace(q.Get(filterView))),
+		Spread:  strings.ToLower(strings.TrimSpace(q.Get(filterSpread))),
 	}
 	// A section view and the row filters describe different tables. The links never
 	// produce both, but a hand-written URL can, and rendering half of each state is
 	// worse than picking one. The view wins because it is the coarser choice.
 	if f.View != "" {
-		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch = nil, nil, "", "", ""
+		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch, f.Spread = nil, nil, "", "", "", ""
 	}
 	return f
 }
@@ -72,7 +78,7 @@ func parseFilterList(vals []string) []string {
 }
 
 func (f Filter) Active() bool {
-	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != ""
+	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != "" || f.Spread != ""
 }
 
 func (f Filter) list(kind string) []string {
@@ -99,6 +105,8 @@ func (f Filter) has(kind, value string) bool {
 		return strings.EqualFold(f.Arch, value)
 	case filterView:
 		return strings.EqualFold(f.View, value)
+	case filterSpread:
+		return strings.EqualFold(f.Spread, value)
 	}
 	return false
 }
@@ -141,6 +149,19 @@ func (f Filter) matches(svc status.Service) bool {
 		if !ok || svc.GPU != want {
 			return false
 		}
+	}
+	switch f.Spread {
+	case "zone":
+		if !svc.Zones.Known() || svc.Zones.Count() != 1 {
+			return false
+		}
+	case "node":
+		if !svc.Nodes.Known() || svc.Nodes.Count() != 1 {
+			return false
+		}
+	case "":
+	default:
+		return false // an unrecognised value matches nothing, per this file's own convention
 	}
 	return true
 }
@@ -242,9 +263,44 @@ func (f Filter) ShowServices() bool { return f.View != "unmanaged" }
 // ShowUnmanaged reports whether the unmanaged workloads section belongs on the page.
 // It is hidden while a service filter is active: if you asked to see only DEGRADED
 // services, a second table of things that are not services at all is noise.
+//
+// Spread is the one exception: zone/node spread applies just as much to a workload
+// outside GitOps as to a service, and the HA gauge's "at risk" count already folds
+// both together (see FillZones) -- hiding this table when spread is active would
+// silently drop rows that contributed to the very number the click came from.
 func (f Filter) ShowUnmanaged() bool {
 	if f.View == "unmanaged" {
 		return true
 	}
+	if f.Spread != "" {
+		return true
+	}
 	return f.View == "" && !f.Active()
+}
+
+// ApplyWorkloads returns the not-in-gitops rows the spread filter selects. Unlike
+// Apply, only the spread axis narrows this table: a Workload has no Sync/GPU/Arch/
+// Blocked concept comparable to a Service's, so those filters intentionally leave it
+// alone -- ShowUnmanaged hides the whole table for them instead.
+func (f Filter) ApplyWorkloads(items []status.Workload) []status.Workload {
+	if f.Spread == "" {
+		return items
+	}
+	out := make([]status.Workload, 0, len(items))
+	for _, w := range items {
+		switch f.Spread {
+		case "zone":
+			if !w.Zones.Known() || w.Zones.Count() != 1 {
+				continue
+			}
+		case "node":
+			if !w.Nodes.Known() || w.Nodes.Count() != 1 {
+				continue
+			}
+		default:
+			continue
+		}
+		out = append(out, w)
+	}
+	return out
 }
