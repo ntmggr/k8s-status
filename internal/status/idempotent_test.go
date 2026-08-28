@@ -46,6 +46,13 @@ func TestFillsAreIdempotent(t *testing.T) {
 	if z.Pods != 2 || z.Count() != 2 {
 		t.Errorf("Zones accumulated: %+v", z)
 	}
+	if snap.Summary.SingleNode != 0 || snap.Summary.MultiNode != 1 {
+		t.Errorf("SingleNode/MultiNode = %d/%d, want 0/1", snap.Summary.SingleNode, snap.Summary.MultiNode)
+	}
+	n := snap.Services[0].Nodes
+	if n.Pods != 2 || n.Count() != 2 {
+		t.Errorf("Nodes accumulated: %+v", n)
+	}
 }
 
 // zonedNode builds a node with one internal IP and a zone label, for FillZones tests.

@@ -107,6 +107,22 @@ type summaryJSON struct {
 	BlockedGPU       int `json:"blockedAccelerator"`
 	BlockedCPU       int `json:"blockedCpu"`
 	BlockedPlacement int `json:"blockedPlacement"`
+	// HA and NodeHA are nested rather than flat ints, for the same reason Health is:
+	// TestEveryNumericSummaryFieldIsMapped fills every Summary int with a distinct
+	// non-zero seed, which can drive the percent formula's denominator negative and
+	// clamp Percent to 0 — a correctly wired field that the test would then flag as
+	// "serialised as 0". A JSON object unmarshals to map[string]any, not float64, so
+	// that reflection walk skips it.
+	HA     haJSON `json:"ha"`
+	NodeHA haJSON `json:"nodeHa"`
+}
+
+type haJSON struct {
+	Percent   int  `json:"percent"`
+	Known     bool `json:"known"`
+	Eligible  int  `json:"eligible"`
+	Compliant int  `json:"compliant"`
+	AtRisk    int  `json:"atRisk"`
 }
 
 type blockedJSON struct {
@@ -484,6 +500,8 @@ func blocked(svc status.Service) *blockedJSON {
 // summaryOf maps the snapshot counters onto the response. Kept as its own function
 // so a test can check that every one of them is actually assigned.
 func summaryOf(snap *status.Snapshot) summaryJSON {
+	ha := snap.HA()
+	nodeHA := snap.NodeHA()
 	return summaryJSON{
 		Total:            snap.Summary.Total,
 		OK:               snap.Summary.OK,
@@ -503,5 +521,19 @@ func summaryOf(snap *status.Snapshot) summaryJSON {
 		BlockedGPU:       snap.Summary.BlockedGPU,
 		BlockedCPU:       snap.Summary.BlockedCPU,
 		BlockedPlacement: snap.Summary.BlockedPlacement,
+		HA: haJSON{
+			Percent:   ha.Percent,
+			Known:     ha.Known,
+			Eligible:  ha.Eligible,
+			Compliant: ha.Compliant,
+			AtRisk:    ha.AtRisk,
+		},
+		NodeHA: haJSON{
+			Percent:   nodeHA.Percent,
+			Known:     nodeHA.Known,
+			Eligible:  nodeHA.Eligible,
+			Compliant: nodeHA.Compliant,
+			AtRisk:    nodeHA.AtRisk,
+		},
 	}
 }

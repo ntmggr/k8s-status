@@ -136,6 +136,9 @@ type Service struct {
 	// Zones is set only when AZ_SPREAD is enabled. Zero value renders as unknown, not
 	// as zero zones.
 	Zones ZoneSpread
+	// Nodes is filled alongside Zones, from the same pod-to-node join. Zero value
+	// renders as unknown, not as zero nodes.
+	Nodes NodeSpread
 }
 
 type Summary struct {
@@ -171,6 +174,12 @@ type Summary struct {
 	Zoned      int
 	SingleZone int
 	MultiZone  int
+	// SingleNode and MultiNode are the node-spread counterpart of SingleZone and
+	// MultiZone: a service can sit in one zone while still spanning several nodes in
+	// it, so the two splits are tracked independently. Zero on both when AZ_SPREAD is
+	// off, same as the zone counters.
+	SingleNode int
+	MultiNode  int
 }
 
 type Snapshot struct {

@@ -133,6 +133,9 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-of .cap-part { display: inline-flex; align-items: baseline; gap: .3rem; }
 .cap-of .is-gpu { color: var(--gpu-fg); }
 .cap-of .is-warn, .cap-split.is-warn { color: var(--warn-fg); }
+.ha-lead.is-ok .cv { color: var(--ok-fg); }
+.ha-lead.is-warning .cv { color: var(--warn-fg); }
+.ha-lead.is-degraded .cv { color: var(--deg-fg); }
 .tile.t-ok        { background: var(--ok-bg);    border-color: transparent; } .tile.t-ok .n,        .tile.t-ok .k        { color: var(--ok-fg); }
 .tile.t-degraded  { background: var(--deg-bg);   border-color: transparent; } .tile.t-degraded .n,  .tile.t-degraded .k  { color: var(--deg-fg); }
 .tile.t-warning   { background: var(--warn-bg);  border-color: transparent; } .tile.t-warning .n,   .tile.t-warning .k   { color: var(--warn-fg); }
@@ -360,6 +363,45 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{- end}}
 </div>
 
+{{if $.HasData}}
+{{with $.Snapshot.HA}}
+<section class="capacity">
+  <div class="cap-head">HA<span class="cap-sub">spread across zones</span></div>
+  <div class="cap-group">
+    {{if .Known}}
+    <div class="cap-lead ha-lead is-{{lower (printf "%s" .State)}}"><span class="cv">{{.Percent}}</span><span class="ck">% zoned</span></div>
+    <div class="cap-of">
+      <span class="cap-part">{{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}}<i>&middot;</i>{{.AtRisk}} at risk (single zone){{end}}</span>
+    </div>
+    {{else}}
+    <div class="cap-lead ha-lead"><span class="cv">&mdash;</span><span class="ck">zoned</span></div>
+    <div class="cap-of">
+      <span class="cap-part">no services counted</span>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+{{with $.Snapshot.NodeHA}}
+<section class="capacity">
+  <div class="cap-head">HA<span class="cap-sub">spread across nodes</span></div>
+  <div class="cap-group">
+    {{if .Known}}
+    <div class="cap-lead"><span class="cv">{{.Percent}}</span><span class="ck">% multi-node</span></div>
+    <div class="cap-of">
+      <span class="cap-part">{{.Compliant}} of {{.Eligible}} counted<span class="cap-split{{if .AtRisk}} is-warn{{end}}">{{if .AtRisk}}{{.AtRisk}} at risk (single node){{end}}</span></span>
+    </div>
+    {{else}}
+    <div class="cap-lead"><span class="cv">&mdash;</span><span class="ck">multi-node</span></div>
+    <div class="cap-of">
+      <span class="cap-part">no services counted</span>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+{{end}}
+
 {{if and $.HasData $.Snapshot.Nodes}}
 <section class="capacity">
   <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
@@ -434,6 +476,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
     <div class="legend-row"><span class="az is-multi">az 2</span><span>Running pods sit in this many availability zones right now.</span></div>
     <div class="legend-row"><span class="az is-single">az 1</span><span>All running pods sit in one zone: that zone going down takes the whole service with it.</span></div>
+    <div class="legend-row"><span class="cap-lead ha-lead is-ok"><span class="cv">92</span><span class="ck">% zoned</span></span><span>Share of zone-eligible services that spread across more than one zone right now.</span></div>
+    <div class="legend-row"><span class="cap-lead"><span class="cv">92</span><span class="ck">% multi-node</span></span><span>Share of node-eligible services that spread across more than one node right now, tracked independently of zone spread.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 
