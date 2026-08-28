@@ -107,7 +107,8 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .sub { color: var(--ink-2); font-size: .85rem; margin-top: .45rem; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-.tiles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.1rem 0 .35rem; }
+.tiles-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.tiles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.1rem 0 .35rem; flex: 1 1 auto; }
 .tile {
   background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
   padding: .5rem .8rem; min-width: 5.5rem;
@@ -132,6 +133,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-of { display: flex; gap: .9rem; align-items: baseline; color: var(--ink-2); font-size: .8rem; }
 .cap-of .cap-part { display: inline-flex; align-items: baseline; gap: .3rem; }
 .cap-of .is-gpu { color: var(--gpu-fg); }
+.cap-of-room { flex-basis: 100%; margin-left: 1.6rem; }
 .cap-of .is-warn, .cap-split.is-warn { color: var(--warn-fg); }
 .tile.t-ok        { background: var(--ok-bg);    border-color: transparent; } .tile.t-ok .n,        .tile.t-ok .k        { color: var(--ok-fg); }
 .tile.t-degraded  { background: var(--deg-bg);   border-color: transparent; } .tile.t-degraded .n,  .tile.t-degraded .k  { color: var(--deg-fg); }
@@ -163,28 +165,47 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
 .health-dial {
   --pct: 0;
-  --track: var(--hair);
-  flex: none; position: relative;
-  width: 28px; height: 28px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: conic-gradient(var(--ok-fg) calc(var(--pct) * 1%), var(--track) 0);
+  flex: none; width: 108px;
+  display: flex; flex-direction: column; align-items: center;
 }
-.health-dial[data-state="warning"]  { background: conic-gradient(var(--warn-fg) calc(var(--pct) * 1%), var(--track) 0); }
-.health-dial[data-state="degraded"] { background: conic-gradient(var(--deg-fg) calc(var(--pct) * 1%), var(--track) 0); }
-.health-dial.is-unknown { background: var(--track); }
-.health-dial::before {
-  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+.health-dial .hd-face {
+  position: relative; width: 100%; height: 54px;
+}
+.health-dial .hd-arc {
+  width: 100%; height: 100%;
+  border-radius: 108px 108px 0 0;
+  background: conic-gradient(from 270deg at 50% 100%,
+    var(--deg-fg) 0deg, var(--deg-fg) 60deg,
+    var(--warn-fg) 60deg, var(--warn-fg) 120deg,
+    var(--ok-fg) 120deg, var(--ok-fg) 180deg);
+}
+.health-dial .hd-mask {
+  position: absolute; left: 8px; right: 8px; bottom: 0; top: 8px;
+  border-radius: 92px 92px 0 0;
   background: var(--plane);
 }
+.health-dial .hd-needle {
+  position: absolute; left: 50%; bottom: 4px; width: 2px; height: 36px;
+  background: var(--ink); transform-origin: bottom center;
+  transform: rotate(calc(var(--pct) * 1.8deg - 90deg));
+  border-radius: 2px;
+}
+.health-dial .hd-pivot {
+  position: absolute; left: 50%; bottom: 0; width: 8px; height: 8px;
+  margin-left: -4px; border-radius: 50%; background: var(--ink);
+}
 .health-dial .hd-num {
-  position: relative; z-index: 1;
-  font-size: .58rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  margin-top: .1rem; text-align: center; line-height: 1;
+  font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
-.health-dial .hd-num small { font-size: .78em; font-weight: 600; margin-left: .05em; }
-.health-dial[data-state="warning"] .hd-num  { color: var(--warn-fg); }
-.health-dial[data-state="degraded"] .hd-num { color: var(--deg-fg); }
-.health-dial.is-unknown .hd-num { color: var(--muted); font-weight: 600; }
+.health-dial .hd-num small { font-size: .68em; font-weight: 600; margin-left: .05em; }
+.health-dial .hd-cap {
+  margin-top: .1rem; text-align: center;
+  font-size: .62rem; color: var(--muted); white-space: nowrap;
+}
+.health-dial.is-unknown .hd-arc { background: var(--track, var(--hair)); }
+.health-dial.is-unknown .hd-needle, .health-dial.is-unknown .hd-pivot { background: var(--muted); }
 
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
@@ -324,11 +345,6 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- if $o.Active}} <span class="sel">{{$o.Label}}</span>{{else}} <a href="{{$o.Href}}">{{$o.Label}}</a>{{end}}
     {{- end}}
   </div>
-  {{if .HasData}}{{with .Snapshot.Summary.Health}}
-  <div class="health-dial{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}" data-state="{{lower (printf "%s" .State)}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
-    <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
-  </div>
-  {{end}}{{end}}
   </div>
 </header>
 
@@ -361,6 +377,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{/* The tiles keep counting the whole cluster while a filter is on. Do not "fix" this
      to count only the filtered rows: every other tile would read 0 as soon as one filter
      is applied and the reader would lose their bearings. Filtering picks rows, not counts. */}}
+<div class="tiles-row">
 <div class="tiles">
   <a class="tile t-total{{if not $.AnyFilter}} is-on{{end}}" href="{{$.ClearHref}}"><div class="n">{{.Total}}</div><div class="k">services</div></a>
   {{if .Degraded}}<a class="tile t-degraded{{if $.FilterActive "status" "DEGRADED"}} is-on{{end}}" href="{{$.FilterHref "status" "DEGRADED"}}"><div class="n">{{.Degraded}}</div><div class="k">degraded</div></a>{{end}}
@@ -371,6 +388,18 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{if .Suspended}}<a class="tile t-suspended{{if $.FilterActive "status" "SUSPENDED"}} is-on{{end}}" href="{{$.FilterHref "status" "SUSPENDED"}}"><div class="n">{{.Suspended}}</div><div class="k">suspended</div></a>{{end}}
   <a class="tile t-ok{{if $.FilterActive "status" "OK"}} is-on{{end}}" href="{{$.FilterHref "status" "OK"}}"><div class="n">{{.OK}}</div><div class="k">ok</div></a>
   {{if .Hidden}}<div class="tile"><div class="n">{{.Hidden}}</div><div class="k">hidden</div></div>{{end}}
+</div>
+{{with .Health}}
+<div class="health-dial{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+  <div class="hd-face">
+    <div class="hd-arc"></div>
+    <div class="hd-mask"></div>
+    {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
+  </div>
+  <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+  <span class="hd-cap">{{if .Known}}{{.OK}} of {{.Counted}} counted{{else}}no services counted{{end}}</span>
+</div>
+{{end}}
 </div>
 <div class="views">
   <span class="views-lab">views</span>
@@ -417,7 +446,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
       {{- /* Its own row, and labelled. This counts services while everything above
              counts machines; run together on one line the numbers read as though they
              belonged to the gpu figure beside them. */}}
-      <div class="cap-of">
+      <div class="cap-of cap-of-room">
         <span class="ck">waiting for room</span>
         <span class="cap-part is-warn" title="Services the scheduler could not place. They are not broken; there is nowhere to run them right now.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} service{{if ne $.Snapshot.Summary.Blocked 1}}s{{end}}
           <span class="cap-split">{{if $.Snapshot.Summary.BlockedCPU}}{{$.Snapshot.Summary.BlockedCPU}} short of cpu or memory{{end}}{{if and $.Snapshot.Summary.BlockedCPU (or $.Snapshot.Summary.BlockedGPU $.Snapshot.Summary.BlockedPlacement)}}<i>·</i>{{end}}{{if $.Snapshot.Summary.BlockedGPU}}{{$.Snapshot.Summary.BlockedGPU}} short of {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.BlockedPlacement}}<i>·</i>{{end}}{{end}}{{if $.Snapshot.Summary.BlockedPlacement}}{{$.Snapshot.Summary.BlockedPlacement}} with no node to run on{{end}}</span></span>
