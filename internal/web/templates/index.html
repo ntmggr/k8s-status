@@ -813,6 +813,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- with .Blocked}}<span class="blocked is-{{.Kind}}" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
     {{- with .Arch}}<span class="arch is-{{.}}" title="Every node this service may run on is {{.}}{{if eq . "arm64"}}, which on AWS means Graviton{{end}}. Services free to run on either architecture carry no badge.">{{.}}</span>{{end}}
     {{- if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}
+    {{- if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for
@@ -868,8 +869,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <div class="sec-head" id="unmanaged">Not managed by ArgoCD
   <span class="sec-sub">running in the cluster but outside GitOps, EKS addons, Terraform-installed
   components, hand-installed Helm releases. These are not services above and are not in the Services counts --
-  the HA gauge's spread numbers are the one place they are folded in, since a zone or node can take them down
-  exactly like any tracked service.</span>
+  the HA and Mesh gauges' numbers are the one place they are folded in, since a zone, node or missing sidecar
+  affects them exactly like it would any tracked service.</span>
 </div>
 <div class="card">
 <table>
@@ -889,7 +890,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <tr>
   <td class="ns">{{.Namespace}}</td>
   <td class="kind">{{.Kind}}</td>
-  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}</td>
+  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}{{if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}</td>
   <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>
   <td class="appver hide-sm">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
   <td class="ready">{{.Ready}}/{{.Desired}}</td>
