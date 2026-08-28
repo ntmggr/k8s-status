@@ -162,10 +162,10 @@ func setList(q url.Values, key string, values []string) {
 // active check all read this one list. They each used to spell it out separately and
 // drifted apart: "services" stopped clearing an architecture because that filter was
 // added in one place and not the other two.
-var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView, filterSpread}
+var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView, filterSpread, filterMesh}
 
 // viewChips are the single-value chips in the views row. Exactly one can be active.
-var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked, filterSpread}
+var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked, filterSpread, filterMesh}
 
 func isViewChip(kind string) bool {
 	for _, k := range viewChips {

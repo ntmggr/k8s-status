@@ -37,6 +37,7 @@ func TestParseFilter(t *testing.T) {
 		{name: "gpu", raw: "gpu=true", want: Filter{GPU: "true"}},
 		{name: "combined", raw: "status=DEGRADED,DRIFT&sync=OutOfSync&gpu=false",
 			want: Filter{Status: []string{"DEGRADED", "DRIFT"}, Sync: []string{"OutOfSync"}, GPU: "false"}},
+		{name: "mesh", raw: "mesh=not-injected", want: Filter{Mesh: "not-injected"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -360,6 +361,79 @@ func TestShowUnmanagedSpreadIsAnException(t *testing.T) {
 		{name: "status filter hides it", f: Filter{Status: []string{"DEGRADED"}}, want: false},
 		{name: "spread alongside status still shows it", f: Filter{Spread: "node", Status: []string{"DEGRADED"}}, want: true},
 		{name: "view=unmanaged always shows it", f: Filter{View: "unmanaged"}, want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.f.ShowUnmanaged(); got != tc.want {
+				t.Errorf("ShowUnmanaged() = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
+func testMeshServices() []status.Service {
+	return []status.Service{
+		{Name: "full", Mesh: status.MeshCoverage{Pods: 2, Injected: 2}},
+		{Name: "partial", Mesh: status.MeshCoverage{Pods: 2, Injected: 1}},
+		{Name: "no-answer"}, // Mesh zero-value: Known() is false
+	}
+}
+
+func TestFilterApplyMeshNotInjected(t *testing.T) {
+	f := Filter{Mesh: "not-injected"}
+	got := names(f.Apply(testMeshServices()))
+	want := []string{"partial"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Apply(mesh=not-injected) = %v, want %v", got, want)
+	}
+}
+
+func TestFilterApplyMeshUnrecognisedValueSelectsNothing(t *testing.T) {
+	f := Filter{Mesh: "bogus"}
+	got := f.Apply(testMeshServices())
+	if len(got) != 0 {
+		t.Errorf("Apply(mesh=bogus) = %v, want none", names(got))
+	}
+}
+
+func testMeshWorkloads() []status.Workload {
+	return []status.Workload{
+		{Name: "full", Mesh: status.MeshCoverage{Pods: 2, Injected: 2}},
+		{Name: "partial", Mesh: status.MeshCoverage{Pods: 2, Injected: 1}},
+		{Name: "no-answer"}, // Mesh zero-value: Known() is false
+	}
+}
+
+func TestApplyWorkloadsFiltersByMesh(t *testing.T) {
+	items := testMeshWorkloads()
+	cases := []struct {
+		mesh string
+		want []string
+	}{
+		{mesh: "", want: []string{"full", "partial", "no-answer"}},
+		{mesh: "not-injected", want: []string{"partial"}},
+		{mesh: "bogus", want: []string{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.mesh, func(t *testing.T) {
+			f := Filter{Mesh: tc.mesh}
+			got := workloadNames(f.ApplyWorkloads(items))
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ApplyWorkloads(mesh=%q) = %v, want %v", tc.mesh, got, tc.want)
+			}
+		})
+	}
+}
+
+// Mesh is the same kind of exception Spread is: see ShowUnmanaged's own comment.
+func TestShowUnmanagedMeshIsAnException(t *testing.T) {
+	cases := []struct {
+		name string
+		f    Filter
+		want bool
+	}{
+		{name: "mesh only", f: Filter{Mesh: "not-injected"}, want: true},
+		{name: "mesh alongside status still shows it", f: Filter{Mesh: "not-injected", Status: []string{"DEGRADED"}}, want: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
