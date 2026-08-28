@@ -799,8 +799,7 @@ same arithmetic reason as GPU.
 ### Mesh mTLS
 
 Shows whether Istio is installed and, if so, the cluster-wide mTLS posture: `STRICT`,
-`PERMISSIVE`, or disabled. This is cluster-wide only — per-service mTLS coverage is out
-of scope.
+`PERMISSIVE`, or disabled.
 
 - Istio is detected via discovery (`HasResource`), the same mechanism `SOURCES=auto`
   uses for ArgoCD and Flux; no Istio CRD served means no mesh, rendered as a neutral
@@ -813,6 +812,13 @@ of scope.
   workload rather than the whole mesh, and the page says so.
 - **Mesh-wide policy only.** Namespace and workload `PeerAuthentication` objects can
   override this for individual services and are not read.
+
+Alongside that cluster-wide answer, when `AZ_SPREAD` is also on, each service gets a
+per-service **sidecar-injection** answer: how many of its running pods carry an
+`istio-proxy` container, from the same running-pods read AZ_SPREAD already fetches. This
+is injection only, never enforcement — a service can carry the sidecar on every pod
+without STRICT mTLS applying to it, since that depends on the policy objects above,
+which are not read per-service.
 
 ## How it works
 
