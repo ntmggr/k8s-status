@@ -87,7 +87,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
   color: var(--ink-2); vertical-align: .12em;
 }
 .hdr-sub { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: .7; }
-.legend { margin: .5rem 0 .2rem; padding: .6rem .75rem; background: var(--surface);
+.legend { margin: .55rem 0 .2rem; padding: .55rem .8rem; background: var(--surface);
           border: 1px solid var(--ring); border-radius: 8px; }
 .legend > summary { cursor: pointer; color: var(--ink-2); font-size: .78rem; font-weight: 600;
                     letter-spacing: .02em; list-style: none; }
@@ -99,24 +99,45 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .legend-row { display: flex; align-items: baseline; gap: .45rem; font-size: .78rem;
               color: var(--ink-2); }
 .legend-row .pill { flex: none; }
+.legend-kw { flex: none; font-size: .68rem; font-weight: 700; letter-spacing: .04em;
+             color: var(--muted); }
 .legend-note { margin-top: .5rem; font-size: .74rem; color: var(--muted); }
 .region { font-weight: 400; color: var(--muted); margin-left: .5rem; font-size: .9rem; }
 .meta { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 
 .sub { color: var(--ink-2); font-size: .85rem; margin-top: .45rem; }
+.src-tag {
+  display: inline-block; margin-right: .4rem; padding: .05rem .4rem;
+  border: 1px solid var(--ring); border-radius: 4px;
+  font-size: .62rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--muted); vertical-align: .1em;
+}
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-.tiles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.1rem 0 .35rem; }
+/* One bordered .panel per summary group (Services today; Availability/Security etc.
+   can join as sibling .panel elements later without restructuring this row). */
+.panel-row { display: flex; flex-wrap: wrap; gap: .75rem; margin: .9rem 0 .35rem; }
+.panel { flex: 1 1 380px; box-sizing: border-box; background: var(--surface);
+         border: 1px solid var(--ring); border-radius: 8px; padding: .55rem .8rem; }
+.tiles-row { display: flex; align-items: stretch; justify-content: flex-start; gap: .9rem;
+             margin-top: .45rem; }
+.tiles-stack { display: flex; flex-direction: column; gap: .5rem; margin: 1.1rem 0 .35rem; }
+.tiles { display: flex; flex-wrap: wrap; gap: .5rem; }
 .tile {
   background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
-  padding: .5rem .8rem; min-width: 5.5rem;
+  padding: .5rem .8rem; width: 7.4rem; box-sizing: border-box;
 }
 .tile .n { font-size: 1.35rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .tile .k { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .tile.t-total .n { color: var(--ink); }
-.views { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .5rem 0 .1rem; }
-.views-lab { font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: .2rem; }
+/* Same flat-bordered-card language as .capacity (Cluster) below it: these two are the
+   same kind of thing -- a labelled group of at-a-glance facts -- and should look it. */
+.views { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+         margin: .55rem 0 .2rem; padding: .55rem .8rem;
+         background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; }
+.views-lab { font-size: .68rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+             color: var(--muted); margin-right: .3rem; }
 .vchip { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .55rem; border-radius: 999px;
          border: 1px solid var(--ring); background: var(--surface); color: var(--ink-2);
          font-size: .74rem; text-decoration: none; }
@@ -132,6 +153,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-of { display: flex; gap: .9rem; align-items: baseline; color: var(--ink-2); font-size: .8rem; }
 .cap-of .cap-part { display: inline-flex; align-items: baseline; gap: .3rem; }
 .cap-of .is-gpu { color: var(--gpu-fg); }
+.cap-of-room { flex-basis: 100%; margin-left: 1.6rem; }
 .cap-of .is-warn, .cap-split.is-warn { color: var(--warn-fg); }
 .ha-lead.is-ok .cv { color: var(--ok-fg); }
 .ha-lead.is-warning .cv { color: var(--warn-fg); }
@@ -159,6 +181,107 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-item .ck { font-size: .72rem; color: var(--muted); }
 .cap-item.is-gpu .cv { color: var(--gpu-fg); }
 .cap-note { margin-top: .4rem; font-size: .74rem; color: var(--muted); }
+
+.hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
+.health-dial {
+  /* Flat and bordered like .capacity/.tile, not its own elevated card -- a drop
+     shadow here would make this the only "raised" element on the whole page.
+     Stretched to match the tiles-stack's height (align-items: stretch on the parent
+     row) rather than a hand-picked height, so it stays right if the tile styling
+     ever changes. justify-content spaces its own content out to fill that height. */
+  --pct: 0;
+  flex: none; width: 124px;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  box-sizing: border-box;
+  padding: .55rem .8rem .5rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--ring);
+}
+.health-dial .hd-title {
+  /* Matches .cap-head/.views-lab exactly: this is the same "eyebrow label" role as
+     CLUSTER and VIEWS, not a one-off style. */
+  font-size: .68rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: .3rem;
+}
+.health-dial .hd-face {
+  position: relative; width: 100%; height: 58px;
+}
+.health-dial .hd-arc {
+  /* A smooth blend, not hard blocks: mapping severity thresholds (75/90) straight onto
+     arc degrees made red cover ~73% of the face and look alarming regardless of the
+     actual number. The needle position and the number's color still track the real
+     Health.State() thresholds -- only the background band is now a gradient. */
+  width: 100%; height: 100%;
+  border-radius: 108px 108px 0 0;
+  background: conic-gradient(from 270deg at 50% 100%,
+    var(--deg-fg) 0deg, var(--warn-fg) 90deg, var(--ok-fg) 180deg);
+  box-shadow: inset 0 -3px 6px rgba(0,0,0,.1), inset 0 0 0 1px rgba(0,0,0,.04);
+}
+.health-dial .hd-tick {
+  position: absolute; left: 50%; bottom: 0; width: 2px; height: 54px;
+  margin-left: -1px; transform-origin: bottom center;
+}
+.health-dial .hd-tick::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 2px; height: 7px;
+  background: var(--plane); box-shadow: 0 0 0 1px rgba(0,0,0,.1);
+}
+.health-dial .hd-scale {
+  /* Counter-rotated so the digits stay upright regardless of which tick they sit on. */
+  position: absolute; top: -13px; left: 50%; margin-left: -7px; width: 14px;
+  text-align: center; font-size: .5rem; font-weight: 700; color: var(--muted);
+}
+.health-dial .hd-mask {
+  position: absolute; left: 9px; right: 9px; bottom: 0; top: 9px;
+  border-radius: 92px 92px 0 0;
+  background: var(--plane);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.07);
+}
+.health-dial .hd-needle {
+  /* An arrowhead on a thin shaft, not a wide taper starting from the pivot: a wide
+     base sweeps directly over the number at low/high percentages, where the needle
+     lies close to horizontal, but the arrowhead itself sits far enough out along
+     the needle's length that it clears the number even then. */
+  position: absolute; left: 50%; bottom: 0; width: 10px; height: 42px;
+  margin-left: -5px;
+  clip-path: polygon(50% 0%, 100% 24%, 64% 24%, 64% 100%, 36% 100%, 36% 24%, 0% 24%);
+  /* Softened --ink (not --muted): the needle still needs to read against all three
+     arc colors, and a light grey nearly disappears against the amber band. A
+     translucent dark keeps contrast everywhere while staying secondary to the number. */
+  background: color-mix(in srgb, var(--ink) 78%, transparent);
+  transform-origin: bottom center;
+  transform: rotate(calc(var(--pct) * 1.8deg - 90deg));
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.3));
+}
+.health-dial .hd-pivot {
+  position: absolute; left: 50%; bottom: -1px; width: 10px; height: 10px;
+  margin-left: -5px; border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 78%, transparent);
+  box-shadow: 0 0 0 3px var(--plane), 0 1px 3px rgba(0,0,0,.35);
+}
+.health-dial .hd-num {
+  /* Matches the arc's own gradient at the needle's exact position, not the
+     Health.State() thresholds -- otherwise the number can land on a color the
+     needle visually isn't pointing at. Two chained color-mixes reproduce the arc's
+     two-segment gradient: clamped so segment two only kicks in past the midpoint. */
+  --seg1: clamp(0%, calc(var(--pct) * 2%), 100%);
+  --seg2: clamp(0%, calc((var(--pct) - 50) * 2%), 100%);
+  --hd-mid: color-mix(in srgb, var(--deg-fg), var(--warn-fg) var(--seg1));
+  /* Sits inside the arc face, above the pivot hub and the needle's rotation band so
+     the needle never sweeps across it even at 0%/100% (near-horizontal). */
+  position: absolute; left: 0; right: 0; bottom: 11px; z-index: 1;
+  text-align: center; line-height: 1;
+  font-size: 1.1rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--hd-mid), var(--ok-fg) var(--seg2));
+}
+.health-dial .hd-num small { font-size: .6em; font-weight: 700; margin-left: .05em; }
+.health-dial .hd-cap {
+  margin-top: .15rem; text-align: center;
+  font-size: .62rem; color: var(--muted); white-space: nowrap;
+}
+.health-dial.is-unknown .hd-arc { background: var(--track, var(--hair)); box-shadow: none; }
+.health-dial.is-unknown .hd-needle, .health-dial.is-unknown .hd-pivot { background: var(--muted); filter: none; }
+.health-dial.is-unknown .hd-num { color: var(--muted); }
 
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
@@ -296,15 +419,22 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
+  <div class="hdr-right">
   <div class="meta">checked {{.AgeSeconds}}s ago &middot; auto-refresh
     {{- range $i, $o := .RefreshOptions}}{{if $i}} &middot;{{end}}
     {{- if $o.Active}} <span class="sel">{{$o.Label}}</span>{{else}} <a href="{{$o.Href}}">{{$o.Label}}</a>{{end}}
     {{- end}}
   </div>
+  </div>
 </header>
 
 {{if .ShowRootLine}}{{with .Snapshot}}
 <div class="sub" title="root health {{.RootHealth}} &middot; root sync {{.RootSync}}">
+  {{/* Everything on this line comes from the ArgoCD root Application: a Flux-only
+       cluster has none of it (ShowRootLine is false there), and a mixed cluster's
+       Flux-managed rows are not reflected here at all -- this is ArgoCD's own
+       account of itself, not the whole cluster's. Label it so that's not assumed. */}}
+  <span class="src-tag" title="This line reflects the ArgoCD root Application only, not the whole cluster.">ArgoCD</span>
   version
   {{- $tree := repoTree .RepoURL .Version}}
   {{- if $tree}} <a class="mono" href="{{$tree}}"><strong>{{.Version}}</strong></a>
@@ -329,19 +459,45 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 
 {{if .HasData}}
 {{with .Snapshot.Summary}}
+{{/* .panel-row holds one bordered .panel per summary group -- Services today, room for
+     e.g. an Availability or Security panel to sit beside it later without restructuring
+     this section again. Each panel owns its own cap-head label, same as Cluster/Views. */}}
+<div class="panel-row">
+<div class="panel">
 {{/* The tiles keep counting the whole cluster while a filter is on. Do not "fix" this
      to count only the filtered rows: every other tile would read 0 as soon as one filter
      is applied and the reader would lose their bearings. Filtering picks rows, not counts. */}}
-<div class="tiles">
-  <a class="tile t-total{{if not $.AnyFilter}} is-on{{end}}" href="{{$.ClearHref}}"><div class="n">{{.Total}}</div><div class="k">services</div></a>
-  {{if .Degraded}}<a class="tile t-degraded{{if $.FilterActive "status" "DEGRADED"}} is-on{{end}}" href="{{$.FilterHref "status" "DEGRADED"}}"><div class="n">{{.Degraded}}</div><div class="k">degraded</div></a>{{end}}
-  {{if .Warning}}<a class="tile t-warning{{if $.FilterActive "status" "WARNING"}} is-on{{end}}" href="{{$.FilterHref "status" "WARNING"}}"><div class="n">{{.Warning}}</div><div class="k">warning</div></a>{{end}}
-  {{if .Progressing}}<a class="tile t-progressing{{if $.FilterActive "status" "PROGRESSING"}} is-on{{end}}" href="{{$.FilterHref "status" "PROGRESSING"}}"><div class="n">{{.Progressing}}</div><div class="k">progressing</div></a>{{end}}
-  {{if .Drift}}<a class="tile t-drift{{if $.FilterActive "status" "DRIFT"}} is-on{{end}}" href="{{$.FilterHref "status" "DRIFT"}}"><div class="n">{{.Drift}}</div><div class="k">drift</div></a>{{end}}
-  {{if .Prune}}<a class="tile t-prune{{if $.FilterActive "status" "PRUNE"}} is-on{{end}}" href="{{$.FilterHref "status" "PRUNE"}}"><div class="n">{{.Prune}}</div><div class="k">prune</div></a>{{end}}
-  {{if .Suspended}}<a class="tile t-suspended{{if $.FilterActive "status" "SUSPENDED"}} is-on{{end}}" href="{{$.FilterHref "status" "SUSPENDED"}}"><div class="n">{{.Suspended}}</div><div class="k">suspended</div></a>{{end}}
-  <a class="tile t-ok{{if $.FilterActive "status" "OK"}} is-on{{end}}" href="{{$.FilterHref "status" "OK"}}"><div class="n">{{.OK}}</div><div class="k">ok</div></a>
-  {{if .Hidden}}<div class="tile"><div class="n">{{.Hidden}}</div><div class="k">hidden</div></div>{{end}}
+<div class="cap-head">Services<span class="cap-sub">what's deployed, and whether it's healthy</span></div>
+<div class="tiles-row">
+{{with .Health}}
+<div class="health-dial{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+  <span class="hd-title">Health</span>
+  <div class="hd-face">
+    <div class="hd-arc"></div>
+    <i class="hd-tick" style="transform: rotate(-90deg)"></i>
+    <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+    <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+    <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
+    <i class="hd-tick" style="transform: rotate(90deg)"></i>
+    <div class="hd-mask"></div>
+    {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
+    <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+  </div>
+  <span class="hd-cap">{{if .Known}}{{.OK}} of {{.Counted}} counted{{else}}no services counted{{end}}</span>
+</div>
+{{end}}
+<div class="tiles-stack">
+  <div class="tiles">
+    {{range $.TileRowTop}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
+  </div>
+  {{with $.TileRowBottom}}
+  <div class="tiles">
+    {{range .}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
+  </div>
+  {{end}}
+</div>
+</div>
+</div>
 </div>
 <div class="views">
   <span class="views-lab">views</span>
@@ -433,7 +589,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
       {{- /* Its own row, and labelled. This counts services while everything above
              counts machines; run together on one line the numbers read as though they
              belonged to the gpu figure beside them. */}}
-      <div class="cap-of">
+      <div class="cap-of cap-of-room">
         <span class="ck">waiting for room</span>
         <span class="cap-part is-warn" title="Services the scheduler could not place. They are not broken; there is nowhere to run them right now.">{{icon "warn"}}{{$.Snapshot.Summary.Blocked}} service{{if ne $.Snapshot.Summary.Blocked 1}}s{{end}}
           <span class="cap-split">{{if $.Snapshot.Summary.BlockedCPU}}{{$.Snapshot.Summary.BlockedCPU}} short of cpu or memory{{end}}{{if and $.Snapshot.Summary.BlockedCPU (or $.Snapshot.Summary.BlockedGPU $.Snapshot.Summary.BlockedPlacement)}}<i>·</i>{{end}}{{if $.Snapshot.Summary.BlockedGPU}}{{$.Snapshot.Summary.BlockedGPU}} short of {{$.Snapshot.AcceleratorLabel}}{{if $.Snapshot.Summary.BlockedPlacement}}<i>·</i>{{end}}{{end}}{{if $.Snapshot.Summary.BlockedPlacement}}{{$.Snapshot.Summary.BlockedPlacement}} with no node to run on{{end}}</span></span>
@@ -474,10 +630,11 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
+    <div class="legend-row"><span class="legend-kw">HEALTH</span><span>The gauge's needle and number are the share of counted services that are <em>OK</em> right now. <em>Prune</em> and <em>suspended</em> rows are excluded from the count; <em>progressing</em> and <em>drift</em> still count as not-OK. Shows &mdash; when nothing is left to count.</span></div>
     <div class="legend-row"><span class="az is-multi">az 2</span><span>Running pods sit in this many availability zones right now.</span></div>
     <div class="legend-row"><span class="az is-single">az 1</span><span>All running pods sit in one zone: that zone going down takes the whole service with it.</span></div>
-    <div class="legend-row"><span class="cap-lead ha-lead is-ok"><span class="cv">92</span><span class="ck">% zoned</span></span><span>Share of zone-eligible services that spread across more than one zone right now.</span></div>
-    <div class="legend-row"><span class="cap-lead"><span class="cv">92</span><span class="ck">% multi-node</span></span><span>Share of node-eligible services that spread across more than one node right now, tracked independently of zone spread.</span></div>
+    <div class="legend-row"><span class="legend-kw">ZONED</span><span>Share of zone-eligible services that spread across more than one zone right now.</span></div>
+    <div class="legend-row"><span class="legend-kw">MULTI-NODE</span><span>Share of node-eligible services that spread across more than one node right now, tracked independently of zone spread.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 

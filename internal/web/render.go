@@ -232,6 +232,58 @@ func (d pageData) ClearHref() string {
 	return d.href(q)
 }
 
+// Tile is one summary-count box in the tiles row.
+type Tile struct {
+	Class string
+	Count int
+	Label string
+	Href  string
+	IsOn  bool
+}
+
+// tiles builds the tile list in the same order and the same nonzero-count gating the
+// template used to apply inline. Kept as one Go-side list so TileRowTop/TileRowBottom
+// can split it by count rather than by whatever happens to fit a CSS row's width.
+func (d pageData) tiles() []Tile {
+	if d.Snapshot == nil {
+		return nil
+	}
+	s := d.Snapshot.Summary
+	out := []Tile{{Class: "t-total", Count: s.Total, Label: "services", Href: d.ClearHref(), IsOn: !d.AnyFilter()}}
+	add := func(count int, class, label string) {
+		if count == 0 {
+			return
+		}
+		out = append(out, Tile{Class: class, Count: count, Label: label,
+			Href: d.FilterHref("status", strings.ToUpper(label)), IsOn: d.FilterActive("status", strings.ToUpper(label))})
+	}
+	add(s.Degraded, "t-degraded", "degraded")
+	add(s.Warning, "t-warning", "warning")
+	add(s.Progressing, "t-progressing", "progressing")
+	add(s.Drift, "t-drift", "drift")
+	add(s.Prune, "t-prune", "prune")
+	add(s.Suspended, "t-suspended", "suspended")
+	out = append(out, Tile{Class: "t-ok", Count: s.OK, Label: "ok", Href: d.FilterHref("status", "OK"), IsOn: d.FilterActive("status", "OK")})
+	if s.Hidden > 0 {
+		out = append(out, Tile{Count: s.Hidden, Label: "hidden"})
+	}
+	return out
+}
+
+// TileRowTop and TileRowBottom split the tiles into two rows by count, not by width:
+// an even count splits evenly, an odd count puts the extra tile on top. CSS wrapping
+// alone can't guarantee this, since it wraps wherever a row happens to run out of
+// width for whatever content is actually in it.
+func (d pageData) TileRowTop() []Tile {
+	t := d.tiles()
+	return t[:(len(t)+1)/2]
+}
+
+func (d pageData) TileRowBottom() []Tile {
+	t := d.tiles()
+	return t[(len(t)+1)/2:]
+}
+
 func (d pageData) Chips() []Chip {
 	var out []Chip
 	add := func(kind, value string) {

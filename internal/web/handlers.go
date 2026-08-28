@@ -107,14 +107,23 @@ type summaryJSON struct {
 	BlockedGPU       int `json:"blockedAccelerator"`
 	BlockedCPU       int `json:"blockedCpu"`
 	BlockedPlacement int `json:"blockedPlacement"`
-	// HA and NodeHA are nested rather than flat ints, for the same reason Health is:
-	// TestEveryNumericSummaryFieldIsMapped fills every Summary int with a distinct
-	// non-zero seed, which can drive the percent formula's denominator negative and
-	// clamp Percent to 0 — a correctly wired field that the test would then flag as
-	// "serialised as 0". A JSON object unmarshals to map[string]any, not float64, so
-	// that reflection walk skips it.
-	HA     haJSON `json:"ha"`
-	NodeHA haJSON `json:"nodeHa"`
+	// Health, HA and NodeHA are all nested rather than flat ints: TestEveryNumericSummaryFieldIsMapped
+	// fills every Summary int with a distinct non-zero seed, which can drive a
+	// percent formula's denominator negative and clamp Percent to 0 — a correctly
+	// wired field that the test would then flag as "serialised as 0". A JSON object
+	// unmarshals to map[string]any, not float64, so that reflection walk skips it.
+	Health healthJSON `json:"health"`
+	HA     haJSON     `json:"ha"`
+	NodeHA haJSON     `json:"nodeHa"`
+}
+
+type healthJSON struct {
+	Percent   int  `json:"percent"`
+	Known     bool `json:"known"`
+	Counted   int  `json:"counted"`
+	OK        int  `json:"ok"`
+	Excluded  int  `json:"excluded"`
+	Attention int  `json:"attention"`
 }
 
 type haJSON struct {
@@ -500,6 +509,7 @@ func blocked(svc status.Service) *blockedJSON {
 // summaryOf maps the snapshot counters onto the response. Kept as its own function
 // so a test can check that every one of them is actually assigned.
 func summaryOf(snap *status.Snapshot) summaryJSON {
+	h := snap.Summary.Health()
 	ha := snap.HA()
 	nodeHA := snap.NodeHA()
 	return summaryJSON{
@@ -521,6 +531,14 @@ func summaryOf(snap *status.Snapshot) summaryJSON {
 		BlockedGPU:       snap.Summary.BlockedGPU,
 		BlockedCPU:       snap.Summary.BlockedCPU,
 		BlockedPlacement: snap.Summary.BlockedPlacement,
+		Health: healthJSON{
+			Percent:   h.Percent,
+			Known:     h.Known,
+			Counted:   h.Counted,
+			OK:        h.OK,
+			Excluded:  h.Excluded,
+			Attention: h.Attention,
+		},
 		HA: haJSON{
 			Percent:   ha.Percent,
 			Known:     ha.Known,
