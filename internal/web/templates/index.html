@@ -108,7 +108,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
 .tiles-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
-.tiles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.1rem 0 .35rem; flex: 1 1 auto; }
+.tiles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.1rem 0 .35rem; flex: 0 1 auto; max-width: 21rem; }
 .tile {
   background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
   padding: .5rem .8rem; min-width: 5.5rem;
@@ -165,47 +165,78 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
 .health-dial {
   --pct: 0;
-  flex: none; width: 108px;
+  flex: none; width: 124px;
   display: flex; flex-direction: column; align-items: center;
+  padding: .55rem .7rem .5rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 22px -12px rgba(0,0,0,.22);
+}
+.health-dial .hd-title {
+  font-size: .6rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: .3rem;
 }
 .health-dial .hd-face {
-  position: relative; width: 100%; height: 54px;
+  position: relative; width: 100%; height: 58px;
 }
 .health-dial .hd-arc {
+  /* Bands match Health.State()'s own thresholds (<75 degraded, <90 warning, else ok),
+     so the needle's zone and the glowing number always agree on what "healthy" means. */
   width: 100%; height: 100%;
   border-radius: 108px 108px 0 0;
   background: conic-gradient(from 270deg at 50% 100%,
-    var(--deg-fg) 0deg, var(--deg-fg) 60deg,
-    var(--warn-fg) 60deg, var(--warn-fg) 120deg,
-    var(--ok-fg) 120deg, var(--ok-fg) 180deg);
+    var(--deg-fg) 0deg, var(--deg-fg) 132deg,
+    var(--warn-fg) 138deg, var(--warn-fg) 159deg,
+    var(--ok-fg) 165deg, var(--ok-fg) 180deg);
+  box-shadow: inset 0 -3px 6px rgba(0,0,0,.1), inset 0 0 0 1px rgba(0,0,0,.04);
+}
+.health-dial .hd-tick {
+  position: absolute; left: 50%; bottom: 0; width: 2px; height: 54px;
+  margin-left: -1px; transform-origin: bottom center;
+}
+.health-dial .hd-tick::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 2px; height: 7px;
+  background: var(--plane); box-shadow: 0 0 0 1px rgba(0,0,0,.1);
 }
 .health-dial .hd-mask {
-  position: absolute; left: 8px; right: 8px; bottom: 0; top: 8px;
+  position: absolute; left: 9px; right: 9px; bottom: 0; top: 9px;
   border-radius: 92px 92px 0 0;
   background: var(--plane);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.07);
 }
 .health-dial .hd-needle {
-  position: absolute; left: 50%; bottom: 4px; width: 2px; height: 36px;
-  background: var(--ink); transform-origin: bottom center;
+  position: absolute; left: 50%; bottom: 5px; width: 8px; height: 38px;
+  margin-left: -4px;
+  background: linear-gradient(var(--ink), color-mix(in srgb, var(--ink) 45%, transparent));
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  transform-origin: bottom center;
   transform: rotate(calc(var(--pct) * 1.8deg - 90deg));
-  border-radius: 2px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.3));
 }
 .health-dial .hd-pivot {
-  position: absolute; left: 50%; bottom: 0; width: 8px; height: 8px;
-  margin-left: -4px; border-radius: 50%; background: var(--ink);
+  position: absolute; left: 50%; bottom: -1px; width: 10px; height: 10px;
+  margin-left: -5px; border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--plane), 0 1px 3px rgba(0,0,0,.35);
 }
 .health-dial .hd-num {
-  margin-top: .1rem; text-align: center; line-height: 1;
-  font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  margin-top: .2rem; text-align: center; line-height: 1;
+  font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums;
   color: var(--ink);
+  text-shadow: 0 0 14px color-mix(in srgb, currentColor 55%, transparent);
 }
-.health-dial .hd-num small { font-size: .68em; font-weight: 600; margin-left: .05em; }
+.health-dial[data-zone="degraded"] .hd-num { color: var(--deg-fg); }
+.health-dial[data-zone="warning"]  .hd-num { color: var(--warn-fg); }
+.health-dial[data-zone="ok"]       .hd-num { color: var(--ok-fg); }
+.health-dial .hd-num small { font-size: .6em; font-weight: 700; margin-left: .05em; }
 .health-dial .hd-cap {
-  margin-top: .1rem; text-align: center;
+  margin-top: .15rem; text-align: center;
   font-size: .62rem; color: var(--muted); white-space: nowrap;
 }
-.health-dial.is-unknown .hd-arc { background: var(--track, var(--hair)); }
-.health-dial.is-unknown .hd-needle, .health-dial.is-unknown .hd-pivot { background: var(--muted); }
+.health-dial.is-unknown .hd-arc { background: var(--track, var(--hair)); box-shadow: none; }
+.health-dial.is-unknown .hd-needle, .health-dial.is-unknown .hd-pivot { background: var(--muted); filter: none; }
+.health-dial.is-unknown .hd-num { text-shadow: none; color: var(--muted); }
 
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
@@ -390,9 +421,15 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   {{if .Hidden}}<div class="tile"><div class="n">{{.Hidden}}</div><div class="k">hidden</div></div>{{end}}
 </div>
 {{with .Health}}
-<div class="health-dial{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+<div class="health-dial{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}" data-zone="{{lower (printf "%s" .State)}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+  <span class="hd-title">Health</span>
   <div class="hd-face">
     <div class="hd-arc"></div>
+    <i class="hd-tick" style="transform: rotate(-90deg)"></i>
+    <i class="hd-tick" style="transform: rotate(-45deg)"></i>
+    <i class="hd-tick" style="transform: rotate(0deg)"></i>
+    <i class="hd-tick" style="transform: rotate(45deg)"></i>
+    <i class="hd-tick" style="transform: rotate(90deg)"></i>
     <div class="hd-mask"></div>
     {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
   </div>
