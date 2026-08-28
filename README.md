@@ -2,6 +2,8 @@
 
 # k8s-status
 
+**What's actually running in your cluster — and whether Git agrees.**
+
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
@@ -13,12 +15,11 @@
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**See what GitOps actually deployed, and what it doesn't know about.**
-
 ## What is this?
 
 One web page that tells you what is running in a Kubernetes cluster, which version of it,
-and whether it is healthy. Read-only: it can list, and nothing else.
+and whether it is healthy. It also shows what your GitOps controller doesn't know
+about: whatever is running outside it. Read-only: it can list, and nothing else.
 
 It reads one cluster and nothing else. It makes no outbound calls. There is no
 JavaScript and no database. You open a URL and read a table.
