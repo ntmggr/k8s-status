@@ -56,6 +56,9 @@ type Workload struct {
 	// the row is one thing to know about, and "is it spread out" is one fact about it.
 	Zones ZoneSpread
 	Nodes NodeSpread
+	// Mesh is filled alongside Zones/Nodes by the same FillZones pass (zero-value when
+	// AZ_SPREAD is off), the mesh-sidecar-injection counterpart of Zones/Nodes.
+	Mesh MeshCoverage
 }
 
 // Unmanaged is the set of workloads running outside GitOps. Error is set when the

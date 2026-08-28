@@ -158,3 +158,38 @@ func TestListRunningPodsDecodesHostIP(t *testing.T) {
 		t.Errorf("items = %+v, want hostIP 10.0.1.5", list.Items)
 	}
 }
+
+func TestListRunningPodsDecodesContainerStatuses(t *testing.T) {
+	h := &pagedHandler{bodies: []string{
+		`{"metadata":{"continue":""},"items":[{"metadata":{"name":"a"},"status":{"phase":"Running","containerStatuses":[{"name":"app"},{"name":"istio-proxy"}]}}]}`,
+	}}
+	c := newTestClient(t, h)
+
+	list, err := c.ListRunningPods(context.Background())
+	if err != nil {
+		t.Fatalf("ListRunningPods: %v", err)
+	}
+	if len(list.Items) != 1 || !list.Items[0].IsIstioInjected() {
+		t.Errorf("items = %+v, want IsIstioInjected true", list.Items)
+	}
+}
+
+func TestIsIstioInjected(t *testing.T) {
+	cases := []struct {
+		name string
+		pod  Pod
+		want bool
+	}{
+		{"no containers", Pod{}, false},
+		{"app only", Pod{Status: PodStatus{ContainerStatuses: []ContainerStatus{{Name: "app"}}}}, false},
+		{"app and sidecar", Pod{Status: PodStatus{ContainerStatuses: []ContainerStatus{{Name: "app"}, {Name: "istio-proxy"}}}}, true},
+		{"sidecar only", Pod{Status: PodStatus{ContainerStatuses: []ContainerStatus{{Name: "istio-proxy"}}}}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.pod.IsIstioInjected(); got != tc.want {
+				t.Errorf("IsIstioInjected() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

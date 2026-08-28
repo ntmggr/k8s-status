@@ -18,8 +18,10 @@ func TestFillsAreIdempotent(t *testing.T) {
 		zonedNode("n1", "eu-west-1a", "10.0.1.1"),
 		zonedNode("n2", "eu-west-1b", "10.0.1.2"),
 	}}
+	injected := runningZonedPod("ml", "worker-1", "10.0.1.1")
+	injected.Status.ContainerStatuses = []kube.ContainerStatus{{Name: "istio-proxy"}}
 	running := &kube.PodList{Items: []kube.Pod{
-		runningZonedPod("ml", "worker-1", "10.0.1.1"),
+		injected,
 		runningZonedPod("ml", "worker-2", "10.0.1.2"),
 	}}
 
@@ -52,6 +54,13 @@ func TestFillsAreIdempotent(t *testing.T) {
 	n := snap.Services[0].Nodes
 	if n.Pods != 2 || n.Count() != 2 {
 		t.Errorf("Nodes accumulated: %+v", n)
+	}
+	if snap.Summary.MeshEligible != 1 || snap.Summary.MeshInjected != 0 {
+		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 1/0 (one of two pods injected)", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+	m := snap.Services[0].Mesh
+	if m.Pods != 2 || m.Injected != 1 {
+		t.Errorf("Mesh accumulated: %+v", m)
 	}
 }
 

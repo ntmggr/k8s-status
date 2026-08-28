@@ -60,6 +60,30 @@ type PodStatus struct {
 	// HostIP is read instead of spec.nodeName so this file still decodes no spec at
 	// all: joined against a node's own addresses, it says which node a pod landed on.
 	HostIP string `json:"hostIP"`
+	// ContainerStatuses is read instead of spec.containers so this file still decodes
+	// no spec at all: a container's name is not a credential-bearing field the way
+	// spec.containers[].env is, and joined against istioProxyContainer it says whether
+	// this pod actually has the Istio sidecar injected.
+	ContainerStatuses []ContainerStatus `json:"containerStatuses"`
+}
+
+type ContainerStatus struct {
+	Name string `json:"name"`
+}
+
+// istioProxyContainer is the name Istio's sidecar injector always uses.
+const istioProxyContainer = "istio-proxy"
+
+// IsIstioInjected reports whether this pod actually has the Istio sidecar running,
+// observed from its own container statuses rather than any injection annotation or
+// namespace label, which only say a sidecar was requested.
+func (p Pod) IsIstioInjected() bool {
+	for _, cs := range p.Status.ContainerStatuses {
+		if cs.Name == istioProxyContainer {
+			return true
+		}
+	}
+	return false
 }
 
 type PodCondition struct {

@@ -139,6 +139,9 @@ type Service struct {
 	// Nodes is filled alongside Zones, from the same pod-to-node join. Zero value
 	// renders as unknown, not as zero nodes.
 	Nodes NodeSpread
+	// Mesh is filled alongside Zones/Nodes, from the same running-pods read. Zero value
+	// renders as unknown, not as zero coverage.
+	Mesh MeshCoverage
 }
 
 type Summary struct {
@@ -180,6 +183,12 @@ type Summary struct {
 	// off, same as the zone counters.
 	SingleNode int
 	MultiNode  int
+	// MeshEligible counts services with at least one running pod (same population as
+	// Zoned would be if AZ_SPREAD were also on). MeshInjected is the subset where every
+	// running pod carries an istio-proxy sidecar. Both zero when AZ_SPREAD is off, since
+	// per-service mesh coverage reuses that same running-pods read.
+	MeshEligible int
+	MeshInjected int
 }
 
 type Snapshot struct {

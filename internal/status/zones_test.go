@@ -414,3 +414,144 @@ func TestZoneReadErrorWrapsErrorsIs(t *testing.T) {
 		t.Errorf("ZoneError = %+v, want TooLarge for a wrapped sentinel", ze)
 	}
 }
+
+// zoneRunningInjectedPod is zoneRunningPod plus an istio-proxy container status, for
+// mesh coverage tests.
+func zoneRunningInjectedPod(ns, name, owner, hostIP string) kube.Pod {
+	p := zoneRunningPod(ns, name, owner, hostIP)
+	p.Status.ContainerStatuses = []kube.ContainerStatus{{Name: "istio-proxy"}}
+	return p
+}
+
+func TestFillZonesMeshCoveragePartiallyInjected(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(zoneSvc("api", "ml", "api"))
+	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.1.1")}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningInjectedPod("ml", "api-1", "api", "10.0.1.1"),
+		zoneRunningPod("ml", "api-2", "api", "10.0.1.1"),
+	}}
+	FillZones(snap, pods, nodes, nil)
+
+	m := snap.Services[0].Mesh
+	if !m.Known() || m.Full() {
+		t.Fatalf("Mesh = %+v, want known but not full (only one of two pods injected)", m)
+	}
+	if m.Pods != 2 || m.Injected != 1 {
+		t.Errorf("Mesh = %+v, want 2 pods, 1 injected", m)
+	}
+	if snap.Summary.MeshEligible != 1 || snap.Summary.MeshInjected != 0 {
+		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 1/0", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+}
+
+func TestFillZonesMeshCoverageFullyInjected(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(zoneSvc("api", "ml", "api"))
+	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.1.1")}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningInjectedPod("ml", "api-1", "api", "10.0.1.1"),
+		zoneRunningInjectedPod("ml", "api-2", "api", "10.0.1.1"),
+	}}
+	FillZones(snap, pods, nodes, nil)
+
+	m := snap.Services[0].Mesh
+	if !m.Full() {
+		t.Fatalf("Mesh = %+v, want Full (every pod injected)", m)
+	}
+	if snap.Summary.MeshEligible != 1 || snap.Summary.MeshInjected != 1 {
+		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 1/1", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+}
+
+func TestFillZonesMeshCoverageNoPodsIsUnknown(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(zoneSvc("api", "ml", "api"))
+	FillZones(snap, &kube.PodList{}, &kube.NodeList{}, nil)
+
+	if snap.Services[0].Mesh.Known() {
+		t.Fatal("no pods should mean no mesh answer")
+	}
+	if snap.Summary.MeshEligible != 0 || snap.Summary.MeshInjected != 0 {
+		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 0/0", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+}
+
+func TestFillZonesMeshCoverageResetsOnRepeatedCalls(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(zoneSvc("api", "ml", "api"))
+	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.1.1")}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningInjectedPod("ml", "api-1", "api", "10.0.1.1"),
+	}}
+	for i := 0; i < 3; i++ {
+		FillZones(snap, pods, nodes, nil)
+	}
+	if m := snap.Services[0].Mesh; m.Pods != 1 || m.Injected != 1 {
+		t.Errorf("Mesh accumulated across repeated calls: %+v", m)
+	}
+	if snap.Summary.MeshEligible != 1 || snap.Summary.MeshInjected != 1 {
+		t.Errorf("MeshEligible/MeshInjected accumulated: %d/%d, want 1/1", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+}
+
+// TestFillZonesFoldsUnmanagedMeshCoverage mirrors TestFillZonesFoldsUnmanagedWorkloadsIntoHA
+// for mesh coverage: an unmanaged workload's pods have no Service row of their own, but
+// still move Summary.MeshEligible/MeshInjected, and the not-in-gitops row gets its own
+// Mesh answer.
+func TestFillZonesFoldsUnmanagedMeshCoverage(t *testing.T) {
+	snap := &Snapshot{}
+	snap.Unmanaged = &Unmanaged{}
+	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.1.1")}}
+	pods := &kube.PodList{Items: []kube.Pod{
+		zoneRunningInjectedPod("batch", "worker-1", "worker", "10.0.1.1"),
+	}}
+	workloads := &kube.WorkloadList{Items: []kube.Workload{
+		unmanagedWorkload("batch", "Deployment", "worker"),
+	}}
+	snap.Unmanaged.Items = collapseReleases([]Workload{
+		{Namespace: "batch", Kind: "Deployment", Name: "worker", Members: 1},
+	})
+
+	FillZones(snap, pods, nodes, workloads)
+
+	if snap.Summary.MeshEligible != 1 || snap.Summary.MeshInjected != 1 {
+		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 1/1", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+	row := snap.Unmanaged.Items[0]
+	if !row.Mesh.Full() {
+		t.Errorf("row.Mesh = %+v, want Full", row.Mesh)
+	}
+}
+
+func TestMeshHA(t *testing.T) {
+	cases := []struct {
+		name               string
+		eligible, injected int
+		wantKnown          bool
+		wantPercent        int
+	}{
+		{"all injected", 4, 4, true, 100},
+		{"mixed", 4, 1, true, 25},
+		{"zero eligible", 0, 0, false, 0},
+		{"none injected", 3, 0, true, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			snap := &Snapshot{Summary: Summary{MeshEligible: tc.eligible, MeshInjected: tc.injected}}
+			m := snap.MeshHA()
+			if m.Known != tc.wantKnown {
+				t.Errorf("Known=%v, want %v", m.Known, tc.wantKnown)
+			}
+			if m.Percent != tc.wantPercent {
+				t.Errorf("Percent=%d, want %d", m.Percent, tc.wantPercent)
+			}
+			if m.Eligible != tc.eligible || m.Injected != tc.injected {
+				t.Errorf("MeshHA=%+v, want eligible=%d injected=%d", m, tc.eligible, tc.injected)
+			}
+			if want := tc.eligible - tc.injected; m.NotInMesh() != want {
+				t.Errorf("NotInMesh()=%d, want %d", m.NotInMesh(), want)
+			}
+		})
+	}
+}

@@ -140,6 +140,64 @@ func roundPercent(num, den int) int {
 	}
 }
 
+// MeshCoverage describes how many of a service's running pods actually carry an
+// Istio sidecar, observed the same way ZoneSpread/NodeSpread are: from the running
+// pods list already read for AZ_SPREAD, not from any separate mesh-injection read.
+//
+// This says nothing about mTLS being enforced for the service, only that its pods
+// carry the sidecar that makes enforcement possible. The mesh-wide policy answer
+// (MeshSection) is the only thing on this page that speaks to enforcement.
+type MeshCoverage struct {
+	// Pods is how many running pods were matched to this service.
+	Pods int
+	// Injected is how many of those pods carry an istio-proxy container.
+	Injected int
+}
+
+// Known reports whether this service has a usable mesh answer at all: at least one
+// running pod matched.
+func (m MeshCoverage) Known() bool { return m.Pods > 0 }
+
+// Full reports whether every running pod matched to this service carries the Istio
+// sidecar.
+func (m MeshCoverage) Full() bool { return m.Known() && m.Injected == m.Pods }
+
+// MeshHA is the per-service sidecar-injection counterpart of HA: what share of
+// mesh-eligible services have the Istio sidecar on every running pod. Derived
+// entirely from Summary, mirroring HA's shape. Zero value (Known false) whenever
+// AZ_SPREAD is off, since this reuses that same running-pods read.
+type MeshHA struct {
+	// Percent is Injected as a share of Eligible, rounded to the nearest integer.
+	// Meaningless when Known is false.
+	Percent int
+	// Known is false when Eligible is zero: there is nothing to divide by.
+	Known bool
+	// Eligible is Summary.MeshEligible: services with at least one running pod.
+	Eligible int
+	// Injected is Summary.MeshInjected: services where every running pod carries the
+	// Istio sidecar.
+	Injected int
+}
+
+// MeshHA folds the mesh summary into one percentage: the share of mesh-eligible
+// services that have the sidecar on every running pod.
+func (snap *Snapshot) MeshHA() MeshHA {
+	m := MeshHA{
+		Eligible: snap.Summary.MeshEligible,
+		Injected: snap.Summary.MeshInjected,
+	}
+	if m.Eligible <= 0 {
+		return m
+	}
+	m.Known = true
+	m.Percent = roundPercent(m.Injected, m.Eligible)
+	return m
+}
+
+// NotInMesh is how many mesh-eligible services do not have the sidecar on every
+// running pod, the exact population the "not in mesh" tile counts.
+func (m MeshHA) NotInMesh() int { return m.Eligible - m.Injected }
+
 // ZoneError is the degraded form of the AZ-spread section: no per-service zone data,
 // one note explaining why. Denied and TooLarge each get their own inline hint in the
 // template; a failed read here is never swallowed silently the way fetchPending's is.
@@ -167,12 +225,14 @@ func zoneReadError(err error) *ZoneError {
 }
 
 // FillZones records, per service, which availability zones its running pods actually
-// sit in, and tallies the cluster-wide single/multi-zone split.
+// sit in, and tallies the cluster-wide single/multi-zone split. In the same pass it
+// also records each service's mesh sidecar coverage (MeshCoverage): no new fetch, no
+// new RBAC, just another fact read off the same running pods.
 //
-// It joins three lists already fetched elsewhere: running pods (hostIP), nodes (their
-// InternalIPs and zone label, from PR2), and the pod-to-service ownership machinery
-// FillPending already built. No new permission and no new fetch beyond the pods read
-// itself.
+// It joins three lists already fetched elsewhere: running pods (hostIP, container
+// statuses), nodes (their InternalIPs and zone label, from PR2), and the pod-to-service
+// ownership machinery FillPending already built. No new permission and no new fetch
+// beyond the pods read itself.
 //
 // workloads is the same raw list UNMANAGED already fetches (nil when that feature is
 // off). Resiliency is a property of what is actually running, not of who deployed it:
@@ -192,15 +252,18 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	for i := range snap.Services {
 		snap.Services[i].Zones = ZoneSpread{}
 		snap.Services[i].Nodes = NodeSpread{}
+		snap.Services[i].Mesh = MeshCoverage{}
 	}
 	if snap.Unmanaged != nil {
 		for i := range snap.Unmanaged.Items {
 			snap.Unmanaged.Items[i].Zones = ZoneSpread{}
 			snap.Unmanaged.Items[i].Nodes = NodeSpread{}
+			snap.Unmanaged.Items[i].Mesh = MeshCoverage{}
 		}
 	}
 	snap.Summary.Zoned, snap.Summary.SingleZone, snap.Summary.MultiZone = 0, 0, 0
 	snap.Summary.SingleNode, snap.Summary.MultiNode = 0, 0
+	snap.Summary.MeshEligible, snap.Summary.MeshInjected = 0, 0
 
 	// hostIP -> zone, built from every node's InternalIPs(). A node missing a zone
 	// label still joins here (its zone is the zoneUnknown sentinel), so a pod that
@@ -277,6 +340,10 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	// and .Unplaced hold for a service, kept separately from the seen-sets above.
 	unmanagedPods := make([]int, len(groupKeys))
 	unmanagedUnplaced := make([]int, len(groupKeys))
+	// Mesh tallies, kept separately from the zone/node seen-sets: injection does not
+	// care where a pod landed, only whether it is running at all.
+	unmanagedMeshPods := make([]int, len(groupKeys))
+	unmanagedMeshInjected := make([]int, len(groupKeys))
 	for i := range unmanagedZonesSeen {
 		unmanagedZonesSeen[i] = map[string]bool{}
 		unmanagedNodesSeen[i] = map[string]bool{}
@@ -297,6 +364,10 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			svc := &snap.Services[idx]
 			svc.Zones.Pods++
 			svc.Nodes.Pods++
+			svc.Mesh.Pods++
+			if pod.IsIstioInjected() {
+				svc.Mesh.Injected++
+			}
 			if nodeOK {
 				nodesSeen[idx][nodeName] = true
 			}
@@ -309,6 +380,10 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		}
 		if uidx := ownerIndex(unmanagedByNS[pod.Metadata.Namespace], pod); uidx >= 0 {
 			unmanagedPods[uidx]++
+			unmanagedMeshPods[uidx]++
+			if pod.IsIstioInjected() {
+				unmanagedMeshInjected[uidx]++
+			}
 			if nodeOK {
 				unmanagedNodesSeen[uidx][nodeName] = true
 			}
@@ -355,6 +430,12 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 				snap.Summary.MultiNode++
 			}
 		}
+		if svc.Mesh.Known() {
+			snap.Summary.MeshEligible++
+			if svc.Mesh.Full() {
+				snap.Summary.MeshInjected++
+			}
+		}
 	}
 
 	// Folded into the exact same totals as the loop above, not a separate count: the
@@ -366,7 +447,16 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	// Zones field does.
 	zonesByKey := make(map[string]ZoneSpread, len(groupKeys))
 	nodesByKey := make(map[string]NodeSpread, len(groupKeys))
+	meshByKey := make(map[string]MeshCoverage, len(groupKeys))
 	for i, key := range groupKeys {
+		if unmanagedMeshPods[i] > 0 {
+			mc := MeshCoverage{Pods: unmanagedMeshPods[i], Injected: unmanagedMeshInjected[i]}
+			meshByKey[key] = mc
+			snap.Summary.MeshEligible++
+			if mc.Full() {
+				snap.Summary.MeshInjected++
+			}
+		}
 		if len(unmanagedZonesSeen[i]) > 0 {
 			snap.Summary.Zoned++
 			zones := make([]string, 0, len(unmanagedZonesSeen[i]))
@@ -408,6 +498,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			}
 			w.Zones = zonesByKey[key]
 			w.Nodes = nodesByKey[key]
+			w.Mesh = meshByKey[key]
 		}
 	}
 }
