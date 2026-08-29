@@ -274,17 +274,22 @@ func (d pageData) tiles() []Tile {
 }
 
 // TileRowTop and TileRowBottom split the tiles into two rows by count, not by width:
-// an even count splits evenly, an odd count puts the extra tile on top. CSS wrapping
-// alone can't guarantee this, since it wraps wherever a row happens to run out of
-// width for whatever content is actually in it.
+// CSS wrapping alone can't guarantee a stable split, since it wraps wherever a row
+// happens to run out of width for whatever content is actually in it.
+//
+// An odd count's extra tile goes to the bottom row, not the top: tiles() always
+// starts with "services" and ends with "ok", so the extra tile landing on top would
+// occasionally leave "ok" stranded alone on the bottom row, which reads like a
+// leftover rather than a deliberate group. "services" alone on top reads fine --
+// it's the header count, not a peer of the status breakdown below it.
 func (d pageData) TileRowTop() []Tile {
 	t := d.tiles()
-	return t[:(len(t)+1)/2]
+	return t[:len(t)/2]
 }
 
 func (d pageData) TileRowBottom() []Tile {
 	t := d.tiles()
-	return t[(len(t)+1)/2:]
+	return t[len(t)/2:]
 }
 
 func (d pageData) Chips() []Chip {
