@@ -7,3 +7,5 @@ coverage.*
 .DS_Store
 .idea/
 .vscode/
+# Claude Code session state and agent worktrees -- local to whoever's machine ran it.
+.claude/
