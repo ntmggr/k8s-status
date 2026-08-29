@@ -419,6 +419,11 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
        font-weight: 700; letter-spacing: .05em; background: var(--gpu-bg); color: var(--gpu-fg);
        vertical-align: .1em; }
 tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
+/* Declared after is-blocked/is-gpu so a row needing action always wins that edge
+   stripe over them, not just over the base unstriped row -- "do you need to act on
+   this" is a stronger signal than "is this on a GPU" or "is this scheduling-blocked". */
+.svc.is-degraded td:first-child { box-shadow: inset 3px 0 0 var(--deg-fg); }
+.svc.is-warning td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
 .src { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
        font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
        background: var(--prune-bg); color: var(--prune-fg); vertical-align: .1em; }
@@ -610,7 +615,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 </div>
 {{if $.Snapshot.Mesh}}
 <div class="area">
-  <div class="cap-head">Mesh<span class="cap-sub">cluster-wide policy, plus per-service sidecar injection</span></div>
+  <div class="cap-head">Istio<span class="cap-sub">cluster-wide mTLS policy, plus per-service sidecar injection</span></div>
   <div class="ha-rows">
     {{with $.Snapshot.Mesh}}
     <div class="tiles-row is-top">
@@ -618,7 +623,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
       {{if not .Error}}
       <div class="cap-lead">{{icon "mesh"}}<span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
         {{- if eq .Effective "strict"}}STRICT mTLS
-        {{- else if eq .Effective "permissive"}}PERMISSIVE
+        {{- else if eq .Effective "permissive"}}PERMISSIVE mTLS
         {{- else if eq .Effective "disabled"}}mTLS disabled
         {{- else}}No service mesh detected{{end -}}
       </span></span>
@@ -753,6 +758,10 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
     <div class="legend-row">{{icon "mesh"}}<span>Cluster-wide Istio mTLS only. Mesh-wide policy only: namespace and workload PeerAuthentications can override this for individual services and are not read.</span></div>
+    <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>STRICT mTLS</span><span>Every connection in the mesh must be mTLS-encrypted; plaintext is rejected.</span></div>
+    <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>PERMISSIVE mTLS</span><span>Istio's own default: accepts both mTLS and plaintext, so an unencrypted connection still gets through.</span></div>
+    <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>mTLS disabled</span><span>Plaintext only; nothing in the mesh enforces encryption.</span></div>
+    <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>No service mesh detected</span><span>Istio is not installed. A legitimate architecture choice, not a fault.</span></div>
     <div class="legend-row"><span class="legend-kw">HEALTH</span><span>The gauge's needle and number are the share of counted services that are <em>OK</em> right now. <em>Prune</em> and <em>suspended</em> rows are excluded from the count; <em>progressing</em> and <em>drift</em> still count as not-OK. Shows &mdash; when nothing is left to count.</span></div>
     <div class="legend-row"><span class="az is-multi">az 2</span><span>Running pods sit in this many availability zones right now.</span></div>
     <div class="legend-row"><span class="az is-single">az 1</span><span>All running pods sit in one zone: that zone going down takes the whole service with it.</span></div>
@@ -765,6 +774,10 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     two independent things, so <em>PROGRESSING</em> beside <em>Synced</em> is normal.
     Rows are ordered worst-first. Expand a row to see which components are out of sync.
     Click a tile to filter the list to that status, and click it again to clear it.
+    A red or yellow stripe on the left edge of a row means <em>DEGRADED</em> or <em>WARNING</em>:
+    the two states worth actually looking at. <em>PROGRESSING</em> and <em>DRIFT</em> get no
+    stripe -- neither needs action right now, even though Health only counts <em>PROGRESSING</em>
+    as healthy, since drifted config does not resolve on its own the way a rollout does.
     {{if $.MultiSource}}<br>Flux rows show their controller in the <em>Source</em> column. Flux does not
     compare running manifests against git the way ArgoCD does, so those rows carry no
     <strong>Sync</strong> value and never appear as <em>DRIFT</em> or <em>PRUNE</em>.{{end}}
@@ -806,7 +819,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{$ui := .ArgoCDUIBase}}
 {{$multi := .MultiSource}}
 {{range .Services}}
-<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}}">
+<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}} is-{{lower (printf "%s" .State)}}">
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
