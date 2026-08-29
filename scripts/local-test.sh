@@ -107,14 +107,36 @@ PORT="$PORT" \
 /tmp/k8s-status-local &
 PIDS+=($!)
 
-sleep 2
 echo
 echo "  page   http://127.0.0.1:$PORT/k8s-status/"
 echo "  json   http://127.0.0.1:$PORT/k8s-status/api/status"
 echo "  health http://127.0.0.1:$PORT/k8s-status/healthz"
 echo
-curl -s "http://127.0.0.1:$PORT/k8s-status/api/status" \
-  | python3 -c 'import json,sys;d=json.load(sys.stdin);print("summary:",d["summary"]);print("error:",d["error"])' || true
+
+# /healthz answers the instant the process starts listening, before the collector's
+# first real fetch -- it says nothing about /api/status being ready yet. A fixed sleep
+# here used to be enough, but MESH_MTLS added another network round trip to that first
+# fetch, so against a real (especially remote) cluster it can still be mid-flight,
+# which showed up as a raw python traceback instead of a useful message. Poll the
+# actual endpoint instead of guessing how long it needs.
+summary=""
+for _ in $(seq 1 30); do
+  # set -e is active: curl's normal "connection refused" exit while the server is
+  # still starting must not kill the script (and, via the EXIT trap, the server it
+  # just started) on the very first failed poll -- `|| true` makes an expected
+  # failure here just an empty $summary, not a script-ending error.
+  summary="$(curl -s "http://127.0.0.1:$PORT/k8s-status/api/status" || true)"
+  if [ -n "$summary" ] && printf '%s' "$summary" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
+    break
+  fi
+  summary=""
+  sleep 1
+done
+if [ -n "$summary" ]; then
+  printf '%s' "$summary" | python3 -c 'import json,sys;d=json.load(sys.stdin);print("summary:",d["summary"]);print("error:",d["error"])'
+else
+  echo "(still starting up -- the page above will work once the first fetch completes)"
+fi
 echo
 echo "Ctrl-C to stop."
 wait
