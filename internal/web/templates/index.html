@@ -119,11 +119,13 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
    can join as sibling .panel elements later without restructuring this row). */
 .panel-row { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .75rem;
              margin: .9rem 0 .35rem; }
-/* flex-grow: 0 -- panels hug their own content instead of stretching to split the row
-   evenly. Two narrow panels sit next to each other with leftover row space after the
-   last one, not distributed as dead space inside each. min-width is the mobile floor;
-   flex-shrink still lets a panel narrow (then wrap) on a small viewport. */
-.panel { flex: 0 1 auto; min-width: 380px; box-sizing: border-box; background: var(--surface);
+/* flex-grow: 1 -- today there is exactly one panel in this row, and it should fill it:
+   its own .areas (Health/HA/Istio) needs the full row's width to lay three areas out
+   side by side instead of wrapping the third one onto its own line. Revisit this once
+   a second sibling panel actually exists -- growing both evenly would then need its
+   own call, not this one. min-width is the mobile floor; flex-shrink still lets a
+   panel narrow (then wrap) on a small viewport. */
+.panel { flex: 1 1 auto; min-width: 380px; box-sizing: border-box; background: var(--surface);
          border: 1px solid var(--ring); border-radius: 8px; padding: .55rem .8rem; }
 /* Health and HA are both about services, so they live inside one Services panel as
    two sub-areas. Each gets its own inset box rather than a divider line between them:
@@ -613,18 +615,15 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{end}}
   </div>
 </div>
-</div>
-</div>
-</div>
 {{if $.Snapshot.Mesh}}
-{{/* Its own full-width section, like Cluster below it, rather than a third narrow
-     .area squeezed inside the Services panel: Policy and In Mesh both read as a
-     label plus a wide row of content, and had no room to breathe at .area width. */}}
-<section class="capacity">
+<div class="area">
   <div class="cap-head">Istio<span class="cap-sub">cluster-wide mTLS policy, plus per-service sidecar injection</span></div>
   <div class="ha-rows">
-    {{with $.Snapshot.Mesh}}
+    {{/* One row, not two: Policy is a short pill, not a gauge, so stacking it above
+         In mesh wasted vertical space for no reason -- they're both facts about the
+         same mesh and read fine side by side. */}}
     <div class="tiles-row is-top">
+    {{with $.Snapshot.Mesh}}
       <span class="spread-lab" title="Mesh-wide policy only. Namespace and workload PeerAuthentications can override this for individual services and are not read.">Policy</span>
       {{if not .Error}}
       <div class="cap-lead">{{icon "mesh"}}<span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
@@ -641,10 +640,8 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         {{- else}}the mesh mTLS read did not complete, so this may be out of date.{{end}} ({{.Error}})
       </div>
       {{end}}
-    </div>
     {{end}}
     {{with $.Snapshot.MeshHA}}
-    <div class="tiles-row">
       <span class="spread-lab" title="Sidecar injection only: a service having the sidecar on every running pod is not the same as mTLS being enforced for it. An Istio ingress gateway reads as 'in mesh' too, but that's its own Envoy engine, not an injected sidecar -- gateways are never sidecar-injected by design.">In mesh</span>
       <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar on every running pod &middot; {{.Injected}} of {{.Eligible}} counted{{if .NotInMesh}} &middot; {{.NotInMesh}} not in mesh{{end}}{{else}}no services counted{{end}}">
         <div class="hd-face">
@@ -663,11 +660,14 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
       {{else if .Known}}
       <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
       {{end}}
-    </div>
     {{end}}
+    </div>
   </div>
-</section>
+</div>
 {{end}}
+</div>
+</div>
+</div>
 <div class="views">
   <span class="views-lab">views</span>
   <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Counts services, not devices. {{$.Snapshot.Summary.GPU}} are backed by {{$.Snapshot.AcceleratorLabel}}: {{$.Snapshot.Summary.GPURunning}} holding one now, {{$.Snapshot.Summary.GPUWaiting}} waiting for one, {{$.Snapshot.Summary.GPUStopped}} with no replicas. The cluster line below counts the devices themselves.">{{icon "gpu"}}<b>{{$.Snapshot.Summary.GPURunning}} running on {{$.Snapshot.AcceleratorLabel}}</b>{{if $.Snapshot.Summary.GPUWaiting}} · {{$.Snapshot.Summary.GPUWaiting}} waiting{{end}}{{if $.Snapshot.Summary.GPUStopped}} · <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
