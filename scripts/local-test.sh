@@ -21,6 +21,22 @@ usage() { echo "usage: $0 fixture | $0 cluster <kube-context>" >&2; exit 2; }
 cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; rm -rf "${FAKE_DIR:-}"; }
 trap cleanup EXIT INT TERM
 
+port_busy() { lsof -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+
+# A second concurrent run (e.g. a leftover cluster-mode instance still up in another
+# terminal) binding the same PROXY_PORT is exactly the failure mode that produced the
+# "Expecting value" JSON traceback here before: two different backends answer the same
+# port depending on timing, and k8s-status's own /api/status fetch to whichever one
+# wins comes back malformed. Fail fast and say so, instead of racing silently.
+for p in "$PORT" "$PROXY_PORT"; do
+  if port_busy "$p"; then
+    echo "error: port $p is already in use -- stop whatever's still holding it (an" >&2
+    echo "earlier local-test.sh run left running?) or override PORT/PROXY_PORT." >&2
+    lsof -iTCP:"$p" -sTCP:LISTEN >&2
+    exit 1
+  fi
+done
+
 cd "$ROOT"
 go build -o /tmp/k8s-status-local ./cmd/k8s-status
 
