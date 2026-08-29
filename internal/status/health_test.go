@@ -37,8 +37,11 @@ func TestSummaryHealth(t *testing.T) {
 		},
 		{
 			name: "counts attention and excluded together",
+			// 11 counted; OK counts Progressing too (6+1=7), Drift does not, so the
+			// numerator is 7, not 6 -- see TestHealthProgressingCountsDriftDoesNot for
+			// the narrower point this makes on its own.
 			sum:  Summary{Total: 14, OK: 6, Degraded: 2, Warning: 1, Progressing: 1, Drift: 1, Prune: 2, Suspended: 1},
-			want: Health{Percent: 55, Known: true, Counted: 11, OK: 6, Excluded: 3, Attention: 3},
+			want: Health{Percent: 64, Known: true, Counted: 11, OK: 7, Excluded: 3, Attention: 3},
 		},
 	}
 
@@ -52,6 +55,20 @@ func TestSummaryHealth(t *testing.T) {
 				t.Errorf("Percent = %d, out of [0,100]", got.Percent)
 			}
 		})
+	}
+}
+
+// TestHealthProgressingCountsDriftDoesNot isolates the one asymmetry in the formula:
+// a rollout in flight needs no action and counts as healthy, but drifted config does
+// not resolve on its own and still counts against the percentage.
+func TestHealthProgressingCountsDriftDoesNot(t *testing.T) {
+	progressing := Summary{Total: 4, OK: 2, Progressing: 2}.Health()
+	if progressing.OK != 4 || progressing.Percent != 100 {
+		t.Errorf("Progressing: Health()=%+v, want OK=4 Percent=100", progressing)
+	}
+	drift := Summary{Total: 4, OK: 2, Drift: 2}.Health()
+	if drift.OK != 2 || drift.Percent != 50 {
+		t.Errorf("Drift: Health()=%+v, want OK=2 Percent=50", drift)
 	}
 }
 
