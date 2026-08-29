@@ -28,7 +28,7 @@ func TestFillsAreIdempotent(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		FillGPU(snap, wl, nil, []string{kube.ResourceGPU})
 		FillPending(snap, ev, nil)
-		FillZones(snap, running, nodes, nil)
+		FillZones(snap, running, nodes, nil, "")
 	}
 
 	g := snap.Services[0].GPUAlloc

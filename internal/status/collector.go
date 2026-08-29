@@ -417,5 +417,5 @@ func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
 		return
 	}
 	snap.ZoneRead = c.zoneRead
-	FillZones(snap, c.runningPods, c.nodeList, c.workloadList)
+	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace)
 }

@@ -352,6 +352,60 @@
           }
         ]
       }
+    },
+    {
+      "metadata": {
+        "name": "istiod-3d5e6f7a1-izz71",
+        "namespace": "istio-system",
+        "ownerReferences": [
+          {
+            "kind": "ReplicaSet",
+            "name": "istiod-3d5e6f7a1"
+          }
+        ]
+      },
+      "status": {
+        "phase": "Running",
+        "hostIP": "10.0.1.14",
+        "conditions": [
+          {
+            "type": "PodScheduled",
+            "status": "True"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "name": "discovery"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "istiod-3d5e6f7a1-izz72",
+        "namespace": "istio-system",
+        "ownerReferences": [
+          {
+            "kind": "ReplicaSet",
+            "name": "istiod-3d5e6f7a1"
+          }
+        ]
+      },
+      "status": {
+        "phase": "Running",
+        "hostIP": "10.0.1.19",
+        "conditions": [
+          {
+            "type": "PodScheduled",
+            "status": "True"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "name": "discovery"
+          }
+        ]
+      }
     }
   ]
 }

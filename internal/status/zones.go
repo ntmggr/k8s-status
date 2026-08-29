@@ -247,7 +247,13 @@ func zoneReadError(err error) *ZoneError {
 // the HA/NodeHA gauges read, so the percentage covers the whole cluster rather than
 // silently excluding whatever isn't in GitOps. They get no per-item Zones/Nodes field
 // of their own -- nothing today reads one for a Workload -- only the aggregate counts.
-func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList) {
+//
+// meshNamespace is where the mesh control plane itself lives (istiod's namespace,
+// empty when MESH_MTLS is off). Pods there are excluded from mesh-coverage only, not
+// from zone/node spread: istiod is the thing that performs sidecar injection, so
+// asking whether it injected a sidecar into itself is a nonsense question, not a real
+// gap -- flagging it "not in mesh" looked exactly like a real one on a live cluster.
+func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList, meshNamespace string) {
 	if snap == nil || pods == nil || nodes == nil {
 		return
 	}
@@ -370,9 +376,11 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			svc := &snap.Services[idx]
 			svc.Zones.Pods++
 			svc.Nodes.Pods++
-			svc.Mesh.Pods++
-			if pod.IsIstioInjected() {
-				svc.Mesh.Injected++
+			if meshNamespace == "" || pod.Metadata.Namespace != meshNamespace {
+				svc.Mesh.Pods++
+				if pod.IsIstioInjected() {
+					svc.Mesh.Injected++
+				}
 			}
 			if nodeOK {
 				nodesSeen[idx][nodeName] = true
@@ -386,9 +394,11 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		}
 		if uidx := ownerIndex(unmanagedByNS[pod.Metadata.Namespace], pod); uidx >= 0 {
 			unmanagedPods[uidx]++
-			unmanagedMeshPods[uidx]++
-			if pod.IsIstioInjected() {
-				unmanagedMeshInjected[uidx]++
+			if meshNamespace == "" || pod.Metadata.Namespace != meshNamespace {
+				unmanagedMeshPods[uidx]++
+				if pod.IsIstioInjected() {
+					unmanagedMeshInjected[uidx]++
+				}
 			}
 			if nodeOK {
 				unmanagedNodesSeen[uidx][nodeName] = true
