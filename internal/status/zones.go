@@ -181,12 +181,18 @@ type MeshHA struct {
 
 // MeshHA folds the mesh summary into one percentage: the share of mesh-eligible
 // services that have the sidecar on every running pod.
+//
+// Known is forced false when Istio itself is not installed, even though Eligible
+// would otherwise be nonzero (services still have running pods, they simply never
+// carry a sidecar to begin with). Without this, a cluster with no service mesh at
+// all would show ~100% of its services "not in mesh" in the same warning color as a
+// real gap -- correct arithmetic, but the wrong question: there is no mesh to be in.
 func (snap *Snapshot) MeshHA() MeshHA {
 	m := MeshHA{
 		Eligible: snap.Summary.MeshEligible,
 		Injected: snap.Summary.MeshInjected,
 	}
-	if m.Eligible <= 0 {
+	if m.Eligible <= 0 || snap.Mesh == nil || !snap.Mesh.Installed {
 		return m
 	}
 	m.Known = true

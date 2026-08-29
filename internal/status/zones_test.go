@@ -528,17 +528,25 @@ func TestMeshHA(t *testing.T) {
 	cases := []struct {
 		name               string
 		eligible, injected int
+		installed          bool
 		wantKnown          bool
 		wantPercent        int
 	}{
-		{"all injected", 4, 4, true, 100},
-		{"mixed", 4, 1, true, 25},
-		{"zero eligible", 0, 0, false, 0},
-		{"none injected", 3, 0, true, 0},
+		{"all injected", 4, 4, true, true, 100},
+		{"mixed", 4, 1, true, true, 25},
+		{"zero eligible", 0, 0, true, false, 0},
+		{"none injected", 3, 0, true, true, 0},
+		// Istio not installed: Eligible is still nonzero (services still have running
+		// pods), but there is no mesh to be "in" at all, so Known must be false rather
+		// than reporting every service as a 0%/all-at-risk gap.
+		{"istio not installed", 3, 0, false, false, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			snap := &Snapshot{Summary: Summary{MeshEligible: tc.eligible, MeshInjected: tc.injected}}
+			snap := &Snapshot{
+				Summary: Summary{MeshEligible: tc.eligible, MeshInjected: tc.injected},
+				Mesh:    &MeshSection{Installed: tc.installed},
+			}
 			m := snap.MeshHA()
 			if m.Known != tc.wantKnown {
 				t.Errorf("Known=%v, want %v", m.Known, tc.wantKnown)
@@ -553,5 +561,16 @@ func TestMeshHA(t *testing.T) {
 				t.Errorf("NotInMesh()=%d, want %d", m.NotInMesh(), want)
 			}
 		})
+	}
+}
+
+// TestMeshHANilMeshIsUnknown covers MESH_MTLS being off entirely (Snapshot.Mesh is
+// never set), which must behave the same as "not installed", not panic or assume
+// installed.
+func TestMeshHANilMeshIsUnknown(t *testing.T) {
+	snap := &Snapshot{Summary: Summary{MeshEligible: 3, MeshInjected: 0}}
+	m := snap.MeshHA()
+	if m.Known {
+		t.Errorf("Known=true with a nil Mesh, want false")
 	}
 }
