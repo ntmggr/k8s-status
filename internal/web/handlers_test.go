@@ -397,6 +397,8 @@ type stubMeshLister struct {
 	detectErr    error
 	pa           *kube.PeerAuthentication
 	policyErr    error
+	list         *kube.PeerAuthenticationList
+	listErr      error
 }
 
 func (s *stubMeshLister) DetectIstio(context.Context) (string, error) {
@@ -405,6 +407,10 @@ func (s *stubMeshLister) DetectIstio(context.Context) (string, error) {
 
 func (s *stubMeshLister) MeshPolicy(context.Context, string, string) (*kube.PeerAuthentication, error) {
 	return s.pa, s.policyErr
+}
+
+func (s *stubMeshLister) ListPeerAuthentications(context.Context, string) (*kube.PeerAuthenticationList, error) {
+	return s.list, s.listErr
 }
 
 // unmanagedProvider drives the whole chain: a real Collector with a fake workloads

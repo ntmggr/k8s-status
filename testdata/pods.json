@@ -50,6 +50,9 @@
       "metadata": {
         "name": "admin-ui-5c7d8f9b4-qq21x",
         "namespace": "admin-ui",
+        "labels": {
+          "app": "admin-ui"
+        },
         "ownerReferences": [
           {
             "kind": "ReplicaSet",
@@ -225,6 +228,9 @@
       "metadata": {
         "name": "admin-ui-9c0d1e2f3-azz31",
         "namespace": "admin-ui",
+        "labels": {
+          "app": "admin-ui"
+        },
         "ownerReferences": [
           {
             "kind": "ReplicaSet",

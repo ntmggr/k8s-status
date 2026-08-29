@@ -36,9 +36,15 @@ type Filter struct {
 	// only one of that kind, the exact rows a Cluster HA gauge's "at risk" count
 	// summarizes. Answers "which ones" for a number that otherwise only says "how many".
 	Spread string
-	// Mesh is "not-injected": services with a known mesh answer where at least one
-	// running pod lacks the Istio sidecar, the exact rows the Mesh area's "not in
-	// mesh" tile summarizes.
+	// Mesh is "not-injected" or "permissive".
+	// "not-injected": services with a known mesh answer where at least one running
+	// pod lacks the Istio sidecar, the exact rows the Mesh area's "not in mesh" tile
+	// summarizes.
+	// "permissive": services whose own EFFECTIVE policy (ServicePolicy, after
+	// namespace/workload overrides, not the cluster-wide default alone) is
+	// PERMISSIVE, the exact rows the "permissive" tile summarizes. STRICT/DISABLE
+	// were not asked for and get no tile of their own to discover them from, so they
+	// are left out rather than added speculatively.
 	Mesh string
 }
 
@@ -174,6 +180,10 @@ func (f Filter) matches(svc status.Service) bool {
 	switch f.Mesh {
 	case "not-injected":
 		if !svc.Mesh.Known() || svc.Mesh.Full() {
+			return false
+		}
+	case "permissive":
+		if !svc.Policy.Known() || svc.Policy.Effective != status.MeshPermissive {
 			return false
 		}
 	case "":
@@ -322,6 +332,10 @@ func (f Filter) ApplyWorkloads(items []status.Workload) []status.Workload {
 		switch f.Mesh {
 		case "not-injected":
 			if !w.Mesh.Known() || w.Mesh.Full() {
+				continue
+			}
+		case "permissive":
+			if !w.Policy.Known() || w.Policy.Effective != status.MeshPermissive {
 				continue
 			}
 		case "":

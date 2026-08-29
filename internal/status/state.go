@@ -142,6 +142,11 @@ type Service struct {
 	// Mesh is filled alongside Zones/Nodes, from the same running-pods read. Zero value
 	// renders as unknown, not as zero coverage.
 	Mesh MeshCoverage
+	// Policy is this service's own effective mTLS mode, resolved against namespace-
+	// and workload-scoped PeerAuthentication overrides rather than the cluster-wide
+	// default alone. Zero value (Known() false) when MESH_MTLS or AZ_SPREAD is off, or
+	// the service matched no running pod to read a namespace/labels from.
+	Policy ServicePolicy
 }
 
 type Summary struct {
@@ -189,6 +194,14 @@ type Summary struct {
 	// per-service mesh coverage reuses that same running-pods read.
 	MeshEligible int
 	MeshInjected int
+	// MeshPolicyEligible counts services (and not-in-gitops workloads) with a
+	// resolved effective policy at all. MeshPolicyPermissive is the subset whose
+	// effective mode is PERMISSIVE -- whether inherited from a PERMISSIVE mesh-wide
+	// default or from their own namespace/workload override. Both zero unless
+	// MESH_MTLS and AZ_SPREAD are both on, since per-service policy reuses the same
+	// running-pods read AZ_SPREAD already fetches.
+	MeshPolicyEligible   int
+	MeshPolicyPermissive int
 }
 
 type Snapshot struct {

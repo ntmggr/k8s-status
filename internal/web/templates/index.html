@@ -623,7 +623,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
          rhythm reads as the same kind of thing at a glance. */}}
     {{with $.Snapshot.Mesh}}
     <div class="tiles-row is-top">
-      <span class="spread-lab" title="Mesh-wide policy only. Namespace and workload PeerAuthentications can override this for individual services and are not read.">Policy</span>
+      <span class="spread-lab" title="The cluster-wide default. Namespace and workload PeerAuthentications can override this for individual services -- when AZ_SPREAD is also on, the permissive tile and each row's own badge below show where they do.">Policy</span>
       {{if not .Error}}
       <div class="cap-lead">{{icon "mesh"}}<span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
         {{- if eq .Effective "strict"}}STRICT mTLS
@@ -633,6 +633,11 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
       </span></span>
       {{- if .Scoped}}<span class="cap-part is-warn" title="The default PeerAuthentication object carries a selector, so it applies to one workload, not the whole mesh.">{{icon "warn"}}workload-scoped</span>{{end}}
       </div>
+      {{if $.Snapshot.Summary.MeshPolicyPermissive}}
+      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{$.Snapshot.Summary.MeshPolicyPermissive}} service{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE, across both services and not-in-gitops workloads -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{$.Snapshot.Summary.MeshPolicyPermissive}}</div><div class="k">permissive</div></a>
+      {{else if $.Snapshot.Summary.MeshPolicyEligible}}
+      <div class="tile t-ok"><div class="n">0</div><div class="k">permissive</div></div>
+      {{end}}
       {{else}}
       <div class="cap-note">
         {{- if .Denied}}mesh mTLS needs a Role granting <span class="mono">get</span> on the <span class="mono">default</span> <span class="mono">peerauthentications.security.istio.io</span> object in the Istio namespace; the default install grants nothing there.
@@ -761,7 +766,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
-    <div class="legend-row">{{icon "mesh"}}<span>Cluster-wide Istio mTLS only. Mesh-wide policy only: namespace and workload PeerAuthentications can override this for individual services and are not read.</span></div>
+    <div class="legend-row">{{icon "mesh"}}<span>The Policy pill is the cluster-wide default. When AZ_SPREAD is also on, namespace and workload PeerAuthentication overrides are read too: the "permissive" tile and each row's own badge (e.g. "workload override: disabled") show where a service's own effective mode differs from it.</span></div>
     <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>STRICT mTLS</span><span>Every connection in the mesh must be mTLS-encrypted; plaintext is rejected.</span></div>
     <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>PERMISSIVE mTLS</span><span>Istio's own default: accepts both mTLS and plaintext, so an unencrypted connection still gets through.</span></div>
     <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>mTLS disabled</span><span>Plaintext only; nothing in the mesh enforces encryption.</span></div>
@@ -831,6 +836,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{- with .Arch}}<span class="arch is-{{.}}" title="Every node this service may run on is {{.}}{{if eq . "arm64"}}, which on AWS means Graviton{{end}}. Services free to run on either architecture carry no badge.">{{.}}</span>{{end}}
     {{- if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}
     {{- if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}
+    {{- if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This service's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for
@@ -905,7 +911,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <tbody>
 {{range $.Unmanaged}}
 <tr>
-  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}{{if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}</td>
+  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}{{if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}{{if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This workload's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}</td>
   <td class="ns hide-sm">{{.Namespace}}</td>
   <td class="kind hide-sm">{{.Kind}}</td>
   <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>

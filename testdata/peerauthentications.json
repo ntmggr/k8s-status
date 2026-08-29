@@ -1,0 +1,48 @@
+{
+  "items": [
+    {
+      "apiVersion": "security.istio.io/v1",
+      "kind": "PeerAuthentication",
+      "metadata": {
+        "name": "default",
+        "namespace": "istio-system"
+      },
+      "spec": {
+        "mtls": {
+          "mode": "STRICT"
+        }
+      }
+    },
+    {
+      "apiVersion": "security.istio.io/v1",
+      "kind": "PeerAuthentication",
+      "metadata": {
+        "name": "namespace-default",
+        "namespace": "search-api"
+      },
+      "spec": {
+        "mtls": {
+          "mode": "PERMISSIVE"
+        }
+      }
+    },
+    {
+      "apiVersion": "security.istio.io/v1",
+      "kind": "PeerAuthentication",
+      "metadata": {
+        "name": "admin-ui-workload",
+        "namespace": "admin-ui"
+      },
+      "spec": {
+        "mtls": {
+          "mode": "DISABLE"
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "admin-ui"
+          }
+        }
+      }
+    }
+  ]
+}

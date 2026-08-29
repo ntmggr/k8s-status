@@ -38,6 +38,7 @@ func TestParseFilter(t *testing.T) {
 		{name: "combined", raw: "status=DEGRADED,DRIFT&sync=OutOfSync&gpu=false",
 			want: Filter{Status: []string{"DEGRADED", "DRIFT"}, Sync: []string{"OutOfSync"}, GPU: "false"}},
 		{name: "mesh", raw: "mesh=not-injected", want: Filter{Mesh: "not-injected"}},
+		{name: "mesh permissive", raw: "mesh=permissive", want: Filter{Mesh: "permissive"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -396,6 +397,24 @@ func TestFilterApplyMeshUnrecognisedValueSelectsNothing(t *testing.T) {
 	}
 }
 
+func testPolicyServices() []status.Service {
+	return []status.Service{
+		{Name: "override", Policy: status.ServicePolicy{Effective: status.MeshPermissive, Scope: status.ScopeWorkload}},
+		{Name: "inherited-permissive", Policy: status.ServicePolicy{Effective: status.MeshPermissive, Scope: status.ScopeMesh}},
+		{Name: "strict", Policy: status.ServicePolicy{Effective: status.MeshStrict, Scope: status.ScopeMesh}},
+		{Name: "no-answer"}, // Policy zero-value: Known() is false
+	}
+}
+
+func TestFilterApplyMeshPermissive(t *testing.T) {
+	f := Filter{Mesh: "permissive"}
+	got := names(f.Apply(testPolicyServices()))
+	want := []string{"override", "inherited-permissive"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Apply(mesh=permissive) = %v, want %v", got, want)
+	}
+}
+
 func testMeshWorkloads() []status.Workload {
 	return []status.Workload{
 		{Name: "full", Mesh: status.MeshCoverage{Pods: 2, Injected: 2}},
@@ -422,6 +441,20 @@ func TestApplyWorkloadsFiltersByMesh(t *testing.T) {
 				t.Errorf("ApplyWorkloads(mesh=%q) = %v, want %v", tc.mesh, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestApplyWorkloadsFiltersByMeshPermissive(t *testing.T) {
+	items := []status.Workload{
+		{Name: "override", Policy: status.ServicePolicy{Effective: status.MeshPermissive, Scope: status.ScopeNamespace}},
+		{Name: "strict", Policy: status.ServicePolicy{Effective: status.MeshStrict, Scope: status.ScopeMesh}},
+		{Name: "no-answer"},
+	}
+	f := Filter{Mesh: "permissive"}
+	got := workloadNames(f.ApplyWorkloads(items))
+	want := []string{"override"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ApplyWorkloads(mesh=permissive) = %v, want %v", got, want)
 	}
 }
 

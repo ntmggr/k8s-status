@@ -253,7 +253,15 @@ func zoneReadError(err error) *ZoneError {
 // from zone/node spread: istiod is the thing that performs sidecar injection, so
 // asking whether it injected a sidecar into itself is a nonsense question, not a real
 // gap -- flagging it "not in mesh" looked exactly like a real one on a live cluster.
-func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList, meshNamespace string) {
+//
+// peerAuths is every PeerAuthentication in the cluster (nil when MESH_MTLS is off, or
+// when that list read was denied or failed: per-service policy then just never gets
+// filled, the same "an optional extra degrades silently" contract FillPending's own
+// swallowed read already follows). It resolves each service's own effective mTLS mode
+// -- ResolveServicePolicy in mesh.go -- from the namespace and labels of any one of
+// its running pods, since all of a workload's pods share both and this is therefore a
+// per-service property, not a per-pod one.
+func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList, meshNamespace string, peerAuths *kube.PeerAuthenticationList) {
 	if snap == nil || pods == nil || nodes == nil {
 		return
 	}
@@ -265,17 +273,20 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		snap.Services[i].Zones = ZoneSpread{}
 		snap.Services[i].Nodes = NodeSpread{}
 		snap.Services[i].Mesh = MeshCoverage{}
+		snap.Services[i].Policy = ServicePolicy{}
 	}
 	if snap.Unmanaged != nil {
 		for i := range snap.Unmanaged.Items {
 			snap.Unmanaged.Items[i].Zones = ZoneSpread{}
 			snap.Unmanaged.Items[i].Nodes = NodeSpread{}
 			snap.Unmanaged.Items[i].Mesh = MeshCoverage{}
+			snap.Unmanaged.Items[i].Policy = ServicePolicy{}
 		}
 	}
 	snap.Summary.Zoned, snap.Summary.SingleZone, snap.Summary.MultiZone = 0, 0, 0
 	snap.Summary.SingleNode, snap.Summary.MultiNode = 0, 0
 	snap.Summary.MeshEligible, snap.Summary.MeshInjected = 0, 0
+	snap.Summary.MeshPolicyEligible, snap.Summary.MeshPolicyPermissive = 0, 0
 
 	// hostIP -> zone, built from every node's InternalIPs(). A node missing a zone
 	// label still joins here (its zone is the zoneUnknown sentinel), so a pod that
@@ -315,6 +326,12 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		zonesSeen[i] = map[string]bool{}
 		nodesSeen[i] = map[string]bool{}
 	}
+	// Namespace and labels of the first running pod matched to each service, used to
+	// resolve Policy once per service below. Namespace/labels are a per-workload
+	// property, not a per-pod one, so the first pod seen speaks for all of them.
+	svcPolicyNS := make([]string, len(snap.Services))
+	svcPolicyLabels := make([]map[string]string, len(snap.Services))
+	svcPolicySeen := make([]bool, len(snap.Services))
 
 	// A second, parallel index space for workloads no service owns, grouped by the
 	// exact same key collapseReleases uses (Release, or a solo key of its own when
@@ -360,6 +377,11 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		unmanagedZonesSeen[i] = map[string]bool{}
 		unmanagedNodesSeen[i] = map[string]bool{}
 	}
+	// Namespace/labels for Policy resolution, the same per-group convention as the
+	// tallies above: one representative pod speaks for the whole group.
+	groupPolicyNS := make([]string, len(groupKeys))
+	groupPolicyLabels := make([]map[string]string, len(groupKeys))
+	groupPolicySeen := make([]bool, len(groupKeys))
 
 	for _, pod := range pods.Items {
 		// Defensive: the server-side fieldSelector should already guarantee this, but
@@ -382,6 +404,11 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 					svc.Mesh.Injected++
 				}
 			}
+			if !svcPolicySeen[idx] {
+				svcPolicySeen[idx] = true
+				svcPolicyNS[idx] = pod.Metadata.Namespace
+				svcPolicyLabels[idx] = pod.Metadata.Labels
+			}
 			if nodeOK {
 				nodesSeen[idx][nodeName] = true
 			}
@@ -400,6 +427,11 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 					unmanagedMeshInjected[uidx]++
 				}
 			}
+			if !groupPolicySeen[uidx] {
+				groupPolicySeen[uidx] = true
+				groupPolicyNS[uidx] = pod.Metadata.Namespace
+				groupPolicyLabels[uidx] = pod.Metadata.Labels
+			}
 			if nodeOK {
 				unmanagedNodesSeen[uidx][nodeName] = true
 			}
@@ -409,6 +441,17 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			}
 			unmanagedZonesSeen[uidx][zone] = true
 		}
+	}
+
+	// resolvePolicy is answered once per workload, from whichever running pod's
+	// namespace/labels were captured first above. Known() stays false (the zero
+	// value) when mesh mTLS is off entirely, since there is then no meshEffective to
+	// fall back to and no policy question worth asking.
+	resolvePolicy := func(seen bool, namespace string, labels map[string]string) ServicePolicy {
+		if !seen || snap.Mesh == nil {
+			return ServicePolicy{}
+		}
+		return ResolveServicePolicy(peerAuths, meshNamespace, namespace, labels, snap.Mesh.Effective)
 	}
 
 	for i := range snap.Services {
@@ -428,6 +471,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			sort.Strings(names)
 			snap.Services[i].Nodes.Nodes = names
 		}
+		snap.Services[i].Policy = resolvePolicy(svcPolicySeen[i], svcPolicyNS[i], svcPolicyLabels[i])
 	}
 
 	for _, svc := range snap.Services {
@@ -452,6 +496,12 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 				snap.Summary.MeshInjected++
 			}
 		}
+		if svc.Policy.Known() {
+			snap.Summary.MeshPolicyEligible++
+			if svc.Policy.Effective == MeshPermissive {
+				snap.Summary.MeshPolicyPermissive++
+			}
+		}
 	}
 
 	// Folded into the exact same totals as the loop above, not a separate count: the
@@ -464,6 +514,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	zonesByKey := make(map[string]ZoneSpread, len(groupKeys))
 	nodesByKey := make(map[string]NodeSpread, len(groupKeys))
 	meshByKey := make(map[string]MeshCoverage, len(groupKeys))
+	policyByKey := make(map[string]ServicePolicy, len(groupKeys))
 	for i, key := range groupKeys {
 		if unmanagedMeshPods[i] > 0 {
 			mc := MeshCoverage{Pods: unmanagedMeshPods[i], Injected: unmanagedMeshInjected[i]}
@@ -471,6 +522,13 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			snap.Summary.MeshEligible++
 			if mc.Full() {
 				snap.Summary.MeshInjected++
+			}
+		}
+		if policy := resolvePolicy(groupPolicySeen[i], groupPolicyNS[i], groupPolicyLabels[i]); policy.Known() {
+			policyByKey[key] = policy
+			snap.Summary.MeshPolicyEligible++
+			if policy.Effective == MeshPermissive {
+				snap.Summary.MeshPolicyPermissive++
 			}
 		}
 		if len(unmanagedZonesSeen[i]) > 0 {
@@ -515,6 +573,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			w.Zones = zonesByKey[key]
 			w.Nodes = nodesByKey[key]
 			w.Mesh = meshByKey[key]
+			w.Policy = policyByKey[key]
 		}
 	}
 }

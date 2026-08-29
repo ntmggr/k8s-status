@@ -133,6 +133,39 @@ roleRef:
 #   name: k8s-status-mesh
 #   apiGroup: rbac.authorization.k8s.io
 ---
+# Optional: uncomment this ClusterRole and ClusterRoleBinding alongside the Role above,
+# also when setting MESH_MTLS: "true". This is a real permission increase over the
+# Role above, not a formality: list, cluster-wide, on peerauthentications, so the page
+# can resolve each service's own effective policy against namespace- and workload-
+# scoped overrides, which can live in any namespace, not only istio-system. list only,
+# not get: the list response already carries every object's full spec. Read-only,
+# still one CRD, but it is no longer confined to one namespace the way the Role is.
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: k8s-status-mesh-list
+#   labels:
+#     app.kubernetes.io/name: k8s-status
+# rules:
+#   - apiGroups: ["security.istio.io"]
+#     resources: ["peerauthentications"]
+#     verbs: ["list"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: k8s-status-mesh-list
+#   labels:
+#     app.kubernetes.io/name: k8s-status
+# subjects:
+#   - kind: ServiceAccount
+#     name: k8s-status
+#     namespace: k8s-status
+# roleRef:
+#   kind: ClusterRole
+#   name: k8s-status-mesh-list
+#   apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -161,7 +194,9 @@ data:
   # "true" also requires the ClusterRole above to be uncommented, with its apps rule.
   UNMANAGED: "false"
   UNMANAGED_IGNORE_NS: ""
-  # "true" also requires the Role/RoleBinding above to be uncommented.
+  # "true" also requires the Role/RoleBinding above to be uncommented, and, to show
+  # per-service policy overrides (needs AZ_SPREAD too), the ClusterRole/
+  # ClusterRoleBinding pair alongside it.
   MESH_MTLS: "false"
   MESH_NAMESPACE: "istio-system"
   # "true" also requires NODE_STATS: "true" and the ClusterRole above to be uncommented,

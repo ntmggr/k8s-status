@@ -58,6 +58,13 @@ case "$MODE" in
     # answers from index.html. Go's http.Client follows that redirect transparently.
     cp testdata/istio-discovery.json "$FAKE_DIR/apis/security.istio.io/v1/index.html"
     cp testdata/peerauthentication.json "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications/default"
+    # Cluster-wide collection endpoint (list), a plain file alongside index.html and
+    # the by-name object above, same trick deployments/statefulsets/daemonsets below
+    # already use: MeshPolicy's single-object-by-name read is unaffected either way.
+    # Exercises all three PeerAuthentication precedence levels: mesh-wide STRICT
+    # (istio-system), namespace-wide PERMISSIVE (search-api), and a workload-scoped
+    # DISABLE (admin-ui, matched on the "app: admin-ui" pod label added below).
+    cp testdata/peerauthentications.json "$FAKE_DIR/apis/security.istio.io/v1/peerauthentications"
     ( cd "$FAKE_DIR" && python3 -m http.server "$PROXY_PORT" >/dev/null 2>&1 ) &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"

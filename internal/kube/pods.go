@@ -49,9 +49,14 @@ type Pod struct {
 }
 
 type PodMetadata struct {
-	Name            string           `json:"name"`
-	Namespace       string           `json:"namespace"`
-	OwnerReferences []OwnerReference `json:"ownerReferences"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	// Labels is read to match a workload-specific PeerAuthentication's
+	// spec.selector.matchLabels against the pods it actually selects: Istio matches
+	// selectors against pod labels, not against the owning Deployment's own labels,
+	// so nothing short of the pod's own labels can answer that question.
+	Labels          map[string]string `json:"labels"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences"`
 }
 
 type PodStatus struct {

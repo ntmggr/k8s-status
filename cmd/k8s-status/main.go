@@ -328,6 +328,10 @@ func (f failingMeshLister) MeshPolicy(context.Context, string, string) (*kube.Pe
 	return nil, f.err
 }
 
+func (f failingMeshLister) ListPeerAuthentications(context.Context, string) (*kube.PeerAuthenticationList, error) {
+	return nil, f.err
+}
+
 type failingRunningLister struct{ err error }
 
 func (f failingRunningLister) ListRunningPods(context.Context) (*kube.PodList, error) {

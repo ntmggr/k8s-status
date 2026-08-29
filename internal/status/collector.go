@@ -40,9 +40,15 @@ type FluxLister interface {
 
 // MeshLister is optional, for the mesh mTLS gauge. It is only wired up when MESH_MTLS
 // is enabled, so the default deployment never touches Istio's CRDs.
+//
+// ListPeerAuthentications is a cluster-wide list, a materially larger permission than
+// MeshPolicy's single-object GET: it lets the per-service policy filter see namespace-
+// and workload-scoped overrides, which can live in any namespace, not only the one
+// MeshPolicy reads.
 type MeshLister interface {
 	DetectIstio(ctx context.Context) (string, error)
 	MeshPolicy(ctx context.Context, groupVersion, namespace string) (*kube.PeerAuthentication, error)
+	ListPeerAuthentications(ctx context.Context, groupVersion string) (*kube.PeerAuthenticationList, error)
 }
 
 // RunningLister reads running pods for the AZ-spread section. Optional, like the
@@ -86,6 +92,12 @@ type Collector struct {
 
 	meshSection *MeshSection
 	meshAt      time.Time
+	// peerAuths is every PeerAuthentication in the cluster, read alongside the
+	// mesh-wide policy so FillZones can resolve each service's own effective mode.
+	// Left nil when that list read is denied or fails: per-service policy then just
+	// never gets filled, same "an optional extra degrades silently" contract as the
+	// rest of this file's optional reads.
+	peerAuths *kube.PeerAuthenticationList
 
 	running     RunningLister
 	runningAt   time.Time
@@ -337,15 +349,27 @@ func (c *Collector) fetchMesh(ctx context.Context) {
 
 	var pa *kube.PeerAuthentication
 	var perr error
+	var peerAuths *kube.PeerAuthenticationList
 	if installed {
 		pa, perr = c.mesh.MeshPolicy(ctx, gv, c.meshNamespace)
 		if abandoned(perr) {
 			return
 		}
+		// Best-effort, independent of the mesh-wide read above: a denied or failed
+		// list here must not take the mesh-wide gauge down with it, it only means no
+		// per-service overrides get shown (FillZones leaves Policy unset).
+		list, lerr := c.mesh.ListPeerAuthentications(ctx, gv)
+		if abandoned(lerr) {
+			return
+		}
+		if lerr == nil {
+			peerAuths = list
+		}
 	}
 
 	sec := BuildMesh(installed, gv, pa, perr)
 	c.meshSection = &sec
+	c.peerAuths = peerAuths
 	c.meshAt = c.now()
 }
 
@@ -417,5 +441,5 @@ func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
 		return
 	}
 	snap.ZoneRead = c.zoneRead
-	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace)
+	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace, c.peerAuths)
 }

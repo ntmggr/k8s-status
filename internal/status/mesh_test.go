@@ -80,7 +80,7 @@ func TestBuildMesh(t *testing.T) {
 			installed: true,
 			pa: &kube.PeerAuthentication{Spec: kube.PeerAuthenticationSpec{
 				MTLS:     kube.PeerAuthenticationMTLS{Mode: "STRICT"},
-				Selector: map[string]any{"matchLabels": map[string]any{"app": "payments"}},
+				Selector: kube.PeerAuthenticationSelector{MatchLabels: map[string]string{"app": "payments"}},
 			}},
 			wantEffective:   MeshStrict,
 			wantPolicyFound: true,
@@ -141,5 +141,102 @@ func TestMeshSectionState(t *testing.T) {
 		if got := sec.State(); got != tt.want {
 			t.Errorf("State() for %q = %v, want %v", tt.effective, got, tt.want)
 		}
+	}
+}
+
+func peerAuth(namespace string, selector map[string]string, mode string) kube.PeerAuthentication {
+	return kube.PeerAuthentication{
+		Metadata: kube.PeerAuthenticationMetadata{Namespace: namespace},
+		Spec: kube.PeerAuthenticationSpec{
+			MTLS:     kube.PeerAuthenticationMTLS{Mode: mode},
+			Selector: kube.PeerAuthenticationSelector{MatchLabels: selector},
+		},
+	}
+}
+
+func TestResolveServicePolicyWorkloadWinsOverNamespace(t *testing.T) {
+	list := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("payments", nil, "PERMISSIVE"),                              // namespace-wide
+		peerAuth("payments", map[string]string{"app": "billing"}, "DISABLE"), // workload-specific
+	}}
+	got := ResolveServicePolicy(list, "istio-system", "payments", map[string]string{"app": "billing"}, MeshStrict)
+	if got.Effective != MeshDisabled || got.Scope != ScopeWorkload {
+		t.Errorf("got %+v, want {disabled workload}", got)
+	}
+}
+
+func TestResolveServicePolicyNamespaceWinsOverMesh(t *testing.T) {
+	list := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("payments", nil, "PERMISSIVE"),
+	}}
+	got := ResolveServicePolicy(list, "istio-system", "payments", map[string]string{"app": "billing"}, MeshStrict)
+	if got.Effective != MeshPermissive || got.Scope != ScopeNamespace {
+		t.Errorf("got %+v, want {permissive namespace}", got)
+	}
+}
+
+func TestResolveServicePolicyUnsetFallsThroughEachLevel(t *testing.T) {
+	// Workload-scoped UNSET falls through to namespace-wide, not to mesh directly.
+	list := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("payments", nil, "DISABLE"),
+		peerAuth("payments", map[string]string{"app": "billing"}, "UNSET"),
+	}}
+	got := ResolveServicePolicy(list, "istio-system", "payments", map[string]string{"app": "billing"}, MeshStrict)
+	if got.Effective != MeshDisabled || got.Scope != ScopeNamespace {
+		t.Errorf("workload UNSET should fall through to namespace-wide: got %+v", got)
+	}
+
+	// Namespace-wide UNSET (and no workload match) falls through to mesh.
+	list2 := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("payments", nil, "UNSET"),
+	}}
+	got2 := ResolveServicePolicy(list2, "istio-system", "payments", map[string]string{"app": "billing"}, MeshStrict)
+	if got2.Effective != MeshStrict || got2.Scope != ScopeMesh {
+		t.Errorf("namespace UNSET should fall through to mesh: got %+v", got2)
+	}
+}
+
+func TestResolveServicePolicyMultipleWorkloadMatchesPicksFirstByListOrder(t *testing.T) {
+	// Istio's own behaviour when two workload-scoped policies in one namespace both
+	// select the same workload is undefined. This only asserts the deterministic,
+	// arbitrary choice this package makes -- first match in list order -- not that it
+	// is somehow "correct", since Istio itself defines no correct answer here.
+	list := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("payments", map[string]string{"app": "billing"}, "STRICT"),
+		peerAuth("payments", map[string]string{"app": "billing"}, "DISABLE"),
+	}}
+	got := ResolveServicePolicy(list, "istio-system", "payments", map[string]string{"app": "billing"}, MeshPermissive)
+	if got.Effective != MeshStrict || got.Scope != ScopeWorkload {
+		t.Errorf("got %+v, want the first matching item (strict), not the second", got)
+	}
+}
+
+func TestResolveServicePolicyNoOverrideInheritsMeshEffective(t *testing.T) {
+	list := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("other-namespace", nil, "DISABLE"),
+	}}
+	got := ResolveServicePolicy(list, "istio-system", "payments", map[string]string{"app": "billing"}, MeshStrict)
+	if got.Effective != MeshStrict || got.Scope != ScopeMesh {
+		t.Errorf("got %+v, want {strict mesh}", got)
+	}
+}
+
+func TestResolveServicePolicyNilListInheritsMesh(t *testing.T) {
+	got := ResolveServicePolicy(nil, "istio-system", "payments", nil, MeshPermissive)
+	if got.Effective != MeshPermissive || got.Scope != ScopeMesh {
+		t.Errorf("got %+v, want {permissive mesh}", got)
+	}
+}
+
+func TestResolveServicePolicyMeshNamespaceItselfIsAlwaysMeshScoped(t *testing.T) {
+	// Istio ignores a selector on a PeerAuthentication placed in the root namespace,
+	// so a workload living there (istiod itself, an ingress gateway) has no
+	// namespace- or workload-level override to look for.
+	list := &kube.PeerAuthenticationList{Items: []kube.PeerAuthentication{
+		peerAuth("istio-system", map[string]string{"app": "istiod"}, "DISABLE"),
+	}}
+	got := ResolveServicePolicy(list, "istio-system", "istio-system", map[string]string{"app": "istiod"}, MeshStrict)
+	if got.Effective != MeshStrict || got.Scope != ScopeMesh {
+		t.Errorf("got %+v, want {strict mesh}", got)
 	}
 }

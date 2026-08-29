@@ -66,6 +66,42 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ include "k8s-status.fullname" . }}-mesh
+---
+{{- /* Cluster-scoped, independent of rbac.clusterRole below: this is the permission
+       the per-service policy filter actually needs. Namespace- and workload-scoped
+       PeerAuthentication overrides can live in any namespace, and a Role only ever
+       grants inside one, so seeing them at all needs a ClusterRole. list only, not
+       get: the list response already carries every object's full spec, so adding get
+       here would grant no additional access, only redundant plumbing.
+       This is a real increase in blast radius over the Role above: it lets the
+       ServiceAccount read the mTLS policy -- a security-relevant setting, not
+       workload metadata -- of every namespace in the cluster, not only
+       rbac.istioNamespace. It is still read-only and still one CRD. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "k8s-status.fullname" . }}-mesh-list
+  labels:
+    {{- include "k8s-status.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["security.istio.io"]
+    resources: ["peerauthentications"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "k8s-status.fullname" . }}-mesh-list
+  labels:
+    {{- include "k8s-status.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "k8s-status.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "k8s-status.fullname" . }}-mesh-list
 {{- end }}
 {{- if .Values.rbac.clusterRole }}
 ---

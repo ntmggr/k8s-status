@@ -59,6 +59,12 @@ type Workload struct {
 	// Mesh is filled alongside Zones/Nodes by the same FillZones pass (zero-value when
 	// AZ_SPREAD is off), the mesh-sidecar-injection counterpart of Zones/Nodes.
 	Mesh MeshCoverage
+	// Policy is filled the same way as a Service's own field of the same name: this
+	// row's effective mTLS mode, resolved against namespace/workload overrides rather
+	// than the cluster-wide default alone. For a collapsed release row this is
+	// whichever member FillZones happened to read pod labels from first, the same
+	// "one thing to know about" choice Zones/Nodes/Mesh already make for the row.
+	Policy ServicePolicy
 }
 
 // Unmanaged is the set of workloads running outside GitOps. Error is set when the
