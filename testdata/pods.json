@@ -90,6 +90,11 @@
         "containerStatuses": [
           {
             "name": "search-api"
+          }
+        ],
+        "initContainerStatuses": [
+          {
+            "name": "istio-init"
           },
           {
             "name": "istio-proxy"
@@ -120,6 +125,11 @@
         "containerStatuses": [
           {
             "name": "search-api"
+          }
+        ],
+        "initContainerStatuses": [
+          {
+            "name": "istio-init"
           },
           {
             "name": "istio-proxy"

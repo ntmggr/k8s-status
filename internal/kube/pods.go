@@ -65,6 +65,13 @@ type PodStatus struct {
 	// spec.containers[].env is, and joined against istioProxyContainer it says whether
 	// this pod actually has the Istio sidecar injected.
 	ContainerStatuses []ContainerStatus `json:"containerStatuses"`
+	// InitContainerStatuses is read for the same reason and the same field-shape
+	// argument as ContainerStatuses above. Kubernetes 1.29+'s native sidecar containers
+	// -- which is how Istio's own injector runs istio-proxy on a current cluster, as an
+	// init container with restartPolicy: Always rather than a regular container --
+	// report their status here instead. Checking only ContainerStatuses produced a
+	// false "not injected" for every properly-injected pod on such a cluster.
+	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses"`
 }
 
 type ContainerStatus struct {
@@ -76,9 +83,16 @@ const istioProxyContainer = "istio-proxy"
 
 // IsIstioInjected reports whether this pod actually has the Istio sidecar running,
 // observed from its own container statuses rather than any injection annotation or
-// namespace label, which only say a sidecar was requested.
+// namespace label, which only say a sidecar was requested. Checks both regular and
+// init container statuses: a native sidecar (Kubernetes 1.29+, Istio's own injector
+// on a current cluster) reports under the latter, not the former.
 func (p Pod) IsIstioInjected() bool {
 	for _, cs := range p.Status.ContainerStatuses {
+		if cs.Name == istioProxyContainer {
+			return true
+		}
+	}
+	for _, cs := range p.Status.InitContainerStatuses {
 		if cs.Name == istioProxyContainer {
 			return true
 		}
