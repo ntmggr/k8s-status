@@ -584,11 +584,13 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 .tile .n { font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; }
 .tile .k { margin-top: .3rem; }
 .tile.t-total       { border-color: var(--hair); border-top-color: var(--ink); }
-.tile.t-ok          { background: var(--surface); border-color: var(--hair); border-top-color: var(--ok-fg); }
-.tile.t-degraded    { background: var(--surface); border-color: var(--hair); border-top-color: var(--deg-fg); }
-.tile.t-warning     { background: var(--surface); border-color: var(--hair); border-top-color: var(--warn-fg); }
-.tile.t-progressing { background: var(--surface); border-color: var(--hair); border-top-color: var(--prog-fg); }
-.tile.t-drift       { background: var(--surface); border-color: var(--hair); border-top-color: var(--drift-fg); }
+/* A full colour ring, not just the top rule: reads as "this box is about that
+   state" at a glance, the same way the .pill capsule beside it does now. */
+.tile.t-ok          { background: color-mix(in srgb, var(--ok-fg) 6%, var(--surface));     border-color: color-mix(in srgb, var(--ok-fg) 45%, var(--hair));     border-top-color: var(--ok-fg); }
+.tile.t-degraded    { background: color-mix(in srgb, var(--deg-fg) 6%, var(--surface));    border-color: color-mix(in srgb, var(--deg-fg) 45%, var(--hair));    border-top-color: var(--deg-fg); }
+.tile.t-warning     { background: color-mix(in srgb, var(--warn-fg) 6%, var(--surface));   border-color: color-mix(in srgb, var(--warn-fg) 45%, var(--hair));   border-top-color: var(--warn-fg); }
+.tile.t-progressing { background: color-mix(in srgb, var(--prog-fg) 6%, var(--surface));   border-color: color-mix(in srgb, var(--prog-fg) 45%, var(--hair));   border-top-color: var(--prog-fg); }
+.tile.t-drift       { background: color-mix(in srgb, var(--drift-fg) 6%, var(--surface));  border-color: color-mix(in srgb, var(--drift-fg) 45%, var(--hair));  border-top-color: var(--drift-fg); }
 .tile.t-prune       { background: var(--surface); border-color: var(--hair); border-top-color: var(--prune-fg); }
 .tile.t-suspended   { background: var(--surface); border-color: var(--hair); border-top-color: var(--susp-fg); }
 .tile.t-ok .k, .tile.t-degraded .k, .tile.t-warning .k, .tile.t-progressing .k,
@@ -730,13 +732,17 @@ tbody.svc:hover td { background: var(--sunken); }
 .svc.is-blocked  td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
 tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
 
-/* Status: glyph + word, no capsule. */
+/* Status: glyph + word in a bordered, lightly tinted capsule -- currentColor picks
+   up whichever state's colour the base .s-* rule already set, so one rule covers
+   all seven states instead of restating each border/background pair. */
 .pill {
-  padding: 0; border-radius: 0; background: transparent;
-  font-family: var(--mono); font-size: .62rem; letter-spacing: .12em;
+  padding: .12rem .55rem; border-radius: 4px; border: 1px solid currentColor;
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
 }
 .pill.s-ok, .pill.s-degraded, .pill.s-warning, .pill.s-progressing,
-.pill.s-drift, .pill.s-prune, .pill.s-suspended { background: transparent; }
+.pill.s-drift, .pill.s-prune, .pill.s-suspended {
+  background: color-mix(in srgb, currentColor 12%, var(--surface));
+}
 .pill .g { opacity: .9; }
 
 /* Inline badges: outline in their own colour, never a fill. */
@@ -940,11 +946,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
       </span></span>
       {{- if .Scoped}}<span class="cap-part is-warn" title="The default PeerAuthentication object carries a selector, so it applies to one workload, not the whole mesh.">{{icon "warn"}}workload-scoped</span>{{end}}
       </div>
-      {{if $.Snapshot.Summary.MeshPolicyPermissive}}
-      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{$.Snapshot.Summary.MeshPolicyPermissive}} service{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE, across both services and not-in-gitops workloads -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{$.Snapshot.Summary.MeshPolicyPermissive}}</div><div class="k">permissive</div></a>
-      {{else if $.Snapshot.Summary.MeshPolicyEligible}}
-      <div class="tile t-ok"><div class="n">0</div><div class="k">permissive</div></div>
-      {{end}}
+      {{- if $.Snapshot.Summary.MeshPolicyPermissive}}<span class="cap-part" title="{{$.Snapshot.Summary.MeshPolicyPermissive}} service{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}} carry their own namespace- or workload-level PeerAuthentication override, not just the cluster-wide default above.">{{$.Snapshot.Summary.MeshPolicyPermissive}} override{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}}</span>{{end}}
       {{else}}
       <div class="cap-note">
         {{- if .Denied}}mesh mTLS needs a Role granting <span class="mono">get</span> on the <span class="mono">default</span> <span class="mono">peerauthentications.security.istio.io</span> object in the Istio namespace; the default install grants nothing there.
@@ -971,9 +973,14 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
       </div>
       {{if .NotInMesh}}
-      <a class="tile t-warning{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod, across both services and not-in-gitops workloads, lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
+      <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod, across both services and not-in-gitops workloads, lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
       {{else if .Known}}
       <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
+      {{end}}
+      {{if $.Snapshot.Summary.MeshPolicyPermissive}}
+      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{$.Snapshot.Summary.MeshPolicyPermissive}} service{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE, across both services and not-in-gitops workloads -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{$.Snapshot.Summary.MeshPolicyPermissive}}</div><div class="k">permissive</div></a>
+      {{else if $.Snapshot.Summary.MeshPolicyEligible}}
+      <div class="tile t-ok"><div class="n">0</div><div class="k">permissive</div></div>
       {{end}}
     </div>
     {{end}}
