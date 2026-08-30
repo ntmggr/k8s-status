@@ -477,6 +477,298 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   .hide-sm { display: none; }
   body { padding: var(--pad-top) var(--pad-x) 3rem; }
 }
+/* >>> instrument refresh (generated) >>> */
+/* ── instrument v2 — one coherent sheet over the stock one ───────────────
+   Three moves: (1) flatten the panel → area → gauge-card nesting to a single
+   card divided by hairlines, (2) colour lives only on numerals, arcs and a 3px
+   row rule, (3) all data is mono, all labels are 10px/.16em, all prose is
+   system-ui. Nothing below adds a class or touches the template. */
+:root {
+  --plane:#f7f7f5; --surface:#ffffff; --sunken:#fbfaf8;
+  --hair:#e6e5df;  --hair-2:#f0efe9;  --ring:#e6e5df; --track:#e9e8e1;
+  --ink:#101112;   --ink-2:#4a4b4d;   --muted:#8d8c86;
+  --warn-arc:#c98a12;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --pad-x:1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --plane:#08090a; --surface:#0e1012; --sunken:#0a0b0c;
+    --hair:#1e2123;  --hair-2:#17191b; --ring:#1e2123; --track:#1c1f21;
+    --ink:#f2f2ef;   --ink-2:#b9b8b2;  --muted:#7d7c76;
+    --warn-arc:#f5c451;
+  }
+}
+
+body { background: var(--plane); font-size: 13px; line-height: 1.5; }
+header { background: var(--plane); border-bottom: 1px solid var(--hair); }
+h1 { font-size: 1.05rem; letter-spacing: -.015em; }
+.meta, .badge, .runmode, .src-tag { font-family: var(--mono); }
+.meta { font-size: .72rem; letter-spacing: .02em; }
+.badge, .runmode, .src-tag {
+  border-radius: 3px; font-size: .6rem; letter-spacing: .12em; padding: .2rem .4rem;
+  background: transparent; border: 1px solid var(--hair); color: var(--muted);
+}
+.runmode { border-style: solid; }
+
+/* Every micro-label, one voice. */
+.tile .k, .cap-head, .views-lab, .spread-lab, .cap-lead .ck, .cap-of .ck, thead th,
+.kind, .legend > summary, .sec-head {
+  font-family: var(--mono); font-size: .6rem; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+.cap-head .cap-sub, .sec-head .sec-sub, .hdr-sub {
+  font-family: system-ui, sans-serif; font-size: .72rem; font-weight: 400;
+  letter-spacing: 0; text-transform: none; color: var(--muted);
+}
+/* Every number, mono and tabular. */
+.tile .n, .cap-item .cv, .cap-lead .cv, .gauge .hd-num, .appver, .chartver, .ready,
+.sync, .meta, .members { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* One console sheet, not five floating cards. Views / Cluster / legend were each a
+   rounded box wrapping a single thin row — five competing containers for four facts.
+   They become bands of one continuous sheet, separated by hairlines. */
+.panel, .views, .capacity, .legend {
+  background: var(--surface); border: 0; border-radius: 0;
+  border-top: 1px solid var(--hair); margin: 0 calc(-1 * var(--pad-x));
+  padding: .7rem var(--pad-x);
+}
+.panel-row { margin: 0 0 0 0; gap: 0; }
+.panel { padding: 0; flex: 1 1 100%; min-width: 0; border-top: 0; }
+.panel > .cap-head, .panel > div:first-child.cap-head {
+  padding: .6rem var(--pad-x); border-bottom: 1px solid var(--hair-2);
+}
+.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; }
+/* A fixed label rail down the left, so every band starts on the same column. */
+.views, .capacity { display: flex; align-items: baseline; gap: .8rem; flex-wrap: nowrap; }
+.views-lab, .capacity > .cap-head {
+  flex: none; width: 5rem; margin: 0; padding-top: .12rem;
+}
+.capacity > .cap-head .cap-sub { display: block; width: 12rem; }
+.capacity { flex-wrap: wrap; }
+.capacity > .cap-row, .capacity > .cap-note { flex: 1 1 24rem; margin-top: 0; }
+.views { flex-wrap: wrap; }
+
+/* Flatten: the three areas share one card, divided by a hairline instead of each
+   being its own rounded box inside a rounded box inside a rounded box. */
+.areas { display: flex; gap: 0; margin: 0; flex-wrap: wrap; }
+.area {
+  background: transparent; border: 0; border-radius: 0;
+  padding: .85rem .9rem; min-width: 0; flex: 1 1 21rem;
+}
+.areas > .area:first-child { flex: 2 1 30rem; }
+.area + .area { border-left: 1px solid var(--hair-2); }
+/* Area heads sit on the same rail as the section labels below them. */
+.area > .cap-head { display: block; margin-bottom: .1rem; }
+.area > .cap-head .cap-sub { display: block; margin-left: 0; margin-top: .15rem; }
+/* Rows centre their cells; they do NOT stretch them. Stretching let the gauge's
+   height drive the tiles, so a 2-line tile grew into a 200px empty box. */
+.tiles-row, .ha-rows .tiles-row { align-items: center; margin-top: .55rem; }
+.tiles { gap: .45rem; }
+.spread-lab { align-self: center; margin-top: 0; width: 3.4rem; }
+
+/* Tiles: fixed cell, hairline box, 2px state rule. The stock .t-* rules set
+   border-color: transparent, so each one has to restate it. */
+/* One cell size for every box in the Health / HA / Istio rows — tiles and the Istio
+   policy box alike, so the four boxes in the Istio area match each other and the
+   AT RISK cells opposite them. */
+:root { --cell-h: 3.9rem; --cell-w: 7.4rem; }
+.tile {
+  flex: none; width: var(--cell-w); min-width: 0; height: var(--cell-h);
+  padding: .5rem .65rem;
+  background: var(--surface); border: 1px solid var(--hair);
+  border-top: 2px solid var(--hair); border-radius: 4px;
+  display: flex; flex-direction: column; justify-content: center;
+  align-items: center; text-align: center;
+}
+.tile .n { font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; }
+.tile .k { margin-top: .3rem; }
+.tile.t-total       { border-color: var(--hair); border-top-color: var(--ink); }
+.tile.t-ok          { background: var(--surface); border-color: var(--hair); border-top-color: var(--ok-fg); }
+.tile.t-degraded    { background: var(--surface); border-color: var(--hair); border-top-color: var(--deg-fg); }
+.tile.t-warning     { background: var(--surface); border-color: var(--hair); border-top-color: var(--warn-fg); }
+.tile.t-progressing { background: var(--surface); border-color: var(--hair); border-top-color: var(--prog-fg); }
+.tile.t-drift       { background: var(--surface); border-color: var(--hair); border-top-color: var(--drift-fg); }
+.tile.t-prune       { background: var(--surface); border-color: var(--hair); border-top-color: var(--prune-fg); }
+.tile.t-suspended   { background: var(--surface); border-color: var(--hair); border-top-color: var(--susp-fg); }
+.tile.t-ok .k, .tile.t-degraded .k, .tile.t-warning .k, .tile.t-progressing .k,
+.tile.t-drift .k, .tile.t-prune .k, .tile.t-suspended .k { color: var(--muted); }
+
+/* Gauge: an instrument, not a dial. No card, no tick marks, no 25/50/75 furniture,
+   no pivot hub — a track, a sweep to --pct, a slim marker and the number. */
+.gauge { background: transparent; border: 0; padding: 0; width: auto; gap: .3rem; }
+.gauge .hd-face {
+  position: relative; width: 108px; height: 54px; margin: 26px auto 0;
+  /* Own stacking context, so the z-index:-1 graduation layers below sit behind the
+     arc (a static in-flow child) but still in front of the face's own background. */
+  isolation: isolate;
+}
+.gauge.gauge-lg .hd-face { width: 156px; height: 78px; margin-top: 30px; }
+.gauge .hd-pivot { display: none; }
+/* Ticks, done properly: a fine graduation fringe drawn OUTSIDE the arc, so the ring
+   itself stays clean. Two layers — minor every 9°, major every 45° and longer — both
+   painted by the face's own pseudo-elements, which the arc then covers from the
+   inside. No extra markup: the stock .hd-tick <i> elements only carry the digits. */
+.gauge .hd-face::before, .gauge .hd-face::after {
+  content: ""; position: absolute; bottom: 0; border-radius: 999px 999px 0 0;
+  pointer-events: none;
+  /* Without this the fringe paints OVER .hd-arc — positioned descendants outrank an
+     in-flow static sibling — and the graduations stripe straight across the band. */
+  z-index: -1;
+}
+.gauge .hd-face::before {                       /* minor graduations */
+  left: -5px; right: -5px; top: -5px;
+  background: repeating-conic-gradient(from 270deg at 50% 100%,
+    var(--muted) 0 .55deg, transparent .55deg 9deg);
+  opacity: .38;
+}
+.gauge .hd-face::after {                        /* major graduations */
+  left: -9px; right: -9px; top: -9px;
+  background: repeating-conic-gradient(from 270deg at 50% 100%,
+    var(--ink-2) 0 .75deg, transparent .75deg 45deg);
+  opacity: .55;
+}
+.gauge.gauge-lg .hd-face::before { left: -6px; right: -6px; top: -6px; }
+.gauge.gauge-lg .hd-face::after  { left: -11px; right: -11px; top: -11px; }
+/* The stock tick <i> keeps only its digit; its own line is now the fringe's job. */
+.gauge .hd-tick { background: none; }
+.gauge .hd-tick::after { display: none; }
+.gauge .hd-scale {
+  top: -22px; font-family: var(--mono); font-size: .52rem; font-weight: 600;
+  letter-spacing: .04em; color: var(--muted); opacity: .8;
+}
+.gauge.gauge-lg .hd-scale { top: -26px; font-size: .58rem; }
+.gauge {
+  --seg1: clamp(0%, calc(var(--pct) * 2%), 100%);
+  --seg2: clamp(0%, calc((var(--pct) - 50) * 2%), 100%);
+  --arc: color-mix(in srgb,
+           color-mix(in srgb, var(--deg-fg), var(--warn-arc) var(--seg1)),
+           var(--ok-fg) var(--seg2));
+}
+.gauge .hd-arc {
+  border-radius: 999px 999px 0 0; box-shadow: none;
+  background: conic-gradient(from 270deg at 50% 100%,
+    var(--arc) 0deg calc(var(--pct) * 1.8deg),
+    var(--track) calc(var(--pct) * 1.8deg) 180deg);
+}
+.gauge .hd-mask {
+  left: 9px; right: 9px; top: 9px; border-radius: 999px 999px 0 0;
+  background: var(--surface); box-shadow: none;
+}
+.gauge.gauge-lg .hd-mask { left: 13px; right: 13px; top: 13px; }
+/* Marker: 2px, painted only where the arc band is, so it reads as a value tick
+   instead of an arrow sweeping over the number and off the card. */
+.gauge .hd-needle {
+  width: 2px; margin-left: -1px; height: 54px; clip-path: none; filter: none;
+  background: linear-gradient(to bottom, var(--ink) 0 9px, transparent 9px);
+}
+.gauge.gauge-lg .hd-needle {
+  height: 78px; background: linear-gradient(to bottom, var(--ink) 0 13px, transparent 13px);
+}
+.gauge .hd-num {
+  bottom: 1px; font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em;
+  color: var(--arc);
+}
+.gauge.gauge-lg .hd-num { bottom: 3px; font-size: 2rem; }
+.gauge .hd-num small { font-size: .5em; color: var(--muted); margin-left: .1em; }
+.gauge .hd-cap { font-family: var(--mono); font-size: .6rem; letter-spacing: .04em; }
+.gauge.is-unknown { --arc: var(--muted); }
+.gauge.is-unknown .hd-arc { background: var(--track); }
+.gauge.is-unknown .hd-needle { background: none; }
+
+/* Views + cluster: hairline chips, no fills. */
+.views, .capacity { padding: .6rem .9rem; }
+.vchip, .chip {
+  background: transparent; border: 1px solid var(--hair); border-radius: 4px;
+  font-family: var(--mono); font-size: .68rem; letter-spacing: .04em;
+  padding: .28rem .5rem; color: var(--ink-2);
+}
+.vchip:hover { border-color: var(--ink-2); }
+.cap-item .cv, .cap-lead .cv { font-size: .95rem; font-weight: 700; }
+.cap-item .ck, .cap-split { font-family: var(--mono); font-size: .68rem; }
+.ic { opacity: .45; }
+
+/* Selection: a tight ring on the element. The stock outline + 2px offset reads as a
+   detached halo once everything is a flat bordered card. */
+.tile.is-on, a.cap-item.is-on, .vchip.is-on, .chips .chip {
+  outline: none; border-radius: 4px; box-shadow: 0 0 0 2px var(--ink);
+  border-color: transparent;
+}
+.tile.is-on { border-top-color: var(--ink); }
+.tile.is-on .n, .tile.is-on .k, a.cap-item.is-on .ck, .vchip.is-on { color: var(--ink); }
+.tile.is-on .k::after, a.cap-item.is-on .ck::after, .vchip.is-on::after {
+  margin-left: .4em; opacity: .55;
+}
+
+/* Table: 10px mono headers, hairline rows, a 3px state rule, no wash. */
+.card { overflow: hidden; margin-top: 1rem; }
+thead th {
+  background: var(--surface); padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
+}
+thead th:first-child, thead th:last-child,
+tbody:last-of-type tr:last-child td:first-child,
+tbody:last-of-type tr:last-child td:last-child { border-radius: 0; }
+tbody td { padding: .45rem .8rem; border-top: 1px solid var(--hair-2); }
+tbody.svc:hover td { background: var(--sunken); }
+.name { font-weight: 500; font-size: .84rem; letter-spacing: -.005em; }
+.appver { font-size: .76rem; font-weight: 700; }
+.chartver, .sync, .detail { font-size: .72rem; }
+.detail { font-family: system-ui, sans-serif; color: var(--ink-2); }
+.svc.is-degraded td:first-child { box-shadow: inset 3px 0 0 var(--deg-fg); }
+.svc.is-warning  td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
+.svc.is-blocked  td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
+tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
+
+/* Status: glyph + word, no capsule. */
+.pill {
+  padding: 0; border-radius: 0; background: transparent;
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .12em;
+}
+.pill.s-ok, .pill.s-degraded, .pill.s-warning, .pill.s-progressing,
+.pill.s-drift, .pill.s-prune, .pill.s-suspended { background: transparent; }
+.pill .g { opacity: .9; }
+
+/* Inline badges: outline in their own colour, never a fill. */
+.blocked, .arch, .az, .gpu, .src, .members {
+  background: transparent; border: 1px solid currentColor; border-radius: 2px;
+  padding: .04rem .26rem; font-family: var(--mono); font-size: .58rem;
+  letter-spacing: .06em; opacity: .9;
+}
+.arch.is-arm64 { color: var(--prog-fg); }
+.arch.is-amd64 { color: var(--drift-fg); }
+.az.is-single  { color: var(--warn-fg); }
+.az.is-multi   { color: var(--ok-fg); }
+.gpu.is-waiting { color: var(--warn-fg); }
+.gpu.is-stopped { color: var(--susp-fg); }
+.gpu.is-running { color: var(--ok-fg); }
+.blocked { color: var(--warn-fg); }
+.blocked.is-accelerator { color: var(--gpu-fg); }
+.members, .src { color: var(--muted); }
+
+/* Istio's Policy row: a pill where its siblings have a gauge. Same cell as a tile,
+   with the mode wrapping onto two lines instead of forcing the box wide. */
+.area .cap-lead {
+  flex: none; width: var(--cell-w); height: var(--cell-h); box-sizing: border-box;
+  align-items: center; justify-content: center; gap: 0;
+  padding: .4rem .5rem; border: 1px solid var(--hair);
+  border-top: 2px solid var(--hair); border-radius: 4px; background: var(--surface);
+}
+.area .cap-lead .pill {
+  display: block; text-align: center; white-space: normal; word-break: break-word;
+  font-size: .62rem; line-height: 1.35; letter-spacing: .08em; color: var(--ink);
+}
+.area .cap-lead .ic, .area .cap-lead svg { display: none; }
+/* Gauges are cells too — same height, so a row reads as one band. */
+.tiles-row > .gauge { flex: none; }
+
+/* Legend + sections. */
+.legend { margin-bottom: 0; }
+.legend > summary { color: var(--muted); }
+.legend-row, .legend-note, .sub { font-size: .76rem; color: var(--ink-2); }
+.legend-kw { font-family: var(--mono); }
+.sec-head { margin: 1.6rem 0 -.1rem; }
+footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
+/* <<< instrument refresh (generated) <<< */
 </style>
 </head>
 <body>
