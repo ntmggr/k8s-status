@@ -96,9 +96,14 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .legend[open] > summary::before { content: "\25be "; }
 .legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
                gap: .3rem .9rem; margin-top: .55rem; }
-.legend-row { display: flex; align-items: baseline; gap: .45rem; font-size: .78rem;
+/* center, not baseline: baseline pins an icon to the first line of text, which
+   looks fine for a one-line row but leaves the icon stranded at the top of the
+   mesh-policy row's much longer, wrapping paragraph. Centered against the whole
+   block reads right regardless of how many lines the text takes. */
+.legend-row { display: flex; align-items: center; gap: .45rem; font-size: .78rem;
               color: var(--ink-2); }
 .legend-row .pill { flex: none; }
+.legend-row .ic { flex: none; width: 11px; height: 11px; }
 .legend-kw { flex: none; font-size: .68rem; font-weight: 700; letter-spacing: .04em;
              color: var(--muted); }
 .legend-note { margin-top: .5rem; font-size: .74rem; color: var(--muted); }
@@ -564,7 +569,26 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 /* Rows centre their cells; they do NOT stretch them. Stretching let the gauge's
    height drive the tiles, so a 2-line tile grew into a 200px empty box. */
 .tiles-row, .ha-rows .tiles-row { align-items: center; margin-top: .55rem; }
+/* wrap on .ha-rows specifically, not every .tiles-row: Health's own top row (gauge +
+   the full tile grid) already fits without wrapping and does not need this. Istio's
+   "In mesh" row now carries a tile plus a pushed-right text note past it, and on a
+   narrower area that can run out of room -- unlike a second tile, the note dropping
+   to its own line reads fine, it is just a quiet aside either way. */
+.ha-rows .tiles-row { flex-wrap: wrap; }
 .tiles { gap: .45rem; }
+/* A lightweight text note, not a bordered tile: .cap-part.is-warn already exists
+   for the "workload-scoped"/"N overrides" notes elsewhere in this row, but only had
+   colour inside .cap-of's own context (the Cluster band) -- outside it, "is-warn"
+   was a no-op. push-right is the flex "pin to the far end of the row" trick, for
+   the permissive note sitting past the gauge and its tile on the same line. */
+.cap-part { font-size: .68rem; }
+.cap-part.is-warn { color: var(--warn-fg); }
+a.cap-part { text-decoration: none; }
+a.cap-part:hover { text-decoration: underline; }
+/* min-width: 0, not the flex default of auto -- without it this text refuses to
+   wrap when the row runs out of room and gets clipped at the area's edge instead
+   of breaking onto a second line. */
+.push-right { margin-left: auto; min-width: 0; text-align: right; }
 .spread-lab { align-self: center; margin-top: 0; width: 3.4rem; }
 
 /* Tiles: fixed cell, hairline box, 2px state rule. The stock .t-* rules set
@@ -978,10 +1002,27 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
       <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
       {{end}}
       {{if $.Snapshot.Summary.MeshPolicyPermissive}}
-      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{$.Snapshot.Summary.MeshPolicyPermissive}} service{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE, across both services and not-in-gitops workloads -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{$.Snapshot.Summary.MeshPolicyPermissive}}</div><div class="k">permissive</div></a>
-      {{else if $.Snapshot.Summary.MeshPolicyEligible}}
-      <div class="tile t-ok"><div class="n">0</div><div class="k">permissive</div></div>
+      <a class="cap-part is-warn push-right{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{$.Snapshot.Summary.MeshPolicyPermissive}} service{{if ne $.Snapshot.Summary.MeshPolicyPermissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE, across both services and not-in-gitops workloads -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which.">{{$.Snapshot.Summary.MeshPolicyPermissive}} permissive</a>
       {{end}}
+    </div>
+    {{end}}
+    {{with $.Snapshot.MeshPolicyHA}}
+    <div class="tiles-row">
+      <span class="spread-lab" title="Effective policy only, the same per-service answer the &quot;permissive&quot; note above reads -- not sidecar injection. A service counts here if AZ_SPREAD and mesh mTLS are both on and it resolved to an effective mode; DISABLE is not tracked per-service, so this is permissive vs. everything else, not a three-way severity ranking.">Strict</span>
+      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of policy-eligible services are NOT permissive &middot; {{.Compliant}} of {{.Eligible}} counted{{if .Permissive}} &middot; {{.Permissive}} permissive{{end}}{{else}}no services counted{{end}}">
+        <div class="hd-face">
+          <div class="hd-arc"></div>
+          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
+          <i class="hd-tick" style="transform: rotate(90deg)"></i>
+          <div class="hd-mask"></div>
+          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
+          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+        </div>
+        <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+      </div>
     </div>
     {{end}}
   </div>

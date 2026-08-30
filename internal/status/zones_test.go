@@ -607,6 +607,44 @@ func TestMeshHANilMeshIsUnknown(t *testing.T) {
 	}
 }
 
+// TestMeshPolicyHA mirrors TestMeshHA for the per-service policy question: what
+// share of policy-eligible services are NOT permissive. Unlike MeshHA there is no
+// "Istio not installed" case to gate on -- MeshPolicyEligible is already zero
+// whenever mesh mTLS or AZ_SPREAD is off, so zero-eligible alone covers it.
+func TestMeshPolicyHA(t *testing.T) {
+	cases := []struct {
+		name                 string
+		eligible, permissive int
+		wantKnown            bool
+		wantPercent          int
+	}{
+		{"none permissive", 4, 0, true, 100},
+		{"mixed", 4, 1, true, 75},
+		{"zero eligible", 0, 0, false, 0},
+		{"all permissive", 3, 3, true, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			snap := &Snapshot{
+				Summary: Summary{MeshPolicyEligible: tc.eligible, MeshPolicyPermissive: tc.permissive},
+			}
+			m := snap.MeshPolicyHA()
+			if m.Known != tc.wantKnown {
+				t.Errorf("Known=%v, want %v", m.Known, tc.wantKnown)
+			}
+			if m.Percent != tc.wantPercent {
+				t.Errorf("Percent=%d, want %d", m.Percent, tc.wantPercent)
+			}
+			if m.Eligible != tc.eligible || m.Permissive != tc.permissive {
+				t.Errorf("MeshPolicyHA=%+v, want eligible=%d permissive=%d", m, tc.eligible, tc.permissive)
+			}
+			if want := tc.eligible - tc.permissive; m.Compliant() != want {
+				t.Errorf("Compliant()=%d, want %d", m.Compliant(), want)
+			}
+		})
+	}
+}
+
 // TestFillZonesResolvesPerServicePolicyFromRunningPod is the wiring test for Policy:
 // FillZones must read the namespace and labels off one of a service's own running
 // pods and hand them to ResolveServicePolicy, not merely have the function available.

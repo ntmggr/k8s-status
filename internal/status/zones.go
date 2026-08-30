@@ -204,6 +204,43 @@ func (snap *Snapshot) MeshHA() MeshHA {
 // running pod, the exact population the "not in mesh" tile counts.
 func (m MeshHA) NotInMesh() int { return m.Eligible - m.Injected }
 
+// MeshPolicyHA mirrors MeshHA's shape for the per-service policy question instead of
+// the sidecar-injection one: what share of services with a known effective mTLS mode
+// are NOT permissive. A service counts as compliant here if it enforces the
+// mesh-wide default or a stricter override; DISABLE is not tracked per-service
+// (ResolveServicePolicy's own scope), so this is a two-way permissive/not split, not
+// a three-way STRICT/PERMISSIVE/DISABLE severity ranking.
+type MeshPolicyHA struct {
+	// Percent is Compliant as a share of Eligible, rounded to the nearest integer.
+	// Meaningless when Known is false.
+	Percent int
+	// Known is false when Eligible is zero: there is nothing to divide by.
+	Known bool
+	// Eligible is Summary.MeshPolicyEligible: services with a resolved effective
+	// policy (AZ_SPREAD on, mesh mTLS on).
+	Eligible int
+	// Permissive is Summary.MeshPolicyPermissive.
+	Permissive int
+}
+
+// MeshPolicyHA folds the per-service policy summary into one percentage, the same
+// way MeshHA does for sidecar injection.
+func (snap *Snapshot) MeshPolicyHA() MeshPolicyHA {
+	m := MeshPolicyHA{
+		Eligible:   snap.Summary.MeshPolicyEligible,
+		Permissive: snap.Summary.MeshPolicyPermissive,
+	}
+	if m.Eligible <= 0 {
+		return m
+	}
+	m.Known = true
+	m.Percent = roundPercent(m.Compliant(), m.Eligible)
+	return m
+}
+
+// Compliant is how many policy-eligible services are NOT permissive.
+func (m MeshPolicyHA) Compliant() int { return m.Eligible - m.Permissive }
+
 // ZoneError is the degraded form of the AZ-spread section: no per-service zone data,
 // one note explaining why. Denied and TooLarge each get their own inline hint in the
 // template; a failed read here is never swallowed silently the way fetchPending's is.
