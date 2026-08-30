@@ -11,8 +11,9 @@
   color-scheme: light dark;
   --pad-x: 1.75rem;
   --pad-top: 1.5rem;
-  /* Height of the sticky page header. thead sticks to exactly this offset, so the
-     two cannot drift apart. */
+  /* Height of the sticky page header, used by the header itself to size/position
+     against. Table headers used to stick at this same offset too, until that
+     turned out to silently collapse table rows -- see the note by thead th. */
   --hdr-h: 2.85rem;
   --plane:      #f9f9f7;
   --surface:    #fcfcfb;
@@ -390,8 +391,15 @@ thead th:first-child { border-top-left-radius: 10px; }
 thead th:last-child  { border-top-right-radius: 10px; }
 tbody:last-of-type tr:last-child td:first-child { border-bottom-left-radius: 10px; }
 tbody:last-of-type tr:last-child td:last-child  { border-bottom-right-radius: 10px; }
+/* Not position: sticky -- with this table's own layout it silently collapsed
+   whichever row happened to sit first in a tbody to zero height (confirmed by
+   removing sticky alone fixing it, and moving it to <thead> instead of each <th>
+   not fixing it): rows counted in "showing N of M" but not rendered at all. A
+   dashboard where filtered rows can silently vanish is worse than one whose table
+   header scrolls off screen, so this stays static rather than chasing the exact
+   layout trigger further. */
 thead th {
-  position: sticky; top: var(--hdr-h); z-index: 2; background: var(--surface);
+  background: var(--surface);
   text-align: left; font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
 }
