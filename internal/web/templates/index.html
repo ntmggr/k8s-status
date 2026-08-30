@@ -557,8 +557,20 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 .views-lab, .capacity > .cap-head {
   flex: none; width: 5rem; margin: 0; padding-top: .12rem;
 }
-.capacity > .cap-head .cap-sub { display: block; width: 12rem; }
+/* 12rem forced this sentence to wrap mid-phrase ("...not the / services above").
+   max-width would seem safer than a bare width, but .cap-head itself is pinned to
+   a 5rem rail (below) and this text is deliberately meant to overflow past it into
+   the row -- max-width: 100% caps it at 100% of that 5rem parent instead, which is
+   the opposite of what's needed here. */
+.capacity > .cap-head .cap-sub { display: block; width: 20rem; }
 .capacity { flex-wrap: wrap; }
+/* Filters and Cluster get their own bordered card back, undoing the flat
+   hairline-band treatment above for just these two: they read as distinct panels,
+   not more rows of the same running sheet. */
+.views, .capacity {
+  background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
+  margin: .9rem 0 0; padding: .6rem .9rem;
+}
 .capacity > .cap-row, .capacity > .cap-note { flex: 1 1 24rem; margin-top: 0; }
 .views { flex-wrap: wrap; }
 
@@ -569,7 +581,10 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
   background: transparent; border: 0; border-radius: 0;
   padding: .85rem .9rem; min-width: 0; flex: 1 1 21rem;
 }
-.areas > .area:first-child { flex: 2 1 30rem; }
+/* Equal growth, not 2x on the first area: with only 1-2 tiles active (most states
+   at zero), Health's own content is narrower than HA/Istio's, so growing it faster
+   just left visibly more empty slack in that one area as the window widened. */
+.areas > .area:first-child { flex: 1 1 30rem; }
 .area + .area { border-left: 1px solid var(--hair-2); }
 /* Area heads sit on the same rail as the section labels below them. */
 .area > .cap-head { display: block; margin-bottom: .1rem; }
