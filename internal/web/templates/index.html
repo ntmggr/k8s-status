@@ -112,7 +112,13 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .meta { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 
-.sub { color: var(--ink-2); font-size: .85rem; margin-top: .45rem; }
+/* Boxed like Views/Cluster/the legend, not a bare line -- the root ArgoCD app is
+   its own fact, not a continuation of the header above it. */
+.sub {
+  color: var(--ink-2); font-size: .85rem; margin: .9rem 0 0;
+  background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
+  padding: .6rem .9rem;
+}
 .src-tag {
   display: inline-block; margin-right: .4rem; padding: .05rem .4rem;
   border: 1px solid var(--ring); border-radius: 4px;
@@ -548,8 +554,10 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 }
 .panel-row { margin: 0 0 0 0; gap: 0; }
 .panel { padding: 0; flex: 1 1 100%; min-width: 0; border-top: 0; }
+/* .9rem, matching .area's own left padding below -- var(--pad-x) (1.75rem) put
+   "Services" and "Health" at two different left edges. */
 .panel > .cap-head, .panel > div:first-child.cap-head {
-  padding: .6rem var(--pad-x); border-bottom: 1px solid var(--hair-2);
+  padding: .6rem .9rem; border-bottom: 1px solid var(--hair-2);
 }
 .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; }
 /* A fixed label rail down the left, so every band starts on the same column. */
@@ -564,28 +572,39 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
    the opposite of what's needed here. */
 .capacity > .cap-head .cap-sub { display: block; width: 20rem; }
 .capacity { flex-wrap: wrap; }
-/* Filters and Cluster get their own bordered card back, undoing the flat
-   hairline-band treatment above for just these two: they read as distinct panels,
-   not more rows of the same running sheet. */
-.views, .capacity {
+/* Filters, Cluster and the legend get their own bordered card back, undoing the
+   flat hairline-band treatment above for these: they read as distinct panels, not
+   more rows of the same running sheet. */
+.views, .capacity, .legend {
   background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
   margin: .9rem 0 0; padding: .6rem .9rem;
 }
 .capacity > .cap-row, .capacity > .cap-note { flex: 1 1 24rem; margin-top: 0; }
 .views { flex-wrap: wrap; }
 
-/* Flatten: the three areas share one card, divided by a hairline instead of each
-   being its own rounded box inside a rounded box inside a rounded box. */
-.areas { display: flex; gap: 0; margin: 0; flex-wrap: wrap; }
+/* Same treatment for Health/HA/Istio: a real gap between three separate boxed
+   cards, not one shared card divided by a hairline. */
+.areas { display: flex; gap: .9rem; margin: 0; flex-wrap: wrap; }
 .area {
-  background: transparent; border: 0; border-radius: 0;
+  background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
   padding: .85rem .9rem; min-width: 0; flex: 1 1 21rem;
+  position: relative; overflow: hidden;
 }
 /* Equal growth, not 2x on the first area: with only 1-2 tiles active (most states
    at zero), Health's own content is narrower than HA/Istio's, so growing it faster
    just left visibly more empty slack in that one area as the window widened. */
 .areas > .area:first-child { flex: 1 1 30rem; }
-.area + .area { border-left: 1px solid var(--hair-2); }
+/* A colored left-edge accent per area, not a border: a *-colored border-left next
+   to the box's own --hair-colored top/bottom borders blends across the rounded
+   corner into a small diagonal wedge of the wrong color right where the curve
+   starts. A ::before rectangle clipped by the parent's own overflow: hidden (its
+   only job) sits flush inside the radius instead, the same technique the
+   reference layout uses for this exact accent. */
+.area::before {
+  content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+}
+.areas > .area:nth-child(2)::before { background: var(--warn-fg); }
+.areas > .area:nth-child(3)::before { background: var(--drift-fg); }
 /* Area heads sit on the same rail as the section labels below them. */
 .area > .cap-head { display: block; margin-bottom: .1rem; }
 .area > .cap-head .cap-sub { display: block; margin-left: 0; margin-top: .15rem; }
