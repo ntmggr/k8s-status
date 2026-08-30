@@ -656,15 +656,26 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
   background: var(--surface); box-shadow: none;
 }
 .gauge.gauge-lg .hd-mask { left: 13px; right: 13px; top: 13px; }
-/* Marker: 2px, painted only where the arc band is, so it reads as a value tick
-   instead of an arrow sweeping over the number and off the card. */
+/* Marker: a small ringed dot riding the arc's tip, not an arrow. The spoke itself
+   (.hd-needle, still rotated by the base rule's own transform/animation) stays
+   invisible -- only its ::after dot renders, at the spoke's tip. This face is a
+   true 2:1 semicircle (width = 2 x height, checked below), so rotate() lands the
+   dot exactly on the ring at every value with no drift to correct for. */
 .gauge .hd-needle {
   width: 2px; margin-left: -1px; height: 54px; clip-path: none; filter: none;
-  background: linear-gradient(to bottom, var(--ink) 0 9px, transparent 9px);
+  background: none;
 }
-.gauge.gauge-lg .hd-needle {
-  height: 78px; background: linear-gradient(to bottom, var(--ink) 0 13px, transparent 13px);
+.gauge .hd-needle::after {
+  content: ""; position: absolute; top: -3px; left: 50%; width: 9px; height: 9px;
+  margin-left: -4.5px; border-radius: 50%; background: var(--surface);
+  box-shadow: 0 0 0 2.25px var(--arc), 0 1px 2px rgba(0,0,0,.25);
 }
+.gauge.gauge-lg .hd-needle { height: 78px; }
+.gauge.gauge-lg .hd-needle::after {
+  top: -4px; width: 12px; height: 12px; margin-left: -6px;
+  box-shadow: 0 0 0 2.75px var(--arc), 0 1px 2px rgba(0,0,0,.25);
+}
+.gauge.is-unknown .hd-needle::after { display: none; }
 .gauge .hd-num {
   bottom: 1px; font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em;
   color: var(--arc);
@@ -868,7 +879,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         <div class="hd-face">
           <div class="hd-arc"></div>
           <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
           <i class="hd-tick" style="transform: rotate(90deg)"></i>
           <div class="hd-mask"></div>
           {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
@@ -890,7 +903,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         <div class="hd-face">
           <div class="hd-arc"></div>
           <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
           <i class="hd-tick" style="transform: rotate(90deg)"></i>
           <div class="hd-mask"></div>
           {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
@@ -945,7 +960,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         <div class="hd-face">
           <div class="hd-arc"></div>
           <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
           <i class="hd-tick" style="transform: rotate(90deg)"></i>
           <div class="hd-mask"></div>
           {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
