@@ -1018,7 +1018,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
       </div>
       {{if .NotInMesh}}
-      <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod, across both services and not-in-gitops workloads, lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
+      <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
       {{else if .Known}}
       <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
       {{end}}
@@ -1042,13 +1042,16 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
       </div>
       {{if .Permissive}}
-      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{.Permissive}} service{{if ne .Permissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE, across both services and not-in-gitops workloads -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{.Permissive}}</div><div class="k">permissive</div></a>
+      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{.Permissive}} service{{if ne .Permissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{.Permissive}}</div><div class="k">permissive</div></a>
       {{else if .Known}}
       <div class="tile t-ok"><div class="n">0</div><div class="k">permissive</div></div>
       {{end}}
     </div>
     {{end}}
   </div>
+  {{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
+  <div class="cap-note">+{{.UnmanagedMeshEligible}} not-in-gitops workload{{if ne .UnmanagedMeshEligible 1}}s{{end}} also checked here, not counted in the percentages above: {{.UnmanagedMeshInjected}} of {{.UnmanagedMeshEligible}} in mesh{{if .UnmanagedMeshPolicyEligible}}, {{.UnmanagedMeshPolicyPermissive}} of {{.UnmanagedMeshPolicyEligible}} permissive{{end}}.</div>
+  {{end}}{{end}}
 </div>
 {{end}}
 </div>
@@ -1272,18 +1275,20 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 <div class="sec-head" id="unmanaged">Not managed by ArgoCD
   <span class="sec-sub">running in the cluster but outside GitOps, EKS addons, Terraform-installed
   components, hand-installed Helm releases. These are not services above and are not in the Services counts --
-  the HA and Mesh gauges' numbers are the one place they are folded in, since a zone, node or missing sidecar
-  affects them exactly like it would any tracked service.</span>
+  the HA gauges' numbers are the one place they are folded in, since a zone or node failing affects them
+  exactly like it would any tracked service. The Istio gauges are GitOps-services only; their own sidecar
+  and policy coverage is mentioned separately in the Istio panel instead.</span>
 </div>
 <div class="card">
 <table>
 <thead>
 <tr>
-  <th>Workload</th>
+  <th>Service</th>
   <th class="hide-sm">Namespace</th>
   <th class="hide-sm">Kind</th>
   <th class="hide-sm">Installed by</th>
-  <th class="hide-sm">Version</th>
+  <th>App version</th>
+  <th class="hide-sm">Chart version</th>
   <th>Ready</th>
   <th>Status</th>
 </tr>
@@ -1295,12 +1300,13 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   <td class="ns hide-sm">{{.Namespace}}</td>
   <td class="kind hide-sm">{{.Kind}}</td>
   <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>
-  <td class="appver hide-sm">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
+  <td class="appver">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
+  <td class="chartver hide-sm">{{.ChartVersion}}</td>
   <td class="ready">{{.Ready}}/{{.Desired}}</td>
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
 </tr>
 {{else}}
-<tr><td colspan="7" class="detail">{{if $.Filter.Spread}}no not-in-gitops workloads are single-{{$.Filter.Spread}}{{else if .Error}}no workloads read{{else}}every workload in the cluster is managed by ArgoCD{{end}}</td></tr>
+<tr><td colspan="8" class="detail">{{if $.Filter.Spread}}no not-in-gitops workloads are single-{{$.Filter.Spread}}{{else if .Error}}no workloads read{{else}}every workload in the cluster is managed by ArgoCD{{end}}</td></tr>
 {{end}}
 </tbody>
 </table>

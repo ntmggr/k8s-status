@@ -407,6 +407,41 @@ func TestHelmReleaseCollapsesToOneRow(t *testing.T) {
 	}
 }
 
+// The chart version (helm.sh/chart) and the app version (app.kubernetes.io/version)
+// are different facts -- a chart can bump its own version without the app inside it
+// changing, and vice versa. Both must be readable independently.
+func TestChartVersionOf(t *testing.T) {
+	cases := []struct {
+		name  string
+		chart string
+		want  string
+	}{
+		{"simple", "cert-manager-v1.14.4", "v1.14.4"},
+		{"hyphenated chart name", "kube-prometheus-stack-45.0.0", "45.0.0"},
+		{"no version suffix", "istiod", ""},
+		{"empty", "", ""},
+	}
+	for _, c := range cases {
+		w := kube.Workload{Metadata: kube.WorkloadMetadata{Labels: map[string]string{"helm.sh/chart": c.chart}}}
+		if got := chartVersionOf(w); got != c.want {
+			t.Errorf("%s: chartVersionOf(%q) = %q, want %q", c.name, c.chart, got, c.want)
+		}
+	}
+}
+
+func TestBuildUnmanagedSetsChartVersion(t *testing.T) {
+	w := dep("istiod", "istio-system", func(w *kube.Workload) {
+		w.Metadata.Labels["helm.sh/chart"] = "istiod-1.20.1"
+	})
+	u := BuildUnmanaged(&kube.WorkloadList{Items: []kube.Workload{w}}, Options{})
+	if len(u.Items) != 1 {
+		t.Fatalf("items = %d, want 1", len(u.Items))
+	}
+	if got := u.Items[0].ChartVersion; got != "1.20.1" {
+		t.Errorf("chart version = %q, want 1.20.1", got)
+	}
+}
+
 // Anything Helm did not install stays on its own row.
 func TestNonHelmWorkloadsAreNotCollapsed(t *testing.T) {
 	mk := func(name string) kube.Workload {

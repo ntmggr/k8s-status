@@ -48,6 +48,11 @@ type Workload struct {
 	// ReleaseVersion is the version Helm recorded for the release, preferred over
 	// image tags when collapsing.
 	ReleaseVersion string
+	// ChartVersion is the version suffix of the release's helm.sh/chart label (e.g.
+	// "1.14.4" from "cert-manager-1.14.4"), distinct from Version/ReleaseVersion which
+	// track the application's own version. Empty when the workload is not Helm-managed
+	// or carries no chart label.
+	ChartVersion string
 	// Members is how many workloads the row stands for. 1 unless collapsed.
 	Members int
 	// Zones and Nodes describe where this row's running pods actually sit, filled in
@@ -115,6 +120,7 @@ func BuildUnmanaged(list *kube.WorkloadList, opts Options) Unmanaged {
 			// tags instead reports "mixed" whenever a chart ships a sidecar on its own
 			// version, which is most of them.
 			ReleaseVersion: w.Metadata.Labels[labelAppVersion],
+			ChartVersion:   chartVersionOf(w),
 		})
 	}
 	out.Items = collapseReleases(out.Items)
@@ -223,6 +229,30 @@ func releaseOf(w kube.Workload) string {
 		return ""
 	}
 	return w.Metadata.Namespace + "/" + inst
+}
+
+// chartVersionOf extracts the version suffix from a workload's "helm.sh/chart" label,
+// which Helm always writes as "<chart-name>-<version>" (e.g. "cert-manager-v1.14.4").
+// Chart names can themselves contain hyphens, so this looks for the rightmost hyphen
+// whose following segment starts like a version (a digit, or "v"/"V" followed by one).
+func chartVersionOf(w kube.Workload) string {
+	chart := w.Metadata.Labels[labelChart]
+	for i := len(chart) - 1; i >= 0; i-- {
+		if chart[i] != '-' {
+			continue
+		}
+		rest := chart[i+1:]
+		if rest == "" {
+			continue
+		}
+		if rest[0] >= '0' && rest[0] <= '9' {
+			return rest
+		}
+		if (rest[0] == 'v' || rest[0] == 'V') && len(rest) > 1 && rest[1] >= '0' && rest[1] <= '9' {
+			return rest
+		}
+	}
+	return ""
 }
 
 // collapseReleases folds the workloads of one Helm release into a single row. Seven

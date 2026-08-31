@@ -324,6 +324,8 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	snap.Summary.SingleNode, snap.Summary.MultiNode = 0, 0
 	snap.Summary.MeshEligible, snap.Summary.MeshInjected = 0, 0
 	snap.Summary.MeshPolicyEligible, snap.Summary.MeshPolicyPermissive = 0, 0
+	snap.Summary.UnmanagedMeshEligible, snap.Summary.UnmanagedMeshInjected = 0, 0
+	snap.Summary.UnmanagedMeshPolicyEligible, snap.Summary.UnmanagedMeshPolicyPermissive = 0, 0
 
 	// hostIP -> zone, built from every node's InternalIPs(). A node missing a zone
 	// label still joins here (its zone is the zoneUnknown sentinel), so a pod that
@@ -541,13 +543,20 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		}
 	}
 
-	// Folded into the exact same totals as the loop above, not a separate count: the
-	// HA/NodeHA gauges read Summary directly, so this is what makes them describe the
-	// whole cluster's resiliency rather than only its GitOps-tracked slice of it.
+	// Zones/Nodes are folded into the exact same totals as the loop above, not a
+	// separate count: the HA/NodeHA gauges read Summary directly, so this is what
+	// makes them describe the whole cluster's resiliency rather than only its
+	// GitOps-tracked slice of it.
 	//
-	// Also recorded per group key (not just tallied) so the badge below can show each
-	// row exactly what made it single- or multi-zone, the same way a service's own
-	// Zones field does.
+	// Mesh/Policy are kept apart in their own Unmanaged* counters instead: the Istio
+	// gauges are specifically about GitOps-tracked services, and blending in
+	// not-in-gitops workloads there would move those percentages for reasons that
+	// have nothing to do with the services they claim to describe. The Istio panel
+	// mentions the Unmanaged* totals alongside the gauges rather than inside them.
+	//
+	// All four are also recorded per group key (not just tallied) so the badge below
+	// can show each row exactly what made it single- or multi-zone (or in-mesh), the
+	// same way a service's own Zones field does.
 	zonesByKey := make(map[string]ZoneSpread, len(groupKeys))
 	nodesByKey := make(map[string]NodeSpread, len(groupKeys))
 	meshByKey := make(map[string]MeshCoverage, len(groupKeys))
@@ -556,16 +565,16 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 		if unmanagedMeshPods[i] > 0 {
 			mc := MeshCoverage{Pods: unmanagedMeshPods[i], Injected: unmanagedMeshInjected[i]}
 			meshByKey[key] = mc
-			snap.Summary.MeshEligible++
+			snap.Summary.UnmanagedMeshEligible++
 			if mc.Full() {
-				snap.Summary.MeshInjected++
+				snap.Summary.UnmanagedMeshInjected++
 			}
 		}
 		if policy := resolvePolicy(groupPolicySeen[i], groupPolicyNS[i], groupPolicyLabels[i]); policy.Known() {
 			policyByKey[key] = policy
-			snap.Summary.MeshPolicyEligible++
+			snap.Summary.UnmanagedMeshPolicyEligible++
 			if policy.Effective == MeshPermissive {
-				snap.Summary.MeshPolicyPermissive++
+				snap.Summary.UnmanagedMeshPolicyPermissive++
 			}
 		}
 		if len(unmanagedZonesSeen[i]) > 0 {

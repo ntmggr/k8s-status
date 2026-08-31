@@ -528,9 +528,11 @@ func TestFillZonesMeshCoverageResetsOnRepeatedCalls(t *testing.T) {
 }
 
 // TestFillZonesFoldsUnmanagedMeshCoverage mirrors TestFillZonesFoldsUnmanagedWorkloadsIntoHA
-// for mesh coverage: an unmanaged workload's pods have no Service row of their own, but
-// still move Summary.MeshEligible/MeshInjected, and the not-in-gitops row gets its own
-// Mesh answer.
+// for mesh coverage, but unlike zones/nodes, mesh coverage does NOT fold into the
+// Istio gauges' own Summary.MeshEligible/MeshInjected -- those describe GitOps-tracked
+// services specifically. An unmanaged workload's pods instead move the separate
+// Summary.UnmanagedMeshEligible/UnmanagedMeshInjected counters, and the not-in-gitops
+// row still gets its own Mesh answer for its per-row badge.
 func TestFillZonesFoldsUnmanagedMeshCoverage(t *testing.T) {
 	snap := &Snapshot{}
 	snap.Unmanaged = &Unmanaged{}
@@ -547,8 +549,11 @@ func TestFillZonesFoldsUnmanagedMeshCoverage(t *testing.T) {
 
 	FillZones(snap, pods, nodes, workloads, "", nil)
 
-	if snap.Summary.MeshEligible != 1 || snap.Summary.MeshInjected != 1 {
-		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 1/1", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	if snap.Summary.MeshEligible != 0 || snap.Summary.MeshInjected != 0 {
+		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 0/0 (not-in-gitops must not move the Istio gauges)", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
+	}
+	if snap.Summary.UnmanagedMeshEligible != 1 || snap.Summary.UnmanagedMeshInjected != 1 {
+		t.Errorf("UnmanagedMeshEligible/UnmanagedMeshInjected = %d/%d, want 1/1", snap.Summary.UnmanagedMeshEligible, snap.Summary.UnmanagedMeshInjected)
 	}
 	row := snap.Unmanaged.Items[0]
 	if !row.Mesh.Full() {
