@@ -22,14 +22,14 @@
   --muted:      #898781;
   --hair:       #e1e0d9;
   --ring:       rgba(11,11,11,.10);
-  --ok-bg:#e6f4ea;      --ok-fg:#0a7a29;
-  --deg-bg:#fce8e6;     --deg-fg:#b3261e;
-  --warn-bg:#fef3d0;    --warn-fg:#8a5a00;
-  --prog-bg:#e3edfb;    --prog-fg:#1a5fb4;
-  --drift-bg:#fdeae0;   --drift-fg:#a34a1e;
+  --ok-bg:#e8f7f1;      --ok-fg:#169c64;
+  --deg-bg:#f7e8eb;     --deg-fg:#cf1736;
+  --warn-bg:#f7f2e8;    --warn-fg:#c27e0a;
+  --prog-bg:#e8f2f7;    --prog-fg:#1481b8;
+  --drift-bg:#f1e8f7;   --drift-fg:#8022c3;
   --prune-bg:#eceff1;   --prune-fg:#5f6368;
   --susp-bg:#e8eaed;    --susp-fg:#3c4043;
-  --gpu-bg:#efe7fb;     --gpu-fg:#5b3ba8;
+  --gpu-bg:#ece9f7;     --gpu-fg:#4e30a6;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -40,14 +40,14 @@
     --muted:   #898781;
     --hair:    #2c2c2a;
     --ring:    rgba(255,255,255,.10);
-    --ok-bg:#0f2e18;    --ok-fg:#5cd07a;
-    --deg-bg:#3a1614;   --deg-fg:#ff9d94;
-    --warn-bg:#33260a;  --warn-fg:#f5c451;
-    --prog-bg:#122740;  --prog-fg:#8ab8f0;
-    --drift-bg:#3a2113; --drift-fg:#f0a077;
+    --ok-bg:#123f2d;    --ok-fg:#00e686;
+    --deg-bg:#3f121a;   --deg-fg:#ff1a40;
+    --warn-bg:#3f2f12;  --warn-fg:#ffa200;
+    --prog-bg:#12303f;  --prog-fg:#1ab2ff;
+    --drift-bg:#2d123f; --drift-fg:#b54dff;
     --prune-bg:#23262a; --prune-fg:#a6adb5;
     --susp-bg:#222427;  --susp-fg:#9aa0a6;
-    --gpu-bg:#2a2140;   --gpu-fg:#c0a9ee;
+    --gpu-bg:#211641;   --gpu-fg:#8964f7;
   }
 }
 * { box-sizing: border-box; }
@@ -116,7 +116,7 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
    its own fact, not a continuation of the header above it. */
 .sub {
   color: var(--ink-2); font-size: .85rem; margin: .9rem 0 0;
-  background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
   padding: .6rem .9rem;
 }
 .src-tag {
@@ -506,7 +506,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   --plane:#f7f7f5; --surface:#ffffff; --sunken:#fbfaf8;
   --hair:#e6e5df;  --hair-2:#f0efe9;  --ring:#e6e5df; --track:#e9e8e1;
   --ink:#101112;   --ink-2:#4a4b4d;   --muted:#8d8c86;
-  --warn-arc:#c98a12;
+  --warn-arc:#c27e0a;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --pad-x:1.5rem;
 }
@@ -515,7 +515,7 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     --plane:#08090a; --surface:#0e1012; --sunken:#0a0b0c;
     --hair:#1e2123;  --hair-2:#17191b; --ring:#1e2123; --track:#1c1f21;
     --ink:#f2f2ef;   --ink-2:#b9b8b2;  --muted:#7d7c76;
-    --warn-arc:#f5c451;
+    --warn-arc:#ffa200;
   }
 }
 
@@ -530,9 +530,11 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 }
 .runmode { border-style: solid; }
 
-/* Every micro-label, one voice. */
+/* Every micro-label, one voice. Not .legend > summary: "What these states mean" is a
+   sentence to read, not a field label, and shrunk to .6rem/mono/uppercase/.16em
+   tracking it turned into a cramped, hard-to-read pill instead of plain text. */
 .tile .k, .cap-head, .views-lab, .spread-lab, .cap-lead .ck, .cap-of .ck, thead th,
-.kind, .legend > summary, .sec-head {
+.kind, .sec-head {
   font-family: var(--mono); font-size: .6rem; font-weight: 700;
   letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
 }
@@ -553,11 +555,16 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
   padding: .7rem var(--pad-x);
 }
 .panel-row { margin: 0 0 0 0; gap: 0; }
-.panel { padding: 0; flex: 1 1 100%; min-width: 0; border-top: 0; }
-/* .9rem, matching .area's own left padding below -- var(--pad-x) (1.75rem) put
-   "Services" and "Health" at two different left edges. */
+/* Unlike .views/.capacity/.legend below, .panel keeps the full-bleed treatment --
+   but its background stays --surface (near-white) from the shared rule above,
+   which shows as a plain white band behind the --plane-toned .area cards. */
+.panel { padding: 0; flex: 1 1 100%; min-width: 0; border-top: 0; background: var(--plane); }
+/* var(--pad-x) horizontally, matching .areas' own left edge below (and .sub/.views/
+   .capacity above and below this panel) -- .9rem here put "Services" to the left of
+   where the Health/HA/Istio boxes actually start. No border-bottom: that hairline
+   read as a stray line under the heading now that .panel has no other framing. */
 .panel > .cap-head, .panel > div:first-child.cap-head {
-  padding: .6rem .9rem; border-bottom: 1px solid var(--hair-2);
+  padding: .6rem var(--pad-x);
 }
 .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; }
 /* A fixed label rail down the left, so every band starts on the same column. */
@@ -569,14 +576,17 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
    max-width would seem safer than a bare width, but .cap-head itself is pinned to
    a 5rem rail (below) and this text is deliberately meant to overflow past it into
    the row -- max-width: 100% caps it at 100% of that 5rem parent instead, which is
-   the opposite of what's needed here. */
-.capacity > .cap-head .cap-sub { display: block; width: 20rem; }
+   the opposite of what's needed here. inline-block (not block) keeps it sitting on
+   the same line as "Cluster" rather than wrapping onto its own line below it --
+   inline-level content overflows a narrower parent's width without wrapping or
+   clipping, so the 5rem rail and the 20rem label coexist fine. */
+.capacity > .cap-head .cap-sub { display: inline-block; width: 20rem; }
 .capacity { flex-wrap: wrap; }
 /* Filters, Cluster and the legend get their own bordered card back, undoing the
    flat hairline-band treatment above for these: they read as distinct panels, not
    more rows of the same running sheet. */
 .views, .capacity, .legend {
-  background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
   margin: .9rem 0 0; padding: .6rem .9rem;
 }
 .capacity > .cap-row, .capacity > .cap-note { flex: 1 1 24rem; margin-top: 0; }
@@ -584,9 +594,12 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 
 /* Same treatment for Health/HA/Istio: a real gap between three separate boxed
    cards, not one shared card divided by a hairline. */
-.areas { display: flex; gap: .9rem; margin: 0; flex-wrap: wrap; }
+/* .panel itself is full-bleed with zero padding (see above), so without this the
+   area boxes sit flush against the viewport edge instead of lining up with .sub/
+   .views/.capacity, which are inset by the page's own --pad-x. */
+.areas { display: flex; gap: .9rem; margin: 0; padding: 0 var(--pad-x); flex-wrap: wrap; }
 .area {
-  background: var(--plane); border: 1px solid var(--hair); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
   padding: .85rem .9rem; min-width: 0; flex: 1 1 21rem;
   position: relative; overflow: hidden;
 }
@@ -603,10 +616,17 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 .area::before {
   content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
 }
+.areas > .area:first-child::before { background: var(--ok-fg); }
 .areas > .area:nth-child(2)::before { background: var(--warn-fg); }
 .areas > .area:nth-child(3)::before { background: var(--drift-fg); }
-/* Area heads sit on the same rail as the section labels below them. */
-.area > .cap-head { display: block; margin-bottom: .1rem; }
+/* Area heads sit on the same rail as the section labels below them. Slightly bigger
+   than the page's other micro-labels and set off with a dashed rule -- these three
+   are section titles for the whole card below them, not a field label next to a
+   value, and read better with a bit more presence. */
+.area > .cap-head {
+  display: block; margin-bottom: .5rem; padding-bottom: .4rem;
+  font-size: .72rem; border-bottom: 1px dashed var(--hair);
+}
 .area > .cap-head .cap-sub { display: block; margin-left: 0; margin-top: .15rem; }
 /* Rows centre their cells; they do NOT stretch them. Stretching let the gauge's
    height drive the tiles, so a 2-line tile grew into a 200px empty box. */
