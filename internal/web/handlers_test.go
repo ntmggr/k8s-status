@@ -215,7 +215,7 @@ func TestPageRenders(t *testing.T) {
 		"s-degraded", "s-warning", "s-drift", "s-prune",
 		"media-encoder", "0/2 replicas available",
 		`href="https://argocd.example.invalid/applications/accounts-api"`,
-		"437a162", "k8s-status 0.1.0",
+		"437a162", "v0.1.0",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q", want)

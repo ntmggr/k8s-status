@@ -52,7 +52,9 @@
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; padding: var(--pad-top) var(--pad-x) 3rem;
+  /* Bottom padding clears the now-fixed footer (see below) so the last bit of
+     real content never sits behind it. */
+  margin: 0; padding: var(--pad-top) var(--pad-x) 3.5rem;
   background: var(--plane); color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; line-height: 1.45;
@@ -490,7 +492,17 @@ table.components td.k { color: var(--muted); }
            color: var(--muted); font-size: .62rem; font-weight: 600; white-space: nowrap; }
 .by.is-unknown { color: var(--muted); }
 
-footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
+/* Fixed like header, not part of the scrolling page: the build-version/cluster
+   line is the one thing worth being able to check without scrolling all the way
+   down, especially now that the Services/not-in-gitops tables scroll internally
+   (below) and no longer force the page itself to grow past a screenful. */
+footer {
+  display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--plane); border-top: 1px solid var(--hair);
+  padding: .5rem var(--pad-x); margin: 0;
+  color: var(--muted); font-size: .72rem;
+}
 @media (max-width: 720px) {
   :root { --pad-x: 1rem; --pad-top: 1rem; --hdr-h: 4.5rem; }
   .hide-sm { display: none; }
@@ -793,7 +805,13 @@ a.cap-part:hover { text-decoration: underline; }
 }
 
 /* Table: 10px mono headers, hairline rows, a 3px state rule, no wash. */
-.card { overflow: hidden; margin-top: 1rem; }
+/* Bounded and internally scrollable -- a cluster with hundreds of services or a
+   long not-in-gitops list used to just grow the whole page instead. overflow-x
+   stays hidden so the card's own rounded corners still clip the table's square
+   ones; overflow-y is the one that actually scrolls. No sticky thead th here:
+   that combination silently collapsed table rows once already (see the note by
+   thead th below) and is not worth re-risking for a nice-to-have. */
+.card { overflow-x: hidden; overflow-y: auto; max-height: 28rem; margin-top: 1rem; }
 thead th {
   background: var(--surface); padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
 }
@@ -861,7 +879,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </head>
 <body>
 <header>
-  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}<span class="badge" title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">v{{.BuildVersion}}</span>{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
+  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
@@ -1342,6 +1360,6 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
 
 
-<footer>k8s-status {{.BuildVersion}}{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</footer>
+<footer><span>k8s-status{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</span><span title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">v{{.BuildVersion}}</span></footer>
 </body>
 </html>
