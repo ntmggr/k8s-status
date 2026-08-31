@@ -6,6 +6,11 @@
 
 **Rate your cluster: health and HA, at a glance.**
 
+- Want a list of every service and its version, deployed? Done.
+- Are your services fully HA? One glance.
+- Do you have strict mTLS enforced, cluster-wide? Same glance.
+- Are your services actually healthy? Done.
+
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
