@@ -21,7 +21,15 @@ const (
 	DefaultTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	DefaultCAPath    = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
-	RequestTimeout = 10 * time.Second
+	// 10s used to be tight enough that a single page of ListRunningPods' paginated
+	// read (500 pods, each carrying labels/ownerReferences/container statuses) could
+	// outlive it on a real cluster reached through kubectl proxy: the client's own
+	// Timeout firing mid-read closes the connection, and json.Decoder surfaces that
+	// as "unexpected EOF" rather than a clear timeout, which is what a live 143-node
+	// cluster actually produced. 30s gives real, possibly proxied clusters headroom
+	// without changing anything for the common case, where every read still returns
+	// in milliseconds regardless of the ceiling.
+	RequestTimeout = 30 * time.Second
 	maxBodyBytes   = 16 << 20
 )
 
