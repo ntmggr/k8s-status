@@ -162,10 +162,10 @@ func setList(q url.Values, key string, values []string) {
 // active check all read this one list. They each used to spell it out separately and
 // drifted apart: "services" stopped clearing an architecture because that filter was
 // added in one place and not the other two.
-var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView, filterSpread}
+var allFilters = []string{filterStatus, filterSync, filterGPU, filterArch, filterBlocked, filterView, filterSpread, filterMesh}
 
 // viewChips are the single-value chips in the views row. Exactly one can be active.
-var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked, filterSpread}
+var viewChips = []string{filterView, filterGPU, filterArch, filterBlocked, filterSpread, filterMesh}
 
 func isViewChip(kind string) bool {
 	for _, k := range viewChips {
@@ -274,17 +274,22 @@ func (d pageData) tiles() []Tile {
 }
 
 // TileRowTop and TileRowBottom split the tiles into two rows by count, not by width:
-// an even count splits evenly, an odd count puts the extra tile on top. CSS wrapping
-// alone can't guarantee this, since it wraps wherever a row happens to run out of
-// width for whatever content is actually in it.
+// CSS wrapping alone can't guarantee a stable split, since it wraps wherever a row
+// happens to run out of width for whatever content is actually in it.
+//
+// An odd count's extra tile goes to the bottom row, not the top: tiles() always
+// starts with "services" and ends with "ok", so the extra tile landing on top would
+// occasionally leave "ok" stranded alone on the bottom row, which reads like a
+// leftover rather than a deliberate group. "services" alone on top reads fine --
+// it's the header count, not a peer of the status breakdown below it.
 func (d pageData) TileRowTop() []Tile {
 	t := d.tiles()
-	return t[:(len(t)+1)/2]
+	return t[:len(t)/2]
 }
 
 func (d pageData) TileRowBottom() []Tile {
 	t := d.tiles()
-	return t[(len(t)+1)/2:]
+	return t[len(t)/2:]
 }
 
 func (d pageData) Chips() []Chip {
@@ -452,6 +457,12 @@ func icon(name string) template.HTML {
 		body = `<path d="M8 2.2 1.6 13.2h12.8L8 2.2Z"/><path d="M8 6.4v3.1M8 11.4h.01"/>`
 	case "unmanaged": // broken link: running, but outside gitops
 		body = `<path d="M6.5 9.5L4.8 11.2a2.4 2.4 0 0 1-3.4-3.4L3.1 6.1"/><path d="M9.5 6.5l1.7-1.7a2.4 2.4 0 0 1 3.4 3.4l-1.7 1.7"/><path d="M6 10L10 6"/>`
+	case "mesh": // shield outline, for the mTLS gauge
+		body = `<path d="M8 2 2.5 4v3.8c0 3.6 2.3 6.2 5.5 6.7 3.2-.5 5.5-3.1 5.5-6.7V4L8 2Z"/>`
+	case "laptop": // screen + base, for a local run outside the cluster
+		body = `<rect x="2" y="2.5" width="12" height="8" rx="1"/><path d="M1 13.5h14l-1.2-2.3H2.2L1 13.5Z"/>`
+	case "cluster": // hub-and-spoke wheel, echoing Kubernetes' own mark, for a real cluster
+		body = `<circle cx="8" cy="8" r="1.6"/><circle cx="8" cy="2.3" r="1.1"/><circle cx="13.2" cy="5.2" r="1.1"/><circle cx="13.2" cy="10.8" r="1.1"/><circle cx="8" cy="13.7" r="1.1"/><circle cx="2.8" cy="10.8" r="1.1"/><circle cx="2.8" cy="5.2" r="1.1"/><path d="M8 3.4V6.6M12.2 5.8l-2.8 1.6M12.2 10.2l-2.8-1.6M8 12.6V9.4M3.8 10.2l2.8-1.6M3.8 5.8l2.8 1.6"/>`
 	default:
 		return ""
 	}

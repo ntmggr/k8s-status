@@ -38,9 +38,24 @@ type FluxLister interface {
 	ListFlux(ctx context.Context) (*kube.FluxList, error)
 }
 
+// MeshLister is optional, for the mesh mTLS gauge. It is only wired up when MESH_MTLS
+// is enabled, so the default deployment never touches Istio's CRDs.
+//
+// ListPeerAuthentications is a cluster-wide list, a materially larger permission than
+// MeshPolicy's single-object GET: it lets the per-service policy filter see namespace-
+// and workload-scoped overrides, which can live in any namespace, not only the one
+// MeshPolicy reads.
+type MeshLister interface {
+	DetectIstio(ctx context.Context) (string, error)
+	MeshPolicy(ctx context.Context, groupVersion, namespace string) (*kube.PeerAuthentication, error)
+	ListPeerAuthentications(ctx context.Context, groupVersion string) (*kube.PeerAuthenticationList, error)
+}
+
 // RunningLister reads running pods for the AZ-spread section. Optional, like the
 // others: only wired up when AZ_SPREAD is enabled, and only meaningful alongside a
-// node lister since zone labels come from the node list.
+// node lister since zone labels come from the node list. Per-service mesh sidecar
+// coverage rides along on this same read (see FillZones): it needs no lister of its
+// own.
 type RunningLister interface {
 	ListRunningPods(ctx context.Context) (*kube.PodList, error)
 }
@@ -59,6 +74,10 @@ type Collector struct {
 	pending   PendingLister
 	workloads WorkloadLister
 	flux      FluxLister
+	mesh      MeshLister
+	// meshNamespace is where the mesh-wide PeerAuthentication lives; set alongside mesh
+	// by WithMesh.
+	meshNamespace string
 
 	nodeStats *NodeStats
 	nodesAt   time.Time
@@ -70,6 +89,15 @@ type Collector struct {
 	unmanaged    *Unmanaged
 	unmanagedAt  time.Time
 	workloadList *kube.WorkloadList
+
+	meshSection *MeshSection
+	meshAt      time.Time
+	// peerAuths is every PeerAuthentication in the cluster, read alongside the
+	// mesh-wide policy so FillZones can resolve each service's own effective mode.
+	// Left nil when that list read is denied or fails: per-service policy then just
+	// never gets filled, same "an optional extra degrades silently" contract as the
+	// rest of this file's optional reads.
+	peerAuths *kube.PeerAuthenticationList
 
 	running     RunningLister
 	runningAt   time.Time
@@ -117,10 +145,22 @@ func (c *Collector) WithFlux(fl FluxLister) *Collector {
 	return c
 }
 
-// WithZones enables the per-service AZ-spread section. Not called means the running
-// pods API is never queried and no Service ever gets a Zones answer. Only meaningful
-// alongside WithNodes: zone labels come from the node list, which is the caller's
-// responsibility to have wired up too.
+// WithMesh enables the mesh mTLS gauge. Not called means Istio's APIs are never
+// queried and Snapshot.Mesh stays nil. namespace is where the mesh-wide
+// PeerAuthentication lives, normally "istio-system".
+func (c *Collector) WithMesh(ml MeshLister, namespace string) *Collector {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.mesh = ml
+	c.meshNamespace = namespace
+	return c
+}
+
+// WithZones enables the per-service AZ-spread section, and along with it per-service
+// mesh sidecar coverage (see FillZones). Not called means the running pods API is
+// never queried and no Service ever gets a Zones, Nodes or Mesh answer. Only
+// meaningful alongside WithNodes: zone labels come from the node list, which is the
+// caller's responsibility to have wired up too.
 func (c *Collector) WithZones(rl RunningLister) *Collector {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -178,8 +218,10 @@ func (c *Collector) decorate(ctx context.Context, snap Snapshot) *Snapshot {
 	c.attachNodes(ctx, &snap)
 	c.attachUnmanaged(ctx, &snap)
 	c.attachPending(ctx, &snap)
+	c.attachMesh(ctx, &snap)
 	// After attachUnmanaged: FillOwnedFromLabels there populates svc.Owned, and
 	// attachZones needs it for the same owner-matching machinery attachPending uses.
+	// FillZones also tallies per-service mesh sidecar coverage in the same pass.
 	c.attachZones(ctx, &snap)
 	return &snap
 }
@@ -231,6 +273,13 @@ func (c *Collector) refreshSources(ctx context.Context) {
 		go func() {
 			defer wg.Done()
 			c.fetchPending(ctx)
+		}()
+	}
+	if c.mesh != nil && stale(c.meshAt, c.meshSection == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchMesh(ctx)
 		}()
 	}
 	if c.running != nil && stale(c.runningAt, c.runningPods == nil && c.zoneRead == nil) {
@@ -285,6 +334,45 @@ func (c *Collector) fetchPending(ctx context.Context) {
 	c.pendingAt = c.now()
 }
 
+// fetchMesh detects Istio and, only when present, reads the mesh-wide
+// PeerAuthentication. Detection runs on every refresh rather than once at startup: a
+// cluster can gain or lose Istio without a restart.
+func (c *Collector) fetchMesh(ctx context.Context) {
+	gv, derr := c.mesh.DetectIstio(ctx)
+	if abandoned(derr) {
+		return // keep whatever was cached; a cancelled read says nothing about the cluster
+	}
+	// A discovery failure degrades to "not installed", the same fallback detectSources
+	// already uses for its own probes: a transient API hiccup must not render the mesh
+	// gauge as broken.
+	installed := derr == nil && gv != ""
+
+	var pa *kube.PeerAuthentication
+	var perr error
+	var peerAuths *kube.PeerAuthenticationList
+	if installed {
+		pa, perr = c.mesh.MeshPolicy(ctx, gv, c.meshNamespace)
+		if abandoned(perr) {
+			return
+		}
+		// Best-effort, independent of the mesh-wide read above: a denied or failed
+		// list here must not take the mesh-wide gauge down with it, it only means no
+		// per-service overrides get shown (FillZones leaves Policy unset).
+		list, lerr := c.mesh.ListPeerAuthentications(ctx, gv)
+		if abandoned(lerr) {
+			return
+		}
+		if lerr == nil {
+			peerAuths = list
+		}
+	}
+
+	sec := BuildMesh(installed, gv, pa, perr)
+	c.meshSection = &sec
+	c.peerAuths = peerAuths
+	c.meshAt = c.now()
+}
+
 // fetchRunning reads every running pod for the AZ-spread section. Unlike
 // fetchPending, a failed read here is kept and surfaced as ZoneRead rather than
 // swallowed: a denied or too-large read must produce a visible note, not a silently
@@ -337,13 +425,21 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	FillArch(snap, c.workloadList, c.nodeList)
 }
 
-// attachZones fills each service's AZ spread. Must run after attachUnmanaged:
-// FillOwnedFromLabels there populates svc.Owned, which the owner-matching this reuses
-// from FillPending depends on, the same ordering FillGPU and FillArch already rely on.
+func (c *Collector) attachMesh(_ context.Context, snap *Snapshot) {
+	if c.mesh == nil {
+		return
+	}
+	snap.Mesh = c.meshSection
+}
+
+// attachZones fills each service's AZ spread and mesh sidecar coverage. Must run after
+// attachUnmanaged: FillOwnedFromLabels there populates svc.Owned, which the
+// owner-matching this reuses from FillPending depends on, the same ordering FillGPU
+// and FillArch already rely on.
 func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
 	if c.running == nil {
 		return
 	}
 	snap.ZoneRead = c.zoneRead
-	FillZones(snap, c.runningPods, c.nodeList, c.workloadList)
+	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace, c.peerAuths)
 }

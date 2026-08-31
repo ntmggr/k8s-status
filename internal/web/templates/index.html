@@ -11,8 +11,9 @@
   color-scheme: light dark;
   --pad-x: 1.75rem;
   --pad-top: 1.5rem;
-  /* Height of the sticky page header. thead sticks to exactly this offset, so the
-     two cannot drift apart. */
+  /* Height of the sticky page header, used by the header itself to size/position
+     against. Table headers used to stick at this same offset too, until that
+     turned out to silently collapse table rows -- see the note by thead th. */
   --hdr-h: 2.85rem;
   --plane:      #f9f9f7;
   --surface:    #fcfcfb;
@@ -21,14 +22,14 @@
   --muted:      #898781;
   --hair:       #e1e0d9;
   --ring:       rgba(11,11,11,.10);
-  --ok-bg:#e6f4ea;      --ok-fg:#0a7a29;
-  --deg-bg:#fce8e6;     --deg-fg:#b3261e;
-  --warn-bg:#fef3d0;    --warn-fg:#8a5a00;
-  --prog-bg:#e3edfb;    --prog-fg:#1a5fb4;
-  --drift-bg:#fdeae0;   --drift-fg:#a34a1e;
+  --ok-bg:#e8f7f1;      --ok-fg:#169c64;
+  --deg-bg:#f7e8eb;     --deg-fg:#cf1736;
+  --warn-bg:#f7f2e8;    --warn-fg:#c27e0a;
+  --prog-bg:#e8f2f7;    --prog-fg:#1481b8;
+  --drift-bg:#f1e8f7;   --drift-fg:#8022c3;
   --prune-bg:#eceff1;   --prune-fg:#5f6368;
   --susp-bg:#e8eaed;    --susp-fg:#3c4043;
-  --gpu-bg:#efe7fb;     --gpu-fg:#5b3ba8;
+  --gpu-bg:#ece9f7;     --gpu-fg:#4e30a6;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -39,14 +40,14 @@
     --muted:   #898781;
     --hair:    #2c2c2a;
     --ring:    rgba(255,255,255,.10);
-    --ok-bg:#0f2e18;    --ok-fg:#5cd07a;
-    --deg-bg:#3a1614;   --deg-fg:#ff9d94;
-    --warn-bg:#33260a;  --warn-fg:#f5c451;
-    --prog-bg:#122740;  --prog-fg:#8ab8f0;
-    --drift-bg:#3a2113; --drift-fg:#f0a077;
+    --ok-bg:#123f2d;    --ok-fg:#00e686;
+    --deg-bg:#3f121a;   --deg-fg:#ff1a40;
+    --warn-bg:#3f2f12;  --warn-fg:#ffa200;
+    --prog-bg:#12303f;  --prog-fg:#1ab2ff;
+    --drift-bg:#2d123f; --drift-fg:#b54dff;
     --prune-bg:#23262a; --prune-fg:#a6adb5;
     --susp-bg:#222427;  --susp-fg:#9aa0a6;
-    --gpu-bg:#2a2140;   --gpu-fg:#c0a9ee;
+    --gpu-bg:#211641;   --gpu-fg:#8964f7;
   }
 }
 * { box-sizing: border-box; }
@@ -96,9 +97,14 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .legend[open] > summary::before { content: "\25be "; }
 .legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
                gap: .3rem .9rem; margin-top: .55rem; }
-.legend-row { display: flex; align-items: baseline; gap: .45rem; font-size: .78rem;
+/* center, not baseline: baseline pins an icon to the first line of text, which
+   looks fine for a one-line row but leaves the icon stranded at the top of the
+   mesh-policy row's much longer, wrapping paragraph. Centered against the whole
+   block reads right regardless of how many lines the text takes. */
+.legend-row { display: flex; align-items: center; gap: .45rem; font-size: .78rem;
               color: var(--ink-2); }
 .legend-row .pill { flex: none; }
+.legend-row .ic { flex: none; width: 11px; height: 11px; }
 .legend-kw { flex: none; font-size: .68rem; font-weight: 700; letter-spacing: .04em;
              color: var(--muted); }
 .legend-note { margin-top: .5rem; font-size: .74rem; color: var(--muted); }
@@ -106,7 +112,13 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .meta { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 
-.sub { color: var(--ink-2); font-size: .85rem; margin-top: .45rem; }
+/* Boxed like Views/Cluster/the legend, not a bare line -- the root ArgoCD app is
+   its own fact, not a continuation of the header above it. */
+.sub {
+  color: var(--ink-2); font-size: .85rem; margin: .9rem 0 0;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
+  padding: .6rem .9rem;
+}
 .src-tag {
   display: inline-block; margin-right: .4rem; padding: .05rem .4rem;
   border: 1px solid var(--ring); border-radius: 4px;
@@ -119,11 +131,13 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
    can join as sibling .panel elements later without restructuring this row). */
 .panel-row { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .75rem;
              margin: .9rem 0 .35rem; }
-/* flex-grow: 0 -- panels hug their own content instead of stretching to split the row
-   evenly. Two narrow panels sit next to each other with leftover row space after the
-   last one, not distributed as dead space inside each. min-width is the mobile floor;
-   flex-shrink still lets a panel narrow (then wrap) on a small viewport. */
-.panel { flex: 0 1 auto; min-width: 380px; box-sizing: border-box; background: var(--surface);
+/* flex-grow: 1 -- today there is exactly one panel in this row, and it should fill it:
+   its own .areas (Health/HA/Istio) needs the full row's width to lay three areas out
+   side by side instead of wrapping the third one onto its own line. Revisit this once
+   a second sibling panel actually exists -- growing both evenly would then need its
+   own call, not this one. min-width is the mobile floor; flex-shrink still lets a
+   panel narrow (then wrap) on a small viewport. */
+.panel { flex: 1 1 auto; min-width: 380px; box-sizing: border-box; background: var(--surface);
          border: 1px solid var(--ring); border-radius: 8px; padding: .55rem .8rem; }
 /* Health and HA are both about services, so they live inside one Services panel as
    two sub-areas. Each gets its own inset box rather than a divider line between them:
@@ -383,8 +397,15 @@ thead th:first-child { border-top-left-radius: 10px; }
 thead th:last-child  { border-top-right-radius: 10px; }
 tbody:last-of-type tr:last-child td:first-child { border-bottom-left-radius: 10px; }
 tbody:last-of-type tr:last-child td:last-child  { border-bottom-right-radius: 10px; }
+/* Not position: sticky -- with this table's own layout it silently collapsed
+   whichever row happened to sit first in a tbody to zero height (confirmed by
+   removing sticky alone fixing it, and moving it to <thead> instead of each <th>
+   not fixing it): rows counted in "showing N of M" but not rendered at all. A
+   dashboard where filtered rows can silently vanish is worse than one whose table
+   header scrolls off screen, so this stays static rather than chasing the exact
+   layout trigger further. */
 thead th {
-  position: sticky; top: var(--hdr-h); z-index: 2; background: var(--surface);
+  background: var(--surface);
   text-align: left; font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
 }
@@ -419,6 +440,11 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
        font-weight: 700; letter-spacing: .05em; background: var(--gpu-bg); color: var(--gpu-fg);
        vertical-align: .1em; }
 tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
+/* Declared after is-blocked/is-gpu so a row needing action always wins that edge
+   stripe over them, not just over the base unstriped row -- "do you need to act on
+   this" is a stronger signal than "is this on a GPU" or "is this scheduling-blocked". */
+.svc.is-degraded td:first-child { box-shadow: inset 3px 0 0 var(--deg-fg); }
+.svc.is-warning td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
 .src { margin-left: .4rem; padding: .02rem .3rem; border-radius: 3px; font-size: .6rem;
        font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
        background: var(--prune-bg); color: var(--prune-fg); vertical-align: .1em; }
@@ -470,11 +496,372 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
   .hide-sm { display: none; }
   body { padding: var(--pad-top) var(--pad-x) 3rem; }
 }
+/* >>> instrument refresh (generated) >>> */
+/* ── instrument v2 — one coherent sheet over the stock one ───────────────
+   Three moves: (1) flatten the panel → area → gauge-card nesting to a single
+   card divided by hairlines, (2) colour lives only on numerals, arcs and a 3px
+   row rule, (3) all data is mono, all labels are 10px/.16em, all prose is
+   system-ui. Nothing below adds a class or touches the template. */
+:root {
+  --plane:#f7f7f5; --surface:#ffffff; --sunken:#fbfaf8;
+  --hair:#e6e5df;  --hair-2:#f0efe9;  --ring:#e6e5df; --track:#e9e8e1;
+  --ink:#101112;   --ink-2:#4a4b4d;   --muted:#8d8c86;
+  --warn-arc:#c27e0a;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --pad-x:1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --plane:#08090a; --surface:#0e1012; --sunken:#0a0b0c;
+    --hair:#1e2123;  --hair-2:#17191b; --ring:#1e2123; --track:#1c1f21;
+    --ink:#f2f2ef;   --ink-2:#b9b8b2;  --muted:#7d7c76;
+    --warn-arc:#ffa200;
+  }
+}
+
+body { background: var(--plane); font-size: 13px; line-height: 1.5; }
+header { background: var(--plane); border-bottom: 1px solid var(--hair); }
+h1 { font-size: 1.05rem; letter-spacing: -.015em; }
+.meta, .badge, .runmode, .src-tag { font-family: var(--mono); }
+.meta { font-size: .72rem; letter-spacing: .02em; }
+.badge, .runmode, .src-tag {
+  border-radius: 3px; font-size: .6rem; letter-spacing: .12em; padding: .2rem .4rem;
+  background: transparent; border: 1px solid var(--hair); color: var(--muted);
+}
+.runmode { border-style: solid; }
+
+/* Every micro-label, one voice. Not .legend > summary: "What these states mean" is a
+   sentence to read, not a field label, and shrunk to .6rem/mono/uppercase/.16em
+   tracking it turned into a cramped, hard-to-read pill instead of plain text. */
+.tile .k, .cap-head, .views-lab, .spread-lab, .cap-lead .ck, .cap-of .ck, thead th,
+.kind, .sec-head {
+  font-family: var(--mono); font-size: .6rem; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+.cap-head .cap-sub, .sec-head .sec-sub, .hdr-sub {
+  font-family: system-ui, sans-serif; font-size: .72rem; font-weight: 400;
+  letter-spacing: 0; text-transform: none; color: var(--muted);
+}
+/* Every number, mono and tabular. */
+.tile .n, .cap-item .cv, .cap-lead .cv, .gauge .hd-num, .appver, .chartver, .ready,
+.sync, .meta, .members { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* One console sheet, not five floating cards. Views / Cluster / legend were each a
+   rounded box wrapping a single thin row — five competing containers for four facts.
+   They become bands of one continuous sheet, separated by hairlines. */
+.panel, .views, .capacity, .legend {
+  background: var(--surface); border: 0; border-radius: 0;
+  border-top: 1px solid var(--hair); margin: 0 calc(-1 * var(--pad-x));
+  padding: .7rem var(--pad-x);
+}
+.panel-row { margin: 0 0 0 0; gap: 0; }
+/* Unlike .views/.capacity/.legend below, .panel keeps the full-bleed treatment --
+   but its background stays --surface (near-white) from the shared rule above,
+   which shows as a plain white band behind the --plane-toned .area cards. */
+.panel { padding: 0; flex: 1 1 100%; min-width: 0; border-top: 0; background: var(--plane); }
+/* var(--pad-x) horizontally, matching .areas' own left edge below (and .sub/.views/
+   .capacity above and below this panel) -- .9rem here put "Services" to the left of
+   where the Health/HA/Istio boxes actually start. No border-bottom: that hairline
+   read as a stray line under the heading now that .panel has no other framing. */
+.panel > .cap-head, .panel > div:first-child.cap-head {
+  padding: .6rem var(--pad-x);
+}
+.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; }
+/* A fixed label rail down the left, so every band starts on the same column. */
+.views, .capacity { display: flex; align-items: baseline; gap: .8rem; flex-wrap: nowrap; }
+.views-lab, .capacity > .cap-head {
+  flex: none; width: 5rem; margin: 0; padding-top: .12rem;
+}
+/* 12rem forced this sentence to wrap mid-phrase ("...not the / services above").
+   max-width would seem safer than a bare width, but .cap-head itself is pinned to
+   a 5rem rail (below) and this text is deliberately meant to overflow past it into
+   the row -- max-width: 100% caps it at 100% of that 5rem parent instead, which is
+   the opposite of what's needed here. inline-block (not block) keeps it sitting on
+   the same line as "Cluster" rather than wrapping onto its own line below it --
+   inline-level content overflows a narrower parent's width without wrapping or
+   clipping, so the 5rem rail and the 20rem label coexist fine. */
+.capacity > .cap-head .cap-sub { display: inline-block; width: 20rem; }
+.capacity { flex-wrap: wrap; }
+/* Filters, Cluster and the legend get their own bordered card back, undoing the
+   flat hairline-band treatment above for these: they read as distinct panels, not
+   more rows of the same running sheet. */
+.views, .capacity, .legend {
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
+  margin: .9rem 0 0; padding: .6rem .9rem;
+}
+.capacity > .cap-row, .capacity > .cap-note { flex: 1 1 24rem; margin-top: 0; }
+.views { flex-wrap: wrap; }
+
+/* Same treatment for Health/HA/Istio: a real gap between three separate boxed
+   cards, not one shared card divided by a hairline. */
+/* .panel itself is full-bleed with zero padding (see above), so without this the
+   area boxes sit flush against the viewport edge instead of lining up with .sub/
+   .views/.capacity, which are inset by the page's own --pad-x. */
+.areas { display: flex; gap: .9rem; margin: 0; padding: 0 var(--pad-x); flex-wrap: wrap; }
+.area {
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
+  padding: .85rem .9rem; min-width: 0; flex: 1 1 21rem;
+  position: relative; overflow: hidden;
+}
+/* Equal growth, not 2x on the first area: with only 1-2 tiles active (most states
+   at zero), Health's own content is narrower than HA/Istio's, so growing it faster
+   just left visibly more empty slack in that one area as the window widened. */
+.areas > .area:first-child { flex: 1 1 30rem; }
+/* A colored left-edge accent per area, not a border: a *-colored border-left next
+   to the box's own --hair-colored top/bottom borders blends across the rounded
+   corner into a small diagonal wedge of the wrong color right where the curve
+   starts. A ::before rectangle clipped by the parent's own overflow: hidden (its
+   only job) sits flush inside the radius instead, the same technique the
+   reference layout uses for this exact accent. */
+.area::before {
+  content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+}
+.areas > .area:first-child::before { background: var(--ok-fg); }
+.areas > .area:nth-child(2)::before { background: var(--warn-fg); }
+.areas > .area:nth-child(3)::before { background: var(--drift-fg); }
+/* Area heads sit on the same rail as the section labels below them. Slightly bigger
+   than the page's other micro-labels and set off with a dashed rule -- these three
+   are section titles for the whole card below them, not a field label next to a
+   value, and read better with a bit more presence. */
+.area > .cap-head {
+  display: block; margin-bottom: .5rem; padding-bottom: .4rem;
+  font-size: .72rem; border-bottom: 1px dashed var(--hair);
+}
+.area > .cap-head .cap-sub { display: block; margin-left: 0; margin-top: .15rem; }
+/* Rows centre their cells; they do NOT stretch them. Stretching let the gauge's
+   height drive the tiles, so a 2-line tile grew into a 200px empty box. */
+.tiles-row, .ha-rows .tiles-row { align-items: center; margin-top: .55rem; }
+/* wrap on .ha-rows specifically, not every .tiles-row: Health's own top row (gauge +
+   the full tile grid) already fits without wrapping and does not need this. Istio's
+   "In mesh" row now carries a tile plus a pushed-right text note past it, and on a
+   narrower area that can run out of room -- unlike a second tile, the note dropping
+   to its own line reads fine, it is just a quiet aside either way. */
+.ha-rows .tiles-row { flex-wrap: wrap; }
+.tiles { gap: .45rem; }
+/* .cap-part.is-warn ("not ready", "no cpu", ...) only had colour inside .cap-of's
+   own context (the Cluster band) -- outside it, "is-warn" was a no-op. */
+.cap-part { font-size: .68rem; }
+.cap-part.is-warn { color: var(--warn-fg); }
+a.cap-part { text-decoration: none; }
+a.cap-part:hover { text-decoration: underline; }
+.spread-lab { align-self: center; margin-top: 0; width: 3.4rem; }
+
+/* Tiles: fixed cell, hairline box, 2px state rule. The stock .t-* rules set
+   border-color: transparent, so each one has to restate it. */
+/* One cell size for every box in the Health / HA / Istio rows — tiles and the Istio
+   policy box alike, so the four boxes in the Istio area match each other and the
+   AT RISK cells opposite them. */
+:root { --cell-h: 3.9rem; --cell-w: 7.4rem; }
+.tile {
+  flex: none; width: var(--cell-w); min-width: 0; height: var(--cell-h);
+  padding: .5rem .65rem;
+  background: var(--surface); border: 1px solid var(--hair);
+  border-top: 2px solid var(--hair); border-radius: 4px;
+  display: flex; flex-direction: column; justify-content: center;
+  align-items: center; text-align: center;
+}
+.tile .n { font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; }
+.tile .k { margin-top: .3rem; }
+.tile.t-total       { border-color: var(--hair); border-top-color: var(--ink); }
+/* A full colour ring, not just the top rule: reads as "this box is about that
+   state" at a glance, the same way the .pill capsule beside it does now. */
+.tile.t-ok          { background: color-mix(in srgb, var(--ok-fg) 6%, var(--surface));     border-color: color-mix(in srgb, var(--ok-fg) 45%, var(--hair));     border-top-color: var(--ok-fg); }
+.tile.t-degraded    { background: color-mix(in srgb, var(--deg-fg) 6%, var(--surface));    border-color: color-mix(in srgb, var(--deg-fg) 45%, var(--hair));    border-top-color: var(--deg-fg); }
+.tile.t-warning     { background: color-mix(in srgb, var(--warn-fg) 6%, var(--surface));   border-color: color-mix(in srgb, var(--warn-fg) 45%, var(--hair));   border-top-color: var(--warn-fg); }
+.tile.t-progressing { background: color-mix(in srgb, var(--prog-fg) 6%, var(--surface));   border-color: color-mix(in srgb, var(--prog-fg) 45%, var(--hair));   border-top-color: var(--prog-fg); }
+.tile.t-drift       { background: color-mix(in srgb, var(--drift-fg) 6%, var(--surface));  border-color: color-mix(in srgb, var(--drift-fg) 45%, var(--hair));  border-top-color: var(--drift-fg); }
+.tile.t-prune       { background: var(--surface); border-color: var(--hair); border-top-color: var(--prune-fg); }
+.tile.t-suspended   { background: var(--surface); border-color: var(--hair); border-top-color: var(--susp-fg); }
+.tile.t-ok .k, .tile.t-degraded .k, .tile.t-warning .k, .tile.t-progressing .k,
+.tile.t-drift .k, .tile.t-prune .k, .tile.t-suspended .k { color: var(--muted); }
+
+/* Gauge: an instrument, not a dial. No card, no tick marks, no 25/50/75 furniture,
+   no pivot hub — a track, a sweep to --pct, a slim marker and the number. */
+.gauge { background: transparent; border: 0; padding: 0; width: auto; gap: .3rem; }
+.gauge .hd-face {
+  position: relative; width: 108px; height: 54px; margin: 26px auto 0;
+  /* Own stacking context, so the z-index:-1 graduation layers below sit behind the
+     arc (a static in-flow child) but still in front of the face's own background. */
+  isolation: isolate;
+}
+.gauge.gauge-lg .hd-face { width: 156px; height: 78px; margin-top: 30px; }
+.gauge .hd-pivot { display: none; }
+/* Ticks, done properly: a fine graduation fringe drawn OUTSIDE the arc, so the ring
+   itself stays clean. Two layers — minor every 9°, major every 45° and longer — both
+   painted by the face's own pseudo-elements, which the arc then covers from the
+   inside. No extra markup: the stock .hd-tick <i> elements only carry the digits. */
+.gauge .hd-face::before, .gauge .hd-face::after {
+  content: ""; position: absolute; bottom: 0; border-radius: 999px 999px 0 0;
+  pointer-events: none;
+  /* Without this the fringe paints OVER .hd-arc — positioned descendants outrank an
+     in-flow static sibling — and the graduations stripe straight across the band. */
+  z-index: -1;
+}
+.gauge .hd-face::before {                       /* minor graduations */
+  left: -5px; right: -5px; top: -5px;
+  background: repeating-conic-gradient(from 270deg at 50% 100%,
+    var(--muted) 0 .55deg, transparent .55deg 9deg);
+  opacity: .38;
+}
+.gauge .hd-face::after {                        /* major graduations */
+  left: -9px; right: -9px; top: -9px;
+  background: repeating-conic-gradient(from 270deg at 50% 100%,
+    var(--ink-2) 0 .75deg, transparent .75deg 45deg);
+  opacity: .55;
+}
+.gauge.gauge-lg .hd-face::before { left: -6px; right: -6px; top: -6px; }
+.gauge.gauge-lg .hd-face::after  { left: -11px; right: -11px; top: -11px; }
+/* The stock tick <i> keeps only its digit; its own line is now the fringe's job. */
+.gauge .hd-tick { background: none; }
+.gauge .hd-tick::after { display: none; }
+.gauge .hd-scale {
+  top: -22px; font-family: var(--mono); font-size: .52rem; font-weight: 600;
+  letter-spacing: .04em; color: var(--muted); opacity: .8;
+}
+.gauge.gauge-lg .hd-scale { top: -26px; font-size: .58rem; }
+.gauge {
+  --seg1: clamp(0%, calc(var(--pct) * 2%), 100%);
+  --seg2: clamp(0%, calc((var(--pct) - 50) * 2%), 100%);
+  --arc: color-mix(in srgb,
+           color-mix(in srgb, var(--deg-fg), var(--warn-arc) var(--seg1)),
+           var(--ok-fg) var(--seg2));
+}
+.gauge .hd-arc {
+  border-radius: 999px 999px 0 0; box-shadow: none;
+  background: conic-gradient(from 270deg at 50% 100%,
+    var(--arc) 0deg calc(var(--pct) * 1.8deg),
+    var(--track) calc(var(--pct) * 1.8deg) 180deg);
+}
+.gauge .hd-mask {
+  left: 9px; right: 9px; top: 9px; border-radius: 999px 999px 0 0;
+  background: var(--surface); box-shadow: none;
+}
+.gauge.gauge-lg .hd-mask { left: 13px; right: 13px; top: 13px; }
+/* Marker: a small ringed dot riding the arc's tip, not an arrow. The spoke itself
+   (.hd-needle, still rotated by the base rule's own transform/animation) stays
+   invisible -- only its ::after dot renders, at the spoke's tip. This face is a
+   true 2:1 semicircle (width = 2 x height, checked below), so rotate() lands the
+   dot exactly on the ring at every value with no drift to correct for. */
+.gauge .hd-needle {
+  width: 2px; margin-left: -1px; height: 54px; clip-path: none; filter: none;
+  background: none;
+}
+.gauge .hd-needle::after {
+  content: ""; position: absolute; top: -3px; left: 50%; width: 9px; height: 9px;
+  margin-left: -4.5px; border-radius: 50%; background: var(--surface);
+  box-shadow: 0 0 0 2.25px var(--arc), 0 1px 2px rgba(0,0,0,.25);
+}
+.gauge.gauge-lg .hd-needle { height: 78px; }
+.gauge.gauge-lg .hd-needle::after {
+  top: -4px; width: 12px; height: 12px; margin-left: -6px;
+  box-shadow: 0 0 0 2.75px var(--arc), 0 1px 2px rgba(0,0,0,.25);
+}
+.gauge.is-unknown .hd-needle::after { display: none; }
+.gauge .hd-num {
+  bottom: 1px; font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em;
+  color: var(--arc);
+}
+.gauge.gauge-lg .hd-num { bottom: 3px; font-size: 2rem; }
+.gauge .hd-num small { font-size: .5em; color: var(--muted); margin-left: .1em; }
+.gauge .hd-cap { font-family: var(--mono); font-size: .6rem; letter-spacing: .04em; }
+.gauge.is-unknown { --arc: var(--muted); }
+.gauge.is-unknown .hd-arc { background: var(--track); }
+.gauge.is-unknown .hd-needle { background: none; }
+
+/* Views + cluster: hairline chips, no fills. */
+.views, .capacity { padding: .6rem .9rem; }
+.vchip, .chip {
+  background: transparent; border: 1px solid var(--hair); border-radius: 4px;
+  font-family: var(--mono); font-size: .68rem; letter-spacing: .04em;
+  padding: .28rem .5rem; color: var(--ink-2);
+}
+.vchip:hover { border-color: var(--ink-2); }
+.cap-item .cv, .cap-lead .cv { font-size: .95rem; font-weight: 700; }
+.cap-item .ck, .cap-split { font-family: var(--mono); font-size: .68rem; }
+.ic { opacity: .45; }
+
+/* Selection: a tight ring on the element. The stock outline + 2px offset reads as a
+   detached halo once everything is a flat bordered card. */
+.tile.is-on, a.cap-item.is-on, .vchip.is-on, .chips .chip {
+  outline: none; border-radius: 4px; box-shadow: 0 0 0 2px var(--ink);
+  border-color: transparent;
+}
+.tile.is-on { border-top-color: var(--ink); }
+.tile.is-on .n, .tile.is-on .k, a.cap-item.is-on .ck, .vchip.is-on { color: var(--ink); }
+.tile.is-on .k::after, a.cap-item.is-on .ck::after, .vchip.is-on::after {
+  margin-left: .4em; opacity: .55;
+}
+
+/* Table: 10px mono headers, hairline rows, a 3px state rule, no wash. */
+.card { overflow: hidden; margin-top: 1rem; }
+thead th {
+  background: var(--surface); padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
+}
+thead th:first-child, thead th:last-child,
+tbody:last-of-type tr:last-child td:first-child,
+tbody:last-of-type tr:last-child td:last-child { border-radius: 0; }
+tbody td { padding: .45rem .8rem; border-top: 1px solid var(--hair-2); }
+tbody.svc:hover td { background: var(--sunken); }
+.name { font-weight: 500; font-size: .84rem; letter-spacing: -.005em; }
+.appver { font-size: .76rem; font-weight: 700; }
+.chartver, .sync, .detail { font-size: .72rem; }
+.detail { font-family: system-ui, sans-serif; color: var(--ink-2); }
+.svc.is-degraded td:first-child { box-shadow: inset 3px 0 0 var(--deg-fg); }
+.svc.is-warning  td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
+.svc.is-blocked  td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
+tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
+
+/* Status: glyph + word in a bordered, lightly tinted capsule -- currentColor picks
+   up whichever state's colour the base .s-* rule already set, so one rule covers
+   all seven states instead of restating each border/background pair. */
+.pill {
+  padding: .12rem .55rem; border-radius: 4px; border: 1px solid currentColor;
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+}
+.pill.s-ok, .pill.s-degraded, .pill.s-warning, .pill.s-progressing,
+.pill.s-drift, .pill.s-prune, .pill.s-suspended {
+  background: color-mix(in srgb, currentColor 12%, var(--surface));
+}
+.pill .g { opacity: .9; }
+
+/* Inline badges: outline in their own colour, never a fill. */
+.blocked, .arch, .az, .gpu, .src, .members {
+  background: transparent; border: 1px solid currentColor; border-radius: 2px;
+  padding: .04rem .26rem; font-family: var(--mono); font-size: .58rem;
+  letter-spacing: .06em; opacity: .9;
+}
+.arch.is-arm64 { color: var(--prog-fg); }
+.arch.is-amd64 { color: var(--drift-fg); }
+.az.is-single  { color: var(--warn-fg); }
+.az.is-multi   { color: var(--ok-fg); }
+.gpu.is-waiting { color: var(--warn-fg); }
+.gpu.is-stopped { color: var(--susp-fg); }
+.gpu.is-running { color: var(--ok-fg); }
+.blocked { color: var(--warn-fg); }
+.blocked.is-accelerator { color: var(--gpu-fg); }
+.members, .src { color: var(--muted); }
+
+/* Gauges are cells too — same height, so a row reads as one band. */
+.tiles-row > .gauge { flex: none; }
+/* Istio's Policy pill sits on the title line now, right-aligned, not its own row
+   below -- the wrapper is a span, not the .cap-head div itself, so .cap-sub still
+   sits on its own line underneath exactly like every other area's header. */
+.cap-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.cap-head-badge { flex: none; }
+
+/* Legend + sections. */
+.legend { margin-bottom: 0; }
+.legend > summary { color: var(--muted); }
+.legend-row, .legend-note, .sub { font-size: .76rem; color: var(--ink-2); }
+.legend-kw { font-family: var(--mono); }
+.sec-head { margin: 1.6rem 0 -.1rem; }
+footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
+/* <<< instrument refresh (generated) <<< */
 </style>
 </head>
 <body>
 <header>
-  <h1>{{brand}}{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
+  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
@@ -569,7 +956,9 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         <div class="hd-face">
           <div class="hd-arc"></div>
           <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
           <i class="hd-tick" style="transform: rotate(90deg)"></i>
           <div class="hd-mask"></div>
           {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
@@ -591,7 +980,9 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
         <div class="hd-face">
           <div class="hd-arc"></div>
           <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
           <i class="hd-tick" style="transform: rotate(90deg)"></i>
           <div class="hd-mask"></div>
           {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
@@ -608,6 +999,81 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     {{end}}
   </div>
 </div>
+{{if $.Snapshot.Mesh}}
+<div class="area">
+  {{/* The Policy pill lives on the title line now, right-aligned, not as its own
+       row below: a cluster-wide fact reads as a header-level annotation, and it
+       keeps the rows underneath exactly HA's shape -- label, gauge, one tile. */}}
+  <div class="cap-head">
+    <span class="cap-head-row">Istio{{with $.Snapshot.Mesh}}{{if not .Error}}<span class="pill s-{{lower (printf "%s" .State)}} cap-head-badge" title="The cluster-wide default. Namespace and workload PeerAuthentications can override this for individual services -- when AZ_SPREAD is also on, the &quot;permissive&quot; tile below and each row's own badge show where they do.{{if .Scoped}} The default PeerAuthentication object itself also carries a selector, so it applies to one workload, not the whole mesh.{{end}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
+      {{- if eq .Effective "strict"}}STRICT mTLS
+      {{- else if eq .Effective "permissive"}}PERMISSIVE mTLS
+      {{- else if eq .Effective "disabled"}}mTLS disabled
+      {{- else}}No service mesh detected{{end -}}
+    </span>{{end}}{{end}}</span>
+    <span class="cap-sub">cluster-wide mTLS policy, plus per-service sidecar injection</span>
+  </div>
+  {{with $.Snapshot.Mesh}}{{if .Error}}
+  <div class="cap-note">
+    {{- if .Denied}}mesh mTLS needs a Role granting <span class="mono">get</span> on the <span class="mono">default</span> <span class="mono">peerauthentications.security.istio.io</span> object in the Istio namespace; the default install grants nothing there.
+    {{- else}}the mesh mTLS read did not complete, so this may be out of date.{{end}} ({{.Error}})
+  </div>
+  {{end}}{{end}}
+  <div class="ha-rows">
+    {{with $.Snapshot.MeshHA}}
+    <div class="tiles-row is-top">
+      <span class="spread-lab" title="Sidecar injection only: a service having the sidecar on every running pod is not the same as mTLS being enforced for it. An Istio ingress gateway reads as 'in mesh' too, but that's its own Envoy engine, not an injected sidecar -- gateways are never sidecar-injected by design.">In mesh</span>
+      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar on every running pod &middot; {{.Injected}} of {{.Eligible}} counted{{if .NotInMesh}} &middot; {{.NotInMesh}} not in mesh{{end}}{{else}}no services counted{{end}}">
+        <div class="hd-face">
+          <div class="hd-arc"></div>
+          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
+          <i class="hd-tick" style="transform: rotate(90deg)"></i>
+          <div class="hd-mask"></div>
+          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
+          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+        </div>
+        <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+      </div>
+      {{if .NotInMesh}}
+      <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
+      {{else if .Known}}
+      <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
+      {{end}}
+    </div>
+    {{end}}
+    {{with $.Snapshot.MeshPolicyHA}}
+    <div class="tiles-row">
+      <span class="spread-lab" title="Effective policy only -- not sidecar injection. A service counts here if AZ_SPREAD and mesh mTLS are both on and it resolved to an effective mode; DISABLE is not tracked per-service, so this is permissive vs. everything else, not a three-way severity ranking.">Strict</span>
+      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of policy-eligible services are NOT permissive &middot; {{.Compliant}} of {{.Eligible}} counted{{if .Permissive}} &middot; {{.Permissive}} permissive{{end}}{{else}}no services counted{{end}}">
+        <div class="hd-face">
+          <div class="hd-arc"></div>
+          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
+          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
+          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
+          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
+          <i class="hd-tick" style="transform: rotate(90deg)"></i>
+          <div class="hd-mask"></div>
+          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
+          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+        </div>
+        <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+      </div>
+      {{if .Permissive}}
+      <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{.Permissive}} service{{if ne .Permissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{.Permissive}}</div><div class="k">permissive</div></a>
+      {{else if .Known}}
+      <div class="tile t-ok"><div class="n">0</div><div class="k">permissive</div></div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
+  <div class="cap-note">+{{.UnmanagedMeshEligible}} not-in-gitops workload{{if ne .UnmanagedMeshEligible 1}}s{{end}} also checked here, not counted in the percentages above: {{.UnmanagedMeshInjected}} of {{.UnmanagedMeshEligible}} in mesh{{if .UnmanagedMeshPolicyEligible}}, {{.UnmanagedMeshPolicyPermissive}} of {{.UnmanagedMeshPolicyEligible}} permissive{{end}}.</div>
+  {{end}}{{end}}
+</div>
+{{end}}
 </div>
 </div>
 </div>
@@ -703,17 +1169,27 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
     <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
     <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
+    <div class="legend-row">{{icon "mesh"}}<span>The Policy pill is the cluster-wide default. When AZ_SPREAD is also on, namespace and workload PeerAuthentication overrides are read too: the "permissive" tile and each row's own badge (e.g. "workload override: disabled") show where a service's own effective mode differs from it.</span></div>
+    <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>STRICT mTLS</span><span>Every connection in the mesh must be mTLS-encrypted; plaintext is rejected.</span></div>
+    <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>PERMISSIVE mTLS</span><span>Istio's own default: accepts both mTLS and plaintext, so an unencrypted connection still gets through.</span></div>
+    <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>mTLS disabled</span><span>Plaintext only; nothing in the mesh enforces encryption.</span></div>
+    <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>No service mesh detected</span><span>Istio is not installed. A legitimate architecture choice, not a fault.</span></div>
     <div class="legend-row"><span class="legend-kw">HEALTH</span><span>The gauge's needle and number are the share of counted services that are <em>OK</em> right now. <em>Prune</em> and <em>suspended</em> rows are excluded from the count; <em>progressing</em> and <em>drift</em> still count as not-OK. Shows &mdash; when nothing is left to count.</span></div>
     <div class="legend-row"><span class="az is-multi">az 2</span><span>Running pods sit in this many availability zones right now.</span></div>
     <div class="legend-row"><span class="az is-single">az 1</span><span>All running pods sit in one zone: that zone going down takes the whole service with it.</span></div>
     <div class="legend-row"><span class="legend-kw">ZONED</span><span>Share of zone-eligible services that spread across more than one zone right now.</span></div>
     <div class="legend-row"><span class="legend-kw">MULTI-NODE</span><span>Share of node-eligible services that spread across more than one node right now, tracked independently of zone spread.</span></div>
+    <div class="legend-row"><span class="legend-kw">IN MESH</span><span>Share of mesh-eligible services carrying the Istio sidecar on every running pod right now. Sidecar injection only, not a per-service mTLS enforcement guarantee. An Istio ingress gateway reads as "in mesh" too, but that's its own Envoy engine, not an injected sidecar -- gateways are never sidecar-injected by design.</span></div>
   </div>
   <div class="legend-note">
     <strong>Status</strong> is the workload&rsquo;s health; <strong>Sync</strong> is whether its manifests match git , 
     two independent things, so <em>PROGRESSING</em> beside <em>Synced</em> is normal.
     Rows are ordered worst-first. Expand a row to see which components are out of sync.
     Click a tile to filter the list to that status, and click it again to clear it.
+    A red or yellow stripe on the left edge of a row means <em>DEGRADED</em> or <em>WARNING</em>:
+    the two states worth actually looking at. <em>PROGRESSING</em> and <em>DRIFT</em> get no
+    stripe -- neither needs action right now, even though Health only counts <em>PROGRESSING</em>
+    as healthy, since drifted config does not resolve on its own the way a rollout does.
     {{if $.MultiSource}}<br>Flux rows show their controller in the <em>Source</em> column. Flux does not
     compare running manifests against git the way ArgoCD does, so those rows carry no
     <strong>Sync</strong> value and never appear as <em>DRIFT</em> or <em>PRUNE</em>.{{end}}
@@ -755,13 +1231,15 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 {{$ui := .ArgoCDUIBase}}
 {{$multi := .MultiSource}}
 {{range .Services}}
-<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}}">
+<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}} is-{{lower (printf "%s" .State)}}">
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
     {{- with .Blocked}}<span class="blocked is-{{.Kind}}" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
     {{- with .Arch}}<span class="arch is-{{.}}" title="Every node this service may run on is {{.}}{{if eq . "arm64"}}, which on AWS means Graviton{{end}}. Services free to run on either architecture carry no badge.">{{.}}</span>{{end}}
     {{- if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}
+    {{- if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}
+    {{- if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This service's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for
@@ -817,18 +1295,20 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <div class="sec-head" id="unmanaged">Not managed by ArgoCD
   <span class="sec-sub">running in the cluster but outside GitOps, EKS addons, Terraform-installed
   components, hand-installed Helm releases. These are not services above and are not in the Services counts --
-  the HA gauge's spread numbers are the one place they are folded in, since a zone or node can take them down
-  exactly like any tracked service.</span>
+  the HA gauges' numbers are the one place they are folded in, since a zone or node failing affects them
+  exactly like it would any tracked service. The Istio gauges are GitOps-services only; their own sidecar
+  and policy coverage is mentioned separately in the Istio panel instead.</span>
 </div>
 <div class="card">
 <table>
 <thead>
 <tr>
-  <th>Namespace</th>
-  <th>Kind</th>
-  <th>Workload</th>
+  <th>Service</th>
+  <th class="hide-sm">Namespace</th>
+  <th class="hide-sm">Kind</th>
   <th class="hide-sm">Installed by</th>
-  <th class="hide-sm">Version</th>
+  <th>App version</th>
+  <th class="hide-sm">Chart version</th>
   <th>Ready</th>
   <th>Status</th>
 </tr>
@@ -836,16 +1316,17 @@ footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
 <tbody>
 {{range $.Unmanaged}}
 <tr>
-  <td class="ns">{{.Namespace}}</td>
-  <td class="kind">{{.Kind}}</td>
-  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}</td>
+  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}{{if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}{{if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This workload's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}</td>
+  <td class="ns hide-sm">{{.Namespace}}</td>
+  <td class="kind hide-sm">{{.Kind}}</td>
   <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>
-  <td class="appver hide-sm">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
+  <td class="appver">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
+  <td class="chartver hide-sm">{{.ChartVersion}}</td>
   <td class="ready">{{.Ready}}/{{.Desired}}</td>
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
 </tr>
 {{else}}
-<tr><td colspan="7" class="detail">{{if $.Filter.Spread}}no not-in-gitops workloads are single-{{$.Filter.Spread}}{{else if .Error}}no workloads read{{else}}every workload in the cluster is managed by ArgoCD{{end}}</td></tr>
+<tr><td colspan="8" class="detail">{{if $.Filter.Spread}}no not-in-gitops workloads are single-{{$.Filter.Spread}}{{else if .Error}}no workloads read{{else}}every workload in the cluster is managed by ArgoCD{{end}}</td></tr>
 {{end}}
 </tbody>
 </table>

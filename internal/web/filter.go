@@ -16,6 +16,7 @@ const (
 	filterArch    = "arch"
 	filterView    = "view"
 	filterSpread  = "spread"
+	filterMesh    = "mesh"
 )
 
 // Filter is the row selection parsed from the query string. Values are kept as the
@@ -35,6 +36,16 @@ type Filter struct {
 	// only one of that kind, the exact rows a Cluster HA gauge's "at risk" count
 	// summarizes. Answers "which ones" for a number that otherwise only says "how many".
 	Spread string
+	// Mesh is "not-injected" or "permissive".
+	// "not-injected": services with a known mesh answer where at least one running
+	// pod lacks the Istio sidecar, the exact rows the Mesh area's "not in mesh" tile
+	// summarizes.
+	// "permissive": services whose own EFFECTIVE policy (ServicePolicy, after
+	// namespace/workload overrides, not the cluster-wide default alone) is
+	// PERMISSIVE, the exact rows the "permissive" tile summarizes. STRICT/DISABLE
+	// were not asked for and get no tile of their own to discover them from, so they
+	// are left out rather than added speculatively.
+	Mesh string
 }
 
 // ParseFilter accepts both repeated parameters and comma-separated values.
@@ -47,12 +58,13 @@ func ParseFilter(q url.Values) Filter {
 		Arch:    strings.TrimSpace(q.Get(filterArch)),
 		View:    strings.ToLower(strings.TrimSpace(q.Get(filterView))),
 		Spread:  strings.ToLower(strings.TrimSpace(q.Get(filterSpread))),
+		Mesh:    strings.ToLower(strings.TrimSpace(q.Get(filterMesh))),
 	}
 	// A section view and the row filters describe different tables. The links never
 	// produce both, but a hand-written URL can, and rendering half of each state is
 	// worse than picking one. The view wins because it is the coarser choice.
 	if f.View != "" {
-		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch, f.Spread = nil, nil, "", "", "", ""
+		f.Status, f.Sync, f.GPU, f.Blocked, f.Arch, f.Spread, f.Mesh = nil, nil, "", "", "", "", ""
 	}
 	return f
 }
@@ -78,7 +90,7 @@ func parseFilterList(vals []string) []string {
 }
 
 func (f Filter) Active() bool {
-	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != "" || f.Spread != ""
+	return len(f.Status) > 0 || len(f.Sync) > 0 || f.GPU != "" || f.Blocked != "" || f.Arch != "" || f.Spread != "" || f.Mesh != ""
 }
 
 func (f Filter) list(kind string) []string {
@@ -107,6 +119,8 @@ func (f Filter) has(kind, value string) bool {
 		return strings.EqualFold(f.View, value)
 	case filterSpread:
 		return strings.EqualFold(f.Spread, value)
+	case filterMesh:
+		return strings.EqualFold(f.Mesh, value)
 	}
 	return false
 }
@@ -162,6 +176,19 @@ func (f Filter) matches(svc status.Service) bool {
 	case "":
 	default:
 		return false // an unrecognised value matches nothing, per this file's own convention
+	}
+	switch f.Mesh {
+	case "not-injected":
+		if !svc.Mesh.Known() || svc.Mesh.Full() {
+			return false
+		}
+	case "permissive":
+		if !svc.Policy.Known() || svc.Policy.Effective != status.MeshPermissive {
+			return false
+		}
+	case "":
+	default:
+		return false
 	}
 	return true
 }
@@ -264,26 +291,27 @@ func (f Filter) ShowServices() bool { return f.View != "unmanaged" }
 // It is hidden while a service filter is active: if you asked to see only DEGRADED
 // services, a second table of things that are not services at all is noise.
 //
-// Spread is the one exception: zone/node spread applies just as much to a workload
-// outside GitOps as to a service, and the HA gauge's "at risk" count already folds
-// both together (see FillZones) -- hiding this table when spread is active would
-// silently drop rows that contributed to the very number the click came from.
+// Spread and Mesh are the exceptions: zone/node spread and mesh sidecar coverage both
+// apply just as much to a workload outside GitOps as to a service, and the HA/MeshHA
+// gauges' counts already fold both together (see FillZones) -- hiding this table when
+// either is active would silently drop rows that contributed to the very number the
+// click came from.
 func (f Filter) ShowUnmanaged() bool {
 	if f.View == "unmanaged" {
 		return true
 	}
-	if f.Spread != "" {
+	if f.Spread != "" || f.Mesh != "" {
 		return true
 	}
 	return f.View == "" && !f.Active()
 }
 
-// ApplyWorkloads returns the not-in-gitops rows the spread filter selects. Unlike
-// Apply, only the spread axis narrows this table: a Workload has no Sync/GPU/Arch/
+// ApplyWorkloads returns the not-in-gitops rows the spread/mesh filters select. Unlike
+// Apply, only those two axes narrow this table: a Workload has no Sync/GPU/Arch/
 // Blocked concept comparable to a Service's, so those filters intentionally leave it
 // alone -- ShowUnmanaged hides the whole table for them instead.
 func (f Filter) ApplyWorkloads(items []status.Workload) []status.Workload {
-	if f.Spread == "" {
+	if f.Spread == "" && f.Mesh == "" {
 		return items
 	}
 	out := make([]status.Workload, 0, len(items))
@@ -297,6 +325,20 @@ func (f Filter) ApplyWorkloads(items []status.Workload) []status.Workload {
 			if !w.Nodes.Known() || w.Nodes.Count() != 1 {
 				continue
 			}
+		case "":
+		default:
+			continue
+		}
+		switch f.Mesh {
+		case "not-injected":
+			if !w.Mesh.Known() || w.Mesh.Full() {
+				continue
+			}
+		case "permissive":
+			if !w.Policy.Known() || w.Policy.Effective != status.MeshPermissive {
+				continue
+			}
+		case "":
 		default:
 			continue
 		}

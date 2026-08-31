@@ -51,6 +51,8 @@ func main() {
 	pendingReasons := envBool("PENDING_REASONS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
+	meshMTLS := envBool("MESH_MTLS", false)
+	meshNamespace := env("MESH_NAMESPACE", "istio-system")
 	// AZ_SPREAD needs the node list to resolve a pod's zone, which only NODE_STATS
 	// fetches. Without it there are no zone labels to join against, so it is left
 	// unwired below rather than rendering a section of all-dashes.
@@ -116,6 +118,17 @@ func main() {
 		collector.WithUnmanaged(workloadLister)
 	}
 
+	if meshMTLS {
+		meshLister, merr := buildMeshLister()
+		if merr != nil {
+			log.Printf("mesh mtls enabled but the mesh client is unavailable: %v", merr)
+			meshLister = failingMeshLister{err: merr}
+		} else {
+			probeIstio(meshLister)
+		}
+		collector.WithMesh(meshLister, meshNamespace)
+	}
+
 	if azSpread {
 		if !nodeStats {
 			log.Print("AZ_SPREAD is enabled but NODE_STATS is not: zone labels come from the node list, so the AZ-spread section is left disabled rather than rendering with no zones to join against")
@@ -144,8 +157,8 @@ func main() {
 		log.Fatalf("build server: %v", err)
 	}
 
-	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v azSpread=%t",
-		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS, azSpread)
+	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v meshMTLS=%t meshNamespace=%q azSpread=%t",
+		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS, meshMTLS, meshNamespace, azSpread)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + port,
@@ -244,15 +257,43 @@ func buildWorkloadLister() (status.WorkloadLister, error) {
 	return c, nil
 }
 
+// buildMeshLister is only called when MESH_MTLS is on. DetectIstio reads discovery,
+// which needs no extra RBAC; MeshPolicy is a single-object namespaced read.
+func buildMeshLister() (status.MeshLister, error) {
+	c, err := buildKubeClient()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // buildRunningLister is only called when AZ_SPREAD is on (and NODE_STATS is also on):
 // listing running pods cluster-wide is the same permission PENDING_REASONS already
-// needs, widened from Pending to Running pods.
+// needs, widened from Pending to Running pods. Per-service mesh sidecar coverage rides
+// along on this same list (see FillZones) rather than needing a lister of its own.
 func buildRunningLister() (status.RunningLister, error) {
 	c, err := buildKubeClient()
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// probeIstio logs whether the cluster serves Istio's PeerAuthentication CRD, the same
+// way detectSources logs its own discovery probes. This is a one-off startup log; the
+// collector re-probes on every refresh, so a mesh installed later is still found.
+func probeIstio(ml status.MeshLister) {
+	ctx, cancel := context.WithTimeout(context.Background(), kube.RequestTimeout)
+	defer cancel()
+
+	switch gv, err := ml.DetectIstio(ctx); {
+	case err != nil:
+		log.Printf("MESH_MTLS: istio discovery failed: %v", err)
+	case gv == "":
+		log.Print("MESH_MTLS: no Istio PeerAuthentication CRD found, mesh gauge will show \"no service mesh detected\"")
+	default:
+		log.Printf("MESH_MTLS: found Istio PeerAuthentication CRD at %s", gv)
+	}
 }
 
 type failingLister struct{ err error }
@@ -276,6 +317,18 @@ func (f failingNodeLister) ListNodes(context.Context) (*kube.NodeList, error) {
 type failingWorkloadLister struct{ err error }
 
 func (f failingWorkloadLister) ListWorkloads(context.Context) (*kube.WorkloadList, error) {
+	return nil, f.err
+}
+
+type failingMeshLister struct{ err error }
+
+func (f failingMeshLister) DetectIstio(context.Context) (string, error) { return "", f.err }
+
+func (f failingMeshLister) MeshPolicy(context.Context, string, string) (*kube.PeerAuthentication, error) {
+	return nil, f.err
+}
+
+func (f failingMeshLister) ListPeerAuthentications(context.Context, string) (*kube.PeerAuthenticationList, error) {
 	return nil, f.err
 }
 

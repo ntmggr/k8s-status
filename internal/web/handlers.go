@@ -242,6 +242,20 @@ type fluxJSON struct {
 	Error          string `json:"error,omitempty"`
 }
 
+// meshJSON is omitted entirely when MESH_MTLS is off.
+type meshJSON struct {
+	Installed  bool   `json:"installed"`
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Mode is the literal spec.mtls.mode string, omitted when the object carries none.
+	Mode        string `json:"mode,omitempty"`
+	Effective   string `json:"effective"`
+	PolicyFound bool   `json:"policyFound,omitempty"`
+	Scoped      bool   `json:"scoped,omitempty"`
+	Denied      bool   `json:"denied,omitempty"`
+	Missing     bool   `json:"missing,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
 // filtersJSON echoes the applied selection so the payload is self-describing.
 // Omitted when no filter is active.
 type filtersJSON struct {
@@ -271,6 +285,7 @@ type apiResponse struct {
 	Nodes          *nodesJSON     `json:"nodes,omitempty"`
 	Unmanaged      *unmanagedJSON `json:"unmanaged,omitempty"`
 	Flux           *fluxJSON      `json:"flux,omitempty"`
+	Mesh           *meshJSON      `json:"mesh,omitempty"`
 	Filters        *filtersJSON   `json:"filters,omitempty"`
 	Services       []serviceJSON  `json:"services"`
 	CheckedAt      string         `json:"checkedAt"`
@@ -316,6 +331,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 		resp.Nodes = nodes(snap)
 		resp.Unmanaged = unmanaged(snap)
 		resp.Flux = flux(snap)
+		resp.Mesh = mesh(snap)
 		// summary stays whole-cluster: filtering selects rows, it does not change counts.
 		services := filter.Apply(snap.Services)
 		if filter.Active() {
@@ -393,6 +409,24 @@ func flux(snap *status.Snapshot) *fluxJSON {
 		HelmReleases:   snap.Flux.HelmReleases,
 		Kustomizations: snap.Flux.Kustomizations,
 		Error:          snap.Flux.Error,
+	}
+}
+
+func mesh(snap *status.Snapshot) *meshJSON {
+	if snap.Mesh == nil {
+		return nil
+	}
+	m := snap.Mesh
+	return &meshJSON{
+		Installed:   m.Installed,
+		APIVersion:  m.APIVersion,
+		Mode:        m.Mode,
+		Effective:   m.Effective,
+		PolicyFound: m.PolicyFound,
+		Scoped:      m.Scoped,
+		Denied:      m.Denied,
+		Missing:     m.Missing,
+		Error:       m.Error,
 	}
 }
 

@@ -139,6 +139,14 @@ type Service struct {
 	// Nodes is filled alongside Zones, from the same pod-to-node join. Zero value
 	// renders as unknown, not as zero nodes.
 	Nodes NodeSpread
+	// Mesh is filled alongside Zones/Nodes, from the same running-pods read. Zero value
+	// renders as unknown, not as zero coverage.
+	Mesh MeshCoverage
+	// Policy is this service's own effective mTLS mode, resolved against namespace-
+	// and workload-scoped PeerAuthentication overrides rather than the cluster-wide
+	// default alone. Zero value (Known() false) when MESH_MTLS or AZ_SPREAD is off, or
+	// the service matched no running pod to read a namespace/labels from.
+	Policy ServicePolicy
 }
 
 type Summary struct {
@@ -180,6 +188,31 @@ type Summary struct {
 	// off, same as the zone counters.
 	SingleNode int
 	MultiNode  int
+	// MeshEligible counts services (GitOps-tracked only) with at least one running pod
+	// (same population as Zoned would be if AZ_SPREAD were also on). MeshInjected is
+	// the subset where every running pod carries an istio-proxy sidecar. Both zero
+	// when AZ_SPREAD is off, since per-service mesh coverage reuses that same
+	// running-pods read.
+	MeshEligible int
+	MeshInjected int
+	// MeshPolicyEligible counts services (GitOps-tracked only) with a resolved
+	// effective policy at all. MeshPolicyPermissive is the subset whose effective mode
+	// is PERMISSIVE -- whether inherited from a PERMISSIVE mesh-wide default or from
+	// their own namespace/workload override. Both zero unless MESH_MTLS and AZ_SPREAD
+	// are both on, since per-service policy reuses the same running-pods read
+	// AZ_SPREAD already fetches.
+	MeshPolicyEligible   int
+	MeshPolicyPermissive int
+	// UnmanagedMesh{Eligible,Injected} and UnmanagedMeshPolicy{Eligible,Permissive}
+	// are the not-in-gitops counterpart of the four fields above, kept separate
+	// rather than folded in: the Istio gauges describe GitOps-tracked services
+	// specifically, so a not-in-gitops workload gaining or losing its sidecar must
+	// not move a percentage that claims to be about services. The Istio panel
+	// mentions these totals alongside the gauges instead.
+	UnmanagedMeshEligible         int
+	UnmanagedMeshInjected         int
+	UnmanagedMeshPolicyEligible   int
+	UnmanagedMeshPolicyPermissive int
 }
 
 type Snapshot struct {
@@ -211,6 +244,8 @@ type Snapshot struct {
 	Unmanaged *Unmanaged
 	// Flux is nil unless flux is one of SOURCES.
 	Flux *FluxSection
+	// Mesh is nil unless MESH_MTLS is enabled.
+	Mesh *MeshSection
 	// ZoneRead is nil when AZ_SPREAD is off or its read succeeded; non-nil carries a
 	// denied, missing or too-large read as a visible note, the same as Nodes/Unmanaged/
 	// Flux do for their own reads.

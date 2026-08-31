@@ -98,6 +98,22 @@ on requires `rbac.clusterRole=true`, because these resources are not namespaced:
 | Workloads outside GitOps | `config.unmanaged` | `get`, `list` on `deployments`, `statefulsets`, `daemonsets` |
 | Flux support | `config.sources` includes `flux` | `get`, `list` on `helmreleases`, `kustomizations` |
 
+**Mesh mTLS's own Role needs no ClusterRole at all.** It reads one named object in one
+namespace, so that half gets its own namespaced Role, independent of
+`rbac.clusterRole`. But resolving each service's own policy against namespace- and
+workload-scoped overrides needs a second, genuinely cluster-wide grant, since those
+overrides can live in any namespace and a Role only ever grants inside one:
+
+| Feature | Setting | Where | Additionally grants |
+|---|---|---|---|
+| Mesh mTLS (cluster-wide policy) | `config.meshMTLS` | Role in `rbac.istioNamespace` | `get` on `peerauthentications`, restricted to the object named `default` |
+| Mesh mTLS (per-service policy) | `config.meshMTLS` (needs `config.azSpread` too, to show it) | its own ClusterRole, always created with `config.meshMTLS`, independent of `rbac.clusterRole` | `list` on `peerauthentications`, cluster-wide, in every namespace |
+
+That second row is a real increase in blast radius, not a formality: it lets the
+ServiceAccount read the mTLS policy -- a security-relevant setting -- of every
+namespace in the cluster, not only `rbac.istioNamespace`. It is still read-only and
+still confined to one CRD.
+
 Still only `get` and `list`. There is no verb anywhere in this project that changes a
 cluster, and no code path that issues a write.
 
@@ -540,6 +556,8 @@ can run it with none of them set.
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
+| `MESH_MTLS` | `false` | Show the cluster-wide Istio mTLS gauge. Needs a namespaced Role, see [Optional extras](#optional-extras) |
+| `MESH_NAMESPACE` | `istio-system` | Namespace holding the mesh-wide `PeerAuthentication` object |
 | `CACHE_TTL_SECONDS` | `15` | How long a fetched snapshot is reused |
 | `REFRESH_SECONDS` | `30` | Default page auto-refresh interval. A viewer can override it with `?refresh=` |
 | `PORT` | `8080` | Port to listen on |
@@ -682,15 +700,16 @@ Two objects appear only when their feature is on:
 
 ## Optional extras
 
-Both extras below are **off by default**, and for the same reason.
+All three extras below are **off by default**, though not all for the same reason.
 
 The normal install has a namespaced `Role`. It can read ArgoCD Applications in one
 namespace and nothing else. That is the whole permission surface, and you can check it by
 reading eight lines of YAML.
 
-Both extras read things that live outside any single namespace, which a `Role` cannot do.
-That needs a **ClusterRole**, a permission that applies cluster-wide. So each extra needs
-two switches flipped: the feature, and the permission.
+Cluster capacity and unmanaged workloads read things that live outside any single
+namespace, which a `Role` cannot do. That needs a **ClusterRole**, a permission that
+applies cluster-wide. So each of those two extras needs two switches flipped: the
+feature, and the permission.
 
 If you turn the feature on but not the permission, nothing breaks. The read is denied, that
 one section shows a short note explaining what is missing, and the rest of the page renders
@@ -705,10 +724,34 @@ With Helm, add `--set rbac.clusterRole=true`. With `deploy/install.yaml`, uncomm
 ClusterRole and ClusterRoleBinding block near the top. Each rule is gated on its own
 feature, so turning one on does not grant the other.
 
-Check for yourself that the default render is clean:
+**Mesh mTLS's cluster-wide policy read is not one of these two.** It reads a single
+named object in a single namespace, so it needs no `rbac.clusterRole=true` at all — it
+gets its own namespaced `Role` instead. Its **per-service** policy read is different:
+resolving namespace- and workload-scoped overrides needs a cluster-wide `list`, since
+those overrides can live in any namespace, so it gets its own dedicated ClusterRole,
+still independent of `rbac.clusterRole`:
+
+| Feature | Env var | Chart value | Extra permission |
+|---|---|---|---|
+| Mesh mTLS (cluster-wide) | `MESH_MTLS=true` | `config.meshMTLS=true` | `get` on `peerauthentications`, restricted by `resourceNames` to the object named `default`, in `rbac.istioNamespace` |
+| Mesh mTLS (per-service) | `MESH_MTLS=true` and `AZ_SPREAD=true` | `config.meshMTLS=true` | `list` on `peerauthentications`, cluster-wide, in every namespace |
+
+With Helm this needs no `rbac.clusterRole=true`; both the Role/RoleBinding and the
+ClusterRole/ClusterRoleBinding render whenever `config.meshMTLS=true`, on their own
+gate. With `deploy/install.yaml`, uncomment the separate Role/RoleBinding and
+ClusterRole/ClusterRoleBinding blocks for it. `resourceNames` plus `get`-only on the
+namespaced Role means the ServiceAccount can read exactly that one object and cannot
+list or enumerate anything else in the namespace, which is why the mesh-wide read does
+a single-object `GET` rather than a list; the ClusterRole is the deliberate exception
+to that, because a per-service answer needs to see overrides in namespaces it does not
+otherwise touch at all. It is still `list`-only, no `get`, since the list response
+already carries every object's full spec.
+
+Check for yourself which render is clean and which is not:
 
 ```sh
-helm template k8s-status charts/k8s-status | grep -c "kind: ClusterRole"   # 0
+helm template k8s-status charts/k8s-status | grep -c '^kind: ClusterRole$'                              # 0
+helm template k8s-status charts/k8s-status --set config.meshMTLS=true | grep -c '^kind: ClusterRole$'   # 1
 ```
 
 ### Cluster capacity
@@ -746,10 +789,11 @@ Each row shows:
 
 | Column | Where it comes from |
 |---|---|
-| Namespace, kind, name | `metadata` |
+| Service, namespace, kind | `metadata` |
 | Installed by | The `app.kubernetes.io/managed-by` label. Observed values are `Helm`, `EKS` and `terraform`. Empty shows as `unknown` |
+| App version | The `app.kubernetes.io/version` label when the workload is part of a Helm release, otherwise the tag of the first container's image |
+| Chart version | The version suffix of the `helm.sh/chart` label (e.g. `1.14.4` from `cert-manager-1.14.4`). Empty when the workload is not Helm-managed or carries no chart label |
 | Ready / desired | `status.readyReplicas` / `status.replicas` for Deployment and StatefulSet; `status.numberReady` / `status.desiredNumberScheduled` for DaemonSet. A missing field counts as 0 |
-| Version | The tag of the first container's image |
 | Status | `OK` when ready equals desired and desired is above 0; `DEGRADED` when ready is below desired; `SUSPENDED` when desired is 0 |
 
 `SUSPENDED` for a 0/0 workload is not a fudge. A Windows DaemonSet on a cluster with no
@@ -770,6 +814,64 @@ not remove that check to simplify the code, the list becomes unreadable.
 
 The count also appears in the cluster capacity section, not in the status tiles, for the
 same arithmetic reason as GPU.
+
+When `AZ_SPREAD` is also on, these workloads' zone/node spread folds into the HA gauges
+(Zones/Nodes) the same way a tracked service's would: a zone or node failing affects them
+identically, so excluding them would understate real blast radius. Their Istio sidecar
+injection and effective policy, when `MESH_MTLS` is also on, do **not** fold into the
+Istio gauges the same way -- those percentages describe GitOps-tracked services
+specifically. Instead, each row still gets its own "not in mesh" / policy-override badge,
+and the Istio panel shows a one-line note summarising how many not-in-gitops workloads
+were checked and how many of them are in mesh or permissive.
+
+### Mesh mTLS
+
+Shows whether Istio is installed and, if so, the cluster-wide mTLS posture: `STRICT`,
+`PERMISSIVE`, or disabled.
+
+- Istio is detected via discovery (`HasResource`), the same mechanism `SOURCES=auto`
+  uses for ArgoCD and Flux; no Istio CRD served means no mesh, rendered as a neutral
+  "no service mesh detected", never as a warning.
+- When Istio is present, the mesh-wide `PeerAuthentication` named `default` in
+  `MESH_NAMESPACE` is read by name, not listed. No object at all is Istio's own
+  PERMISSIVE default, and is reported as such rather than as "unknown". `mode: UNSET`
+  inherits that same PERMISSIVE default.
+- If that `default` object carries a `spec.selector`, it is actually scoped to one
+  workload rather than the whole mesh, and the page says so.
+
+Alongside that cluster-wide answer, when `AZ_SPREAD` is also on, each service gets two
+more per-service answers, both read from the same running-pods list AZ_SPREAD already
+fetches, no separate fetch of their own:
+
+- **Sidecar injection**: how many of a service's running pods carry an `istio-proxy`
+  container. Injection only, never enforcement — a service can carry the sidecar on
+  every pod without STRICT mTLS applying to it, since that depends on policy, not on
+  whether a sidecar is present.
+- **Its own effective policy**: namespace- and workload-scoped `PeerAuthentication`
+  objects can override the cluster-wide default for individual services, and this is
+  what actually reads them, following Istio's own precedence rules
+  ([reference](https://istio.io/latest/docs/reference/config/security/peer_authentication/)):
+  workload-specific (a `PeerAuthentication` in the service's own namespace whose
+  `spec.selector.matchLabels` match its pods' labels) beats namespace-wide (same
+  namespace, empty selector) beats the cluster-wide default above. `mode: UNSET` at a
+  narrower scope falls through to the next broader one rather than stopping the
+  search. If two workload-scoped objects in one namespace both match the same pod,
+  Istio's own behaviour is undefined; this page picks whichever comes first in the
+  list Kubernetes returned, deterministically, and does not claim that choice is
+  "correct" — Istio itself defines no correct answer there.
+
+  This needs a second, genuinely cluster-wide permission beyond the single-object read
+  above — see [Optional extras](#optional-extras) — because an override can live in any namespace, not only
+  `MESH_NAMESPACE`. A denied or failed read there degrades the same way every other
+  optional read in this project does: the per-service answer is simply not shown, the
+  cluster-wide gauge above is unaffected.
+
+  Surfaced as a "permissive" tile in the Istio panel (`?mesh=permissive` narrows the
+  Services table to exactly those rows) and a per-row badge naming the scope and mode
+  whenever a service's own effective policy differs from the cluster-wide default,
+  e.g. "workload override: disabled". `STRICT`/`DISABLE` effective modes get no tile
+  of their own, only the row badge — nobody asked to filter on those, and adding a
+  tile with no way to discover it from would be dead weight.
 
 ## How it works
 
@@ -881,6 +983,9 @@ Endpoints read, and what each needs:
 | `/apis/argoproj.io/v1alpha1/namespaces/<ns>/applications` | always | Role in `ARGOCD_NAMESPACE` |
 | `/api/v1/nodes` | `NODE_STATS=true` | ClusterRole |
 | `/apis/apps/v1/{deployments,statefulsets,daemonsets}` | `UNMANAGED=true` | ClusterRole |
+| `/apis/security.istio.io/{v1,v1beta1}` (discovery) | `MESH_MTLS=true` | none, discovery is always readable |
+| `/apis/security.istio.io/v1/namespaces/<ns>/peerauthentications/default` | `MESH_MTLS=true` and Istio detected | Role in `MESH_NAMESPACE` |
+| `/apis/security.istio.io/v1/peerauthentications` (cluster-wide list) | `MESH_MTLS=true` and `AZ_SPREAD=true`, Istio detected | ClusterRole |
 
 The three workload kinds are fetched at the same time under one shared timeout. If one of
 them fails, the other two are still shown, with a note.
@@ -899,6 +1004,8 @@ string and renders as no revision.
 | Lots of rows read `PROGRESSING` at once | The root app is mid-sync, so every `OutOfSync` child hits rule 4 | Wait for the sync to finish |
 | Capacity section says a ClusterRole is needed | `NODE_STATS=true` without `rbac.clusterRole=true` | Set both, or turn the feature off |
 | Unmanaged section says a ClusterRole is needed | `UNMANAGED=true` without `rbac.clusterRole=true` | Set both, or turn the feature off |
+| Mesh mTLS section says a Role is needed | `MESH_MTLS=true` without the mesh Role granted | Set `config.meshMTLS=true` (which renders the Role too), or turn the feature off |
+| Cluster-wide Policy pill is right but no service ever shows an override badge or the "permissive" tile | `AZ_SPREAD=false`, or the per-service list read (ClusterRole) was denied | Set `config.azSpread=true`, and confirm the `-mesh-list` ClusterRole rendered (`config.meshMTLS=true` should always render it, independent of `rbac.clusterRole`) |
 | Unmanaged list is enormous (hundreds of rows) | An operator in the cluster spawns owned workloads and something dropped the `ownerReferences` check | See [the section above](#workloads-that-argocd-does-not-manage) |
 | 404 behind an ingress | A rewrite rule strips `BASE_PATH` | Remove the rewrite. The app serves the prefix itself |
 | `data is Ns stale` banner | The last refresh failed; you are seeing the previous snapshot | Look at the error banner beside it |

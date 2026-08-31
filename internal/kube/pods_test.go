@@ -158,3 +158,75 @@ func TestListRunningPodsDecodesHostIP(t *testing.T) {
 		t.Errorf("items = %+v, want hostIP 10.0.1.5", list.Items)
 	}
 }
+
+func TestListRunningPodsDecodesContainerStatuses(t *testing.T) {
+	h := &pagedHandler{bodies: []string{
+		`{"metadata":{"continue":""},"items":[{"metadata":{"name":"a"},"status":{"phase":"Running","containerStatuses":[{"name":"app"},{"name":"istio-proxy"}]}}]}`,
+	}}
+	c := newTestClient(t, h)
+
+	list, err := c.ListRunningPods(context.Background())
+	if err != nil {
+		t.Fatalf("ListRunningPods: %v", err)
+	}
+	if len(list.Items) != 1 || !list.Items[0].IsIstioInjected() {
+		t.Errorf("items = %+v, want IsIstioInjected true", list.Items)
+	}
+}
+
+// TestListRunningPodsDecodesNativeSidecarInitContainerStatuses covers Kubernetes
+// 1.29+'s native sidecar containers, which is how Istio's own injector actually runs
+// istio-proxy on a current cluster: as an init container with restartPolicy: Always,
+// reported under initContainerStatuses rather than containerStatuses. Checking only
+// the latter silently reported every real, correctly-injected pod on such a cluster
+// as "not in mesh" -- caught by checking real cluster data, not a synthetic guess.
+func TestListRunningPodsDecodesNativeSidecarInitContainerStatuses(t *testing.T) {
+	h := &pagedHandler{bodies: []string{
+		`{"metadata":{"continue":""},"items":[{"metadata":{"name":"a"},"status":{"phase":"Running","containerStatuses":[{"name":"app"}],"initContainerStatuses":[{"name":"istio-init"},{"name":"istio-proxy"}]}}]}`,
+	}}
+	c := newTestClient(t, h)
+
+	list, err := c.ListRunningPods(context.Background())
+	if err != nil {
+		t.Fatalf("ListRunningPods: %v", err)
+	}
+	if len(list.Items) != 1 || !list.Items[0].IsIstioInjected() {
+		t.Errorf("items = %+v, want IsIstioInjected true", list.Items)
+	}
+}
+
+func TestIsIstioInjected(t *testing.T) {
+	cases := []struct {
+		name string
+		pod  Pod
+		want bool
+	}{
+		{"no containers", Pod{}, false},
+		{"app only", Pod{Status: PodStatus{ContainerStatuses: []ContainerStatus{{Name: "app"}}}}, false},
+		{"app and sidecar", Pod{Status: PodStatus{ContainerStatuses: []ContainerStatus{{Name: "app"}, {Name: "istio-proxy"}}}}, true},
+		{"sidecar only", Pod{Status: PodStatus{ContainerStatuses: []ContainerStatus{{Name: "istio-proxy"}}}}, true},
+		{
+			name: "native sidecar as init container, not a regular one",
+			pod: Pod{Status: PodStatus{
+				ContainerStatuses:     []ContainerStatus{{Name: "app"}},
+				InitContainerStatuses: []ContainerStatus{{Name: "istio-init"}, {Name: "istio-proxy"}},
+			}},
+			want: true,
+		},
+		{
+			name: "istio-init alone is not the proxy itself",
+			pod: Pod{Status: PodStatus{
+				ContainerStatuses:     []ContainerStatus{{Name: "app"}},
+				InitContainerStatuses: []ContainerStatus{{Name: "istio-init"}},
+			}},
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.pod.IsIstioInjected(); got != tc.want {
+				t.Errorf("IsIstioInjected() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

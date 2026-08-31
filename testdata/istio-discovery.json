@@ -1,0 +1,14 @@
+{
+  "kind": "APIResourceList",
+  "apiVersion": "v1",
+  "groupVersion": "security.istio.io/v1",
+  "resources": [
+    {
+      "name": "peerauthentications",
+      "singularName": "peerauthentication",
+      "namespaced": true,
+      "kind": "PeerAuthentication",
+      "verbs": ["delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"]
+    }
+  ]
+}

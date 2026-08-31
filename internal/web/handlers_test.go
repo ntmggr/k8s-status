@@ -149,9 +149,10 @@ func TestAPISuccessShape(t *testing.T) {
 	if resp.Summary.Total != 14 || resp.Summary.Degraded != 2 || resp.Summary.Warning != 1 || resp.Summary.Drift != 1 || resp.Summary.Prune != 2 {
 		t.Errorf("summary = %+v", resp.Summary)
 	}
-	// 6 OK out of (14 total - 2 prune - 1 suspended) = 11 counted, rounds to 55%.
-	if !resp.Summary.Health.Known || resp.Summary.Health.Percent != 55 {
-		t.Errorf("summary.health = %+v, want known=true percent=55", resp.Summary.Health)
+	// 6 OK + 1 Progressing (counts as healthy) out of (14 total - 2 prune -
+	// 1 suspended) = 11 counted: 7/11 rounds to 64%.
+	if !resp.Summary.Health.Known || resp.Summary.Health.Percent != 64 {
+		t.Errorf("summary.health = %+v, want known=true percent=64", resp.Summary.Health)
 	}
 	if len(resp.Services) != 14 {
 		t.Fatalf("services = %d, want 14", len(resp.Services))
@@ -370,6 +371,46 @@ type stubNodeLister struct {
 func (s *stubNodeLister) ListNodes(context.Context) (*kube.NodeList, error) {
 	s.called++
 	return s.list, s.err
+}
+
+// meshProvider drives the whole chain: a real Collector with a fake mesh client, so
+// the wiring, not just the template, is under test.
+func meshProvider(t *testing.T, mesh status.MeshLister) Provider {
+	t.Helper()
+	raw, err := os.ReadFile("../../testdata/applications.json")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	var list argocd.ApplicationList
+	if err := json.Unmarshal(raw, &list); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	c := status.NewCollector(staticLister{list: &list}, status.Options{RootAppName: "root-app"}, time.Minute)
+	if mesh != nil {
+		c.WithMesh(mesh, "istio-system")
+	}
+	return c
+}
+
+type stubMeshLister struct {
+	groupVersion string
+	detectErr    error
+	pa           *kube.PeerAuthentication
+	policyErr    error
+	list         *kube.PeerAuthenticationList
+	listErr      error
+}
+
+func (s *stubMeshLister) DetectIstio(context.Context) (string, error) {
+	return s.groupVersion, s.detectErr
+}
+
+func (s *stubMeshLister) MeshPolicy(context.Context, string, string) (*kube.PeerAuthentication, error) {
+	return s.pa, s.policyErr
+}
+
+func (s *stubMeshLister) ListPeerAuthentications(context.Context, string) (*kube.PeerAuthenticationList, error) {
+	return s.list, s.listErr
 }
 
 // unmanagedProvider drives the whole chain: a real Collector with a fake workloads
@@ -707,6 +748,39 @@ func TestAPINodesObject(t *testing.T) {
 	}
 	if resp.Nodes.Error != "" {
 		t.Errorf("error = %q, want empty", resp.Nodes.Error)
+	}
+}
+
+func TestAPIMeshObjectOmittedWhenDisabled(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, meshProvider(t, nil))
+
+	body := get(t, h, "/k8s-status/api/status").Body.String()
+	if strings.Contains(body, `"mesh"`) {
+		t.Errorf("mesh object should be omitted when the feature is off: %s", body)
+	}
+}
+
+func TestAPIMeshObjectPresentWhenEnabled(t *testing.T) {
+	mesh := &stubMeshLister{
+		groupVersion: kube.IstioSecurityGroupVersion,
+		pa:           &kube.PeerAuthentication{Spec: kube.PeerAuthenticationSpec{MTLS: kube.PeerAuthenticationMTLS{Mode: "STRICT"}}},
+	}
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, meshProvider(t, mesh))
+
+	var resp struct {
+		Mesh *struct {
+			Installed bool   `json:"installed"`
+			Effective string `json:"effective"`
+		} `json:"mesh"`
+	}
+	if err := json.Unmarshal(get(t, h, "/k8s-status/api/status").Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Mesh == nil {
+		t.Fatal("want a mesh object")
+	}
+	if !resp.Mesh.Installed || resp.Mesh.Effective != "strict" {
+		t.Errorf("mesh = %+v", *resp.Mesh)
 	}
 }
 

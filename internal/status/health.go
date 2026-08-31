@@ -15,7 +15,10 @@ type Health struct {
 	Known bool
 	// Counted is Total minus the rows deliberately excluded from the percentage.
 	Counted int
-	OK      int
+	// OK is the numerator: genuinely OK, plus Progressing. A rollout in flight needs
+	// no action -- see the reference table in the legend -- so it counts as healthy
+	// the same way OK does.
+	OK int
 	// Excluded is Prune plus Suspended: a cleanup backlog and a deliberate pause are
 	// not health problems, so neither counts for or against the percentage.
 	Excluded int
@@ -24,13 +27,15 @@ type Health struct {
 	Attention int
 }
 
-// Health folds the summary into one percentage. Progressing and Drift count as not-OK
-// in the numerator on purpose: only OK is OK, so the gauge dips honestly while a
-// rollout is underway instead of hiding it behind a generous definition of healthy.
+// Health folds the summary into one percentage. Drift counts as not-OK on purpose:
+// unlike a rollout it does not resolve on its own, so a drifted config still counts
+// against the percentage until someone reconciles it. Progressing does not: a rollout
+// in flight needs no action, so it counts as healthy rather than dragging the gauge
+// down for something that will resolve on its own.
 func (s Summary) Health() Health {
 	h := Health{
 		Counted:   s.Total - s.Prune - s.Suspended,
-		OK:        s.OK,
+		OK:        s.OK + s.Progressing,
 		Excluded:  s.Prune + s.Suspended,
 		Attention: s.Degraded + s.Warning,
 	}
