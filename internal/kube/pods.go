@@ -18,11 +18,17 @@ const runningPodsPath = "/api/v1/pods?fieldSelector=status.phase%3DRunning"
 
 const (
 	// runningPodsPageLimit bounds one page's response size well under maxBodyBytes.
-	runningPodsPageLimit = 500
+	// Was 500: a live 143-node enterprise cluster reached through kubectl proxy
+	// reported "decode pod list: unexpected EOF" on this read, unaffected by
+	// tripling RequestTimeout, which points at a single page's response being the
+	// problem rather than how long it takes to arrive. 200 keeps runningPodsMaxPages
+	// * runningPodsPageLimit (the largest cluster this can describe) the same by
+	// scaling both together, while cutting what any one request has to carry.
+	runningPodsPageLimit = 200
 	// runningPodsMaxPages caps a single ListRunningPods call at 20,000 pods. A cluster
 	// past that needs a narrower question than "every running pod", and ErrPodListTooLarge
 	// says so rather than silently returning a truncated answer.
-	runningPodsMaxPages = 40
+	runningPodsMaxPages = 100
 )
 
 // ErrPodListTooLarge is returned by ListRunningPods when the page cap is hit before the

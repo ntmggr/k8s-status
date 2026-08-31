@@ -520,11 +520,11 @@ they counted only the filtered rows, clicking `DEGRADED` would make every other 
 ```console
 $ curl -s http://localhost:8080/k8s-status/api/versions | jq '.services[0]'
 {
-  "name": "alerting-api",
-  "appVersion": "1.0.0-dev-3cdb4337",
+  "name": "accounts-api",
+  "appVersion": "2.4.1",
   "chartVersion": "develop",
-  "revision": "c335d820...",
-  "image": "registry.example.com/alerting-api:1.0.0-dev-3cdb4337",
+  "revision": "3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb",
+  "image": "registry.example.invalid/platform/accounts-api:2.4.1",
   "source": "argocd",
   "state": "OK"
 }
@@ -542,9 +542,9 @@ Just the name and version of every service, one line each:
 
 ```console
 $ curl -s http://localhost:8080/k8s-status/api/versions | jq -r '.services[] | "\(.name) \(.appVersion)"'
-alerting-api 1.0.0-dev-3cdb4337
-billing-api 2.4.1
-console-api develop-9f1a2c3
+accounts-api 2.4.1
+admin-ui 1.15.0
+media-encoder 5.2.0
 ...
 ```
 

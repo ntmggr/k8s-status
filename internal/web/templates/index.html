@@ -578,18 +578,18 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
 .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; }
 /* A fixed label rail down the left, so every band starts on the same column. */
 .views, .capacity { display: flex; align-items: baseline; gap: .8rem; flex-wrap: nowrap; }
-.views-lab, .capacity > .cap-head {
-  flex: none; width: 5rem; margin: 0; padding-top: .12rem;
-}
-/* 12rem forced this sentence to wrap mid-phrase ("...not the / services above").
-   max-width would seem safer than a bare width, but .cap-head itself is pinned to
-   a 5rem rail (below) and this text is deliberately meant to overflow past it into
-   the row -- max-width: 100% caps it at 100% of that 5rem parent instead, which is
-   the opposite of what's needed here. inline-block (not block) keeps it sitting on
-   the same line as "Cluster" rather than wrapping onto its own line below it --
-   inline-level content overflows a narrower parent's width without wrapping or
-   clipping, so the 5rem rail and the 20rem label coexist fine. */
-.capacity > .cap-head .cap-sub { display: inline-block; width: 20rem; }
+.views-lab { flex: none; width: 5rem; margin: 0; padding-top: .12rem; }
+/* Not the 5rem rail views-lab uses: cap-head carries a whole sentence (.cap-sub),
+   and pinning it to 5rem while relying on inline-block overflow to keep the
+   sentence visually on the same line as "Cluster" turned out to depend on how much
+   room .cap-row's own content left on that line -- fine with a small cluster, but a
+   wide one (many nodes/zones/arches) left no room, so the whole cap-head (label
+   and sentence together) wrapped down, or the sentence wrapped alone, depending on
+   exactly how much room was left. flex-basis 100% sidesteps the question instead of
+   fine-tuning widths further: "Cluster the machines underneath..." always gets its
+   own full-width line regardless of how long .cap-row's content is, and the row
+   below it always starts fresh under that, deterministically either way. */
+.capacity > .cap-head { flex: 1 1 100%; margin: 0; }
 .capacity { flex-wrap: wrap; }
 /* Filters, Cluster and the legend get their own bordered card back, undoing the
    flat hairline-band treatment above for these: they read as distinct panels, not

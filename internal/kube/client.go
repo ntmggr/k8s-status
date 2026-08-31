@@ -21,16 +21,18 @@ const (
 	DefaultTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	DefaultCAPath    = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
-	// 10s used to be tight enough that a single page of ListRunningPods' paginated
-	// read (500 pods, each carrying labels/ownerReferences/container statuses) could
-	// outlive it on a real cluster reached through kubectl proxy: the client's own
-	// Timeout firing mid-read closes the connection, and json.Decoder surfaces that
-	// as "unexpected EOF" rather than a clear timeout, which is what a live 143-node
-	// cluster actually produced. 30s gives real, possibly proxied clusters headroom
-	// without changing anything for the common case, where every read still returns
-	// in milliseconds regardless of the ceiling.
+	// 30s (was 10s): headroom for a real cluster reached through kubectl proxy,
+	// where a single page can plausibly take longer than the common in-cluster case.
+	// A live 143-node cluster reported "decode pod list: unexpected EOF" on
+	// ListRunningPods; this alone did not fix it (see runningPodsPageLimit's own
+	// comment for the change that was actually needed), but there is no reason for
+	// this ceiling to stay this tight either.
 	RequestTimeout = 30 * time.Second
-	maxBodyBytes   = 16 << 20
+	// 64 MiB (was 16 MiB): a defensive margin now that runningPodsPageLimit is
+	// smaller. Not itself confirmed as the cause of the EOF above -- a page of 500
+	// ordinary pods measured well under the old 16 MiB in testing -- but cheap
+	// insurance against whichever cluster does carry unusually large pod metadata.
+	maxBodyBytes = 64 << 20
 )
 
 // Client talks to one API server. BaseURL, TokenPath and HTTPClient are exported so
