@@ -226,6 +226,33 @@ func TestPageRenders(t *testing.T) {
 	}
 }
 
+// The chart version is a Helm/Kubernetes-level fact (which chart install this is),
+// distinct from BuildVersion (which code is actually running) -- worth mentioning
+// only when it is actually known, i.e. installed via the chart at all.
+func TestFooterMentionsChartVersionWhenSet(t *testing.T) {
+	h := newTestServer(t, Config{
+		BasePath:     "/k8s-status",
+		BuildVersion: "0.16.1",
+		ChartVersion: "0.16.1",
+	}, fakeProvider{snap: fixtureSnapshot(t)})
+	body := get(t, h, "/k8s-status/").Body.String()
+	if !strings.Contains(body, "chart 0.16.1") {
+		t.Error("footer should mention the chart version when set")
+	}
+}
+
+func TestFooterOmitsChartVersionWhenUnset(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status", BuildVersion: "dev"}, fakeProvider{snap: fixtureSnapshot(t)})
+	body := get(t, h, "/k8s-status/").Body.String()
+	// Not a bare "chart" search: the main table's own chart-version tooltip says
+	// "chart <rev>" for every row regardless of this field, which would make this
+	// assertion pass or fail for the wrong reason. The footer's own separator
+	// (&middot; chart) is the one thing that should never appear when unset.
+	if strings.Contains(body, "&middot; chart") {
+		t.Error("footer should not mention a chart version that was never set (e.g. a local run)")
+	}
+}
+
 func TestPageWithoutArgoCDUIHasNoServiceLinks(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fixtureSnapshot(t)})
 	body := get(t, h, "/k8s-status/").Body.String()

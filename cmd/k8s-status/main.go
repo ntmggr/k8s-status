@@ -26,6 +26,10 @@ func main() {
 	envName := env("ENV_NAME", "unknown")
 	envType := env("ENV_TYPE", "")
 	clusterName := env("CLUSTER_NAME", "")
+	// Only set by the Helm chart (CHART_VERSION, stamped from .Chart.Version). Empty
+	// for a local run or a plain docker run, so the footer only mentions it when it
+	// is actually meaningful.
+	chartVersion := env("CHART_VERSION", "")
 	region := env("REGION", "")
 	basePath := web.NormalizeBasePath(env("BASE_PATH", "/k8s-status"))
 	sources, auto := parseSources(env("SOURCES", string(status.SourceArgoCD)))
@@ -152,6 +156,7 @@ func main() {
 		ArgoCDUIBase:   argocdUI,
 		RefreshSeconds: refresh,
 		BuildVersion:   version,
+		ChartVersion:   chartVersion,
 	}, collector)
 	if err != nil {
 		log.Fatalf("build server: %v", err)
