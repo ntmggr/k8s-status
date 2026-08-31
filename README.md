@@ -789,10 +789,11 @@ Each row shows:
 
 | Column | Where it comes from |
 |---|---|
-| Namespace, kind, name | `metadata` |
+| Service, namespace, kind | `metadata` |
 | Installed by | The `app.kubernetes.io/managed-by` label. Observed values are `Helm`, `EKS` and `terraform`. Empty shows as `unknown` |
+| App version | The `app.kubernetes.io/version` label when the workload is part of a Helm release, otherwise the tag of the first container's image |
+| Chart version | The version suffix of the `helm.sh/chart` label (e.g. `1.14.4` from `cert-manager-1.14.4`). Empty when the workload is not Helm-managed or carries no chart label |
 | Ready / desired | `status.readyReplicas` / `status.replicas` for Deployment and StatefulSet; `status.numberReady` / `status.desiredNumberScheduled` for DaemonSet. A missing field counts as 0 |
-| Version | The tag of the first container's image |
 | Status | `OK` when ready equals desired and desired is above 0; `DEGRADED` when ready is below desired; `SUSPENDED` when desired is 0 |
 
 `SUSPENDED` for a 0/0 workload is not a fudge. A Windows DaemonSet on a cluster with no
@@ -813,6 +814,15 @@ not remove that check to simplify the code, the list becomes unreadable.
 
 The count also appears in the cluster capacity section, not in the status tiles, for the
 same arithmetic reason as GPU.
+
+When `AZ_SPREAD` is also on, these workloads' zone/node spread folds into the HA gauges
+(Zones/Nodes) the same way a tracked service's would: a zone or node failing affects them
+identically, so excluding them would understate real blast radius. Their Istio sidecar
+injection and effective policy, when `MESH_MTLS` is also on, do **not** fold into the
+Istio gauges the same way -- those percentages describe GitOps-tracked services
+specifically. Instead, each row still gets its own "not in mesh" / policy-override badge,
+and the Istio panel shows a one-line note summarising how many not-in-gitops workloads
+were checked and how many of them are in mesh or permissive.
 
 ### Mesh mTLS
 
