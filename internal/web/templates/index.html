@@ -861,7 +861,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </head>
 <body>
 <header>
-  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
+  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}<span class="badge" title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">v{{.BuildVersion}}</span>{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
