@@ -463,8 +463,8 @@ func icon(name string) template.HTML {
 		body = `<path d="M8 2 2.5 4v3.8c0 3.6 2.3 6.2 5.5 6.7 3.2-.5 5.5-3.1 5.5-6.7V4L8 2Z"/>`
 	case "laptop": // screen + base, for a local run outside the cluster
 		body = `<rect x="2" y="2.5" width="12" height="8" rx="1"/><path d="M1 13.5h14l-1.2-2.3H2.2L1 13.5Z"/>`
-	case "cluster": // hub-and-spoke wheel, echoing Kubernetes' own mark, for a real cluster
-		body = `<circle cx="8" cy="8" r="1.6"/><circle cx="8" cy="2.3" r="1.1"/><circle cx="13.2" cy="5.2" r="1.1"/><circle cx="13.2" cy="10.8" r="1.1"/><circle cx="8" cy="13.7" r="1.1"/><circle cx="2.8" cy="10.8" r="1.1"/><circle cx="2.8" cy="5.2" r="1.1"/><path d="M8 3.4V6.6M12.2 5.8l-2.8 1.6M12.2 10.2l-2.8-1.6M8 12.6V9.4M3.8 10.2l2.8-1.6M3.8 5.8l2.8 1.6"/>`
+	case "cluster": // a ship's helm wheel (seven spokes), Kubernetes' own mark, for a real cluster
+		body = `<circle cx="8" cy="8" r="4.6"/><circle cx="8" cy="8" r="1.3"/><path d="M8 6.7V1.7M9.02 7.19l3.91-3.12M9.27 8.29l4.87 1.11M8.56 9.17l2.17 4.51M7.44 9.17l-2.17 4.51M6.73 8.29l-4.87 1.11M6.98 7.19 3.07 4.07"/>`
 	default:
 		return ""
 	}

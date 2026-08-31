@@ -6,6 +6,11 @@
 
 **Rate your cluster: health and HA, at a glance.**
 
+- Want a list of every service and its version, deployed? Done.
+- Are your services fully HA? One glance.
+- Do you have strict mTLS enforced, cluster-wide? Same glance.
+- Are your services actually healthy? Done.
+
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
@@ -515,11 +520,11 @@ they counted only the filtered rows, clicking `DEGRADED` would make every other 
 ```console
 $ curl -s http://localhost:8080/k8s-status/api/versions | jq '.services[0]'
 {
-  "name": "alerting-api",
-  "appVersion": "1.0.0-dev-3cdb4337",
+  "name": "accounts-api",
+  "appVersion": "2.4.1",
   "chartVersion": "develop",
-  "revision": "c335d820...",
-  "image": "registry.example.com/alerting-api:1.0.0-dev-3cdb4337",
+  "revision": "3c9646b1f0aa27de4b55c8e910d3f7a204ce18bb",
+  "image": "registry.example.invalid/platform/accounts-api:2.4.1",
   "source": "argocd",
   "state": "OK"
 }
@@ -532,6 +537,16 @@ things and the endpoint reports both.
 It takes the same filters as the page, so `?status=DEGRADED` or `?gpu=true` narrows it.
 `/api/status` returns the same facts plus health, counts and components, if you want
 everything in one call.
+
+Just the name and version of every service, one line each:
+
+```console
+$ curl -s http://localhost:8080/k8s-status/api/versions | jq -r '.services[] | "\(.name) \(.appVersion)"'
+accounts-api 2.4.1
+admin-ui 1.15.0
+media-encoder 5.2.0
+...
+```
 
 ## Settings
 
@@ -974,7 +989,7 @@ The client is built from the standard service account mount:
 - **CA**, read once from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` into an
   `x509.CertPool` used as `tls.Config.RootCAs`.
 - **URL**, `https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT`.
-- One shared `http.Client`, 10 second request timeout, response bodies capped at 16 MiB.
+- One shared `http.Client`, 30 second request timeout, response bodies capped at 16 MiB.
 
 Endpoints read, and what each needs:
 
