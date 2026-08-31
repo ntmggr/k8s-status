@@ -85,6 +85,7 @@ type pageData struct {
 	ArgoCDUIBase   string
 	RefreshSeconds int
 	BuildVersion   string
+	ChartVersion   string
 
 	Snapshot *status.Snapshot
 	// MultiSource is true when more than one GitOps controller is enabled. The Source
@@ -343,6 +344,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		ArgoCDUIBase:   strings.TrimRight(s.cfg.ArgoCDUIBase, "/"),
 		RefreshSeconds: refreshSeconds(query, s.cfg.RefreshSeconds),
 		BuildVersion:   s.cfg.BuildVersion,
+		ChartVersion:   s.cfg.ChartVersion,
 		Snapshot:       snap,
 		Filter:         ParseFilter(query),
 		LocalMode:      s.cfg.LocalMode,

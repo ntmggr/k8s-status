@@ -26,3 +26,4 @@ data:
   MESH_NAMESPACE: {{ .Values.rbac.istioNamespace | quote }}
   AZ_SPREAD: {{ .Values.config.azSpread | quote }}
   PORT: {{ .Values.config.port | quote }}
+  CHART_VERSION: {{ .Chart.Version | quote }}

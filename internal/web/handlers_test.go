@@ -215,7 +215,7 @@ func TestPageRenders(t *testing.T) {
 		"s-degraded", "s-warning", "s-drift", "s-prune",
 		"media-encoder", "0/2 replicas available",
 		`href="https://argocd.example.invalid/applications/accounts-api"`,
-		"437a162", "k8s-status 0.1.0",
+		"437a162", "v0.1.0",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page missing %q", want)
@@ -223,6 +223,33 @@ func TestPageRenders(t *testing.T) {
 	}
 	if strings.Contains(body, "<script") {
 		t.Error("page must not contain JavaScript")
+	}
+}
+
+// The chart version is a Helm/Kubernetes-level fact (which chart install this is),
+// distinct from BuildVersion (which code is actually running) -- worth mentioning
+// only when it is actually known, i.e. installed via the chart at all.
+func TestFooterMentionsChartVersionWhenSet(t *testing.T) {
+	h := newTestServer(t, Config{
+		BasePath:     "/k8s-status",
+		BuildVersion: "0.16.1",
+		ChartVersion: "0.16.1",
+	}, fakeProvider{snap: fixtureSnapshot(t)})
+	body := get(t, h, "/k8s-status/").Body.String()
+	if !strings.Contains(body, "chart 0.16.1") {
+		t.Error("footer should mention the chart version when set")
+	}
+}
+
+func TestFooterOmitsChartVersionWhenUnset(t *testing.T) {
+	h := newTestServer(t, Config{BasePath: "/k8s-status", BuildVersion: "dev"}, fakeProvider{snap: fixtureSnapshot(t)})
+	body := get(t, h, "/k8s-status/").Body.String()
+	// Not a bare "chart" search: the main table's own chart-version tooltip says
+	// "chart <rev>" for every row regardless of this field, which would make this
+	// assertion pass or fail for the wrong reason. The footer's own separator
+	// (&middot; chart) is the one thing that should never appear when unset.
+	if strings.Contains(body, "&middot; chart") {
+		t.Error("footer should not mention a chart version that was never set (e.g. a local run)")
 	}
 }
 

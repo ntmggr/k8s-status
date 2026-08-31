@@ -25,6 +25,13 @@ type Config struct {
 	ArgoCDUIBase   string
 	RefreshSeconds int
 	BuildVersion   string
+	// ChartVersion is set only when installed via the Helm chart (CHART_VERSION,
+	// stamped from .Chart.Version -- always equal to BuildVersion for a k8s-status
+	// release proper, since release.yml fails the release otherwise, but they can
+	// legitimately diverge for a chart pinned separately from a custom image build).
+	// Empty for a local run or a plain `docker run`, so the footer only mentions it
+	// when it is actually meaningful.
+	ChartVersion string
 }
 
 type Provider interface {

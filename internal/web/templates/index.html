@@ -12,8 +12,9 @@
   --pad-x: 1.75rem;
   --pad-top: 1.5rem;
   /* Height of the sticky page header, used by the header itself to size/position
-     against. Table headers used to stick at this same offset too, until that
-     turned out to silently collapse table rows -- see the note by thead th. */
+     against. Table headers now stick too, but relative to their own scrolling
+     card, not this offset -- see the note by thead th for why that distinction
+     matters (it once caused a real bug when it didn't hold). */
   --hdr-h: 2.85rem;
   --plane:      #f9f9f7;
   --surface:    #fcfcfb;
@@ -52,7 +53,9 @@
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; padding: var(--pad-top) var(--pad-x) 3rem;
+  /* Bottom padding clears the now-fixed footer (see below) so the last bit of
+     real content never sits behind it. */
+  margin: 0; padding: var(--pad-top) var(--pad-x) 3.5rem;
   background: var(--plane); color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; line-height: 1.45;
@@ -397,13 +400,9 @@ thead th:first-child { border-top-left-radius: 10px; }
 thead th:last-child  { border-top-right-radius: 10px; }
 tbody:last-of-type tr:last-child td:first-child { border-bottom-left-radius: 10px; }
 tbody:last-of-type tr:last-child td:last-child  { border-bottom-right-radius: 10px; }
-/* Not position: sticky -- with this table's own layout it silently collapsed
-   whichever row happened to sit first in a tbody to zero height (confirmed by
-   removing sticky alone fixing it, and moving it to <thead> instead of each <th>
-   not fixing it): rows counted in "showing N of M" but not rendered at all. A
-   dashboard where filtered rows can silently vanish is worse than one whose table
-   header scrolls off screen, so this stays static rather than chasing the exact
-   layout trigger further. */
+/* This base rule doesn't set position -- sticky is added later, scoped to the
+   card's own scroll container, not here. See the thead th override further down
+   for why sticky is now safe (it wasn't, once, in a different layout). */
 thead th {
   background: var(--surface);
   text-align: left; font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
@@ -490,7 +489,17 @@ table.components td.k { color: var(--muted); }
            color: var(--muted); font-size: .62rem; font-weight: 600; white-space: nowrap; }
 .by.is-unknown { color: var(--muted); }
 
-footer { margin-top: 1.6rem; color: var(--muted); font-size: .72rem; }
+/* Fixed like header, not part of the scrolling page: the build-version/cluster
+   line is the one thing worth being able to check without scrolling all the way
+   down, especially now that the Services/not-in-gitops tables scroll internally
+   (below) and no longer force the page itself to grow past a screenful. */
+footer {
+  display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--plane); border-top: 1px solid var(--hair);
+  padding: .5rem var(--pad-x); margin: 0;
+  color: var(--muted); font-size: .72rem;
+}
 @media (max-width: 720px) {
   :root { --pad-x: 1rem; --pad-top: 1rem; --hdr-h: 4.5rem; }
   .hide-sm { display: none; }
@@ -793,9 +802,23 @@ a.cap-part:hover { text-decoration: underline; }
 }
 
 /* Table: 10px mono headers, hairline rows, a 3px state rule, no wash. */
-.card { overflow: hidden; margin-top: 1rem; }
+/* Bounded and internally scrollable -- a cluster with hundreds of services or a
+   long not-in-gitops list used to just grow the whole page instead. overflow-x
+   stays hidden so the card's own rounded corners still clip the table's square
+   ones; overflow-y is the one that actually scrolls. */
+.card { overflow-x: hidden; overflow-y: auto; max-height: 28rem; margin-top: 1rem; position: relative; }
+/* Sticky here is safe, unlike the page-level attempt this project tried once
+   before (see the base thead th rule above): that collapsed rows because the
+   table scrolled with the whole page while sticking to an offset borrowed from
+   the page's own sticky header, two independent sticky contexts fighting over
+   the same element. Here the table's scrolling ancestor is .card itself, a
+   single ordinary overflow:auto box, the textbook case position: sticky is
+   built for -- confirmed row-safe in isolation before landing this. --surface
+   would blend into the body rows it sits above; --plane (a step greyer, same
+   tone the page itself uses) is what actually reads as a header band. */
 thead th {
-  background: var(--surface); padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
+  position: sticky; top: 0; z-index: 5;
+  background: var(--plane); padding: .55rem .8rem; border-bottom: 1px solid var(--hair);
 }
 thead th:first-child, thead th:last-child,
 tbody:last-of-type tr:last-child td:first-child,
@@ -861,7 +884,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </head>
 <body>
 <header>
-  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}<span class="badge" title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">v{{.BuildVersion}}</span>{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
+  <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
     {{- else if .EnvType}}<span class="badge is-envtype" title="Environment type, from the EnvType label on the GitOps root application">{{.EnvType}}</span>{{end}}
     {{- if .Region}}<span class="region">{{.Region}}</span>{{end}}</h1>
@@ -1342,6 +1365,6 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
 
 
-<footer>k8s-status {{.BuildVersion}}{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</footer>
+<footer><span>k8s-status{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</span><span title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">v{{.BuildVersion}}{{if .ChartVersion}} &middot; chart {{.ChartVersion}}{{end}}</span></footer>
 </body>
 </html>
