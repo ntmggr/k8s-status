@@ -538,6 +538,16 @@ It takes the same filters as the page, so `?status=DEGRADED` or `?gpu=true` narr
 `/api/status` returns the same facts plus health, counts and components, if you want
 everything in one call.
 
+Just the name and version of every service, one line each:
+
+```console
+$ curl -s http://localhost:8080/k8s-status/api/versions | jq -r '.services[] | "\(.name) \(.appVersion)"'
+alerting-api 1.0.0-dev-3cdb4337
+billing-api 2.4.1
+console-api develop-9f1a2c3
+...
+```
+
 ## Settings
 
 Everything is read from environment variables at startup. Every one has a default, so you
@@ -979,7 +989,7 @@ The client is built from the standard service account mount:
 - **CA**, read once from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` into an
   `x509.CertPool` used as `tls.Config.RootCAs`.
 - **URL**, `https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT`.
-- One shared `http.Client`, 10 second request timeout, response bodies capped at 16 MiB.
+- One shared `http.Client`, 30 second request timeout, response bodies capped at 16 MiB.
 
 Endpoints read, and what each needs:
 
