@@ -239,6 +239,11 @@ install behaves exactly as it always has and never calls a Flux API.
 | `argocd,flux` | Both, in one table |
 | `auto` | Whichever of the two the cluster actually serves |
 
+To see the Flux path without a cluster: `SOURCES=flux ./scripts/local-test.sh fixture`
+serves `testdata/helmreleases.json` and `testdata/kustomizations.json` instead of
+ArgoCD's fixture, same as `SOURCES=flux ./scripts/local-test.sh cluster <context>` does
+against a real one.
+
 Rules:
 
 - **A source that is not listed is never called.** No request is made to its API at all,

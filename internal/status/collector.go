@@ -89,6 +89,10 @@ type Collector struct {
 	unmanaged    *Unmanaged
 	unmanagedAt  time.Time
 	workloadList *kube.WorkloadList
+	// fluxList is the most recent Flux read, kept so fetchWorkloads can tell a
+	// Flux-managed Helm release apart from an unmanaged one. Set alongside snap.Flux,
+	// so it is nil exactly when Flux is disabled or has not been read yet.
+	fluxList *kube.FluxList
 
 	meshSection *MeshSection
 	meshAt      time.Time
@@ -205,6 +209,12 @@ func (c *Collector) Get(ctx context.Context) (*Snapshot, error) {
 	if c.flux != nil {
 		fl, ferr := c.flux.ListFlux(ctx)
 		snap.AppendFlux(fl, ferr, c.opts)
+		// Keep the last good read on failure, same as the other optional sources: a
+		// transient Flux error must not make every Flux-managed release flash into
+		// the unmanaged list until the next successful read.
+		if ferr == nil {
+			c.fluxList = fl
+		}
 	}
 	snap.CheckedAt = c.now()
 	c.snap = &snap
@@ -313,7 +323,7 @@ func (c *Collector) fetchWorkloads(ctx context.Context) {
 	if abandoned(err) {
 		return
 	}
-	u := BuildUnmanaged(list, c.opts)
+	u := BuildUnmanaged(list, c.opts, fluxReleaseKeys(c.fluxList))
 	if err != nil {
 		u = unmanagedError(u, err)
 	}
@@ -441,5 +451,5 @@ func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
 		return
 	}
 	snap.ZoneRead = c.zoneRead
-	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace, c.peerAuths)
+	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace, c.peerAuths, fluxReleaseKeys(c.fluxList))
 }

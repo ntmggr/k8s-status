@@ -731,6 +731,68 @@
     "replicas": 2,
     "readyReplicas": 2
    }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "orders-api",
+    "namespace": "sample-apps",
+    "labels": {
+     "app.kubernetes.io/managed-by": "Helm",
+     "app.kubernetes.io/instance": "orders-api",
+     "app.kubernetes.io/version": "6.5.4"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "orders-api",
+        "image": "example/orders-api:6.5.4",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
+  },
+  {
+   "kind": "Deployment",
+   "apiVersion": "apps/v1",
+   "metadata": {
+    "name": "network-policy-controller",
+    "namespace": "kube-system",
+    "labels": {
+     "kustomize.toolkit.fluxcd.io/name": "platform-config",
+     "kustomize.toolkit.fluxcd.io/namespace": "sample-apps",
+     "app.kubernetes.io/version": "1.2.0"
+    }
+   },
+   "spec": {
+    "replicas": 1,
+    "template": {
+     "spec": {
+      "containers": [
+       {
+        "name": "network-policy-controller",
+        "image": "example/network-policy-controller:1.2.0",
+        "resources": {}
+       }
+      ]
+     }
+    }
+   },
+   "status": {
+    "replicas": 1,
+    "readyReplicas": 1
+   }
   }
  ]
 }

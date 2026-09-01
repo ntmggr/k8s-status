@@ -34,6 +34,29 @@ func names(u Unmanaged) []string {
 	return out
 }
 
+// Reproduces the reported bug end to end, through BuildUnmanaged rather than
+// isUnmanaged directly: a Flux-managed HelmRelease's own workload must land in the
+// service table via Flux, not in this list labeled as a plain Helm install.
+func TestBuildUnmanagedExcludesFluxManagedHelmRelease(t *testing.T) {
+	list := &kube.WorkloadList{Items: []kube.Workload{
+		dep("plain-helm", "ns", func(w *kube.Workload) {
+			w.Metadata.Labels[labelInstance] = "plain-helm"
+			w.Metadata.Labels[labelManagedBy] = "Helm"
+		}),
+		dep("podinfo", "apps", func(w *kube.Workload) {
+			w.Metadata.Labels[labelInstance] = "podinfo"
+			w.Metadata.Labels[labelManagedBy] = "Helm"
+		}),
+	}}
+	fluxReleases := map[string]struct{}{"apps/podinfo": {}}
+
+	got := BuildUnmanaged(list, Options{}, fluxReleases)
+
+	if names := names(got); len(names) != 1 || names[0] != "plain-helm" {
+		t.Fatalf("items = %v, want only [plain-helm]: podinfo is Flux-managed", names)
+	}
+}
+
 // Each ArgoCD ownership marker on its own must be enough to keep a workload out of the
 // list, and so must an ownerReference.
 func TestUnmanagedDetectionRule(t *testing.T) {
@@ -53,7 +76,7 @@ func TestUnmanagedDetectionRule(t *testing.T) {
 		}),
 	}}
 
-	got := BuildUnmanaged(list, Options{})
+	got := BuildUnmanaged(list, Options{}, nil)
 
 	if got.Scanned != 5 {
 		t.Errorf("scanned = %d, want 5", got.Scanned)
@@ -73,7 +96,7 @@ func TestOwnerReferencesSuppressOperatorChurn(t *testing.T) {
 		}))
 	}
 
-	got := BuildUnmanaged(&kube.WorkloadList{Items: items}, Options{})
+	got := BuildUnmanaged(&kube.WorkloadList{Items: items}, Options{}, nil)
 
 	if got.Count != 1 {
 		t.Errorf("count = %d, want 1: owned workloads must be excluded", got.Count)
@@ -96,7 +119,7 @@ func TestReadinessPerKind(t *testing.T) {
 			Status: kube.WorkloadStatus{Replicas: 9, ReadyReplicas: 9}},
 	}}
 
-	got := BuildUnmanaged(list, Options{})
+	got := BuildUnmanaged(list, Options{}, nil)
 
 	want := map[string][2]int{
 		"d":            {2, 2},
@@ -143,7 +166,7 @@ func TestUnmanagedNamespaceIgnoreGlobs(t *testing.T) {
 		dep("d", "mcp-server", nil),
 	}}
 
-	got := BuildUnmanaged(list, Options{UnmanagedIgnoreNS: []string{"kube-*", "istio-system"}})
+	got := BuildUnmanaged(list, Options{UnmanagedIgnoreNS: []string{"kube-*", "istio-system"}}, nil)
 
 	if got.Count != 2 {
 		t.Fatalf("items = %v, want 2", names(got))
@@ -173,7 +196,7 @@ func TestUnmanagedManagedByAndVersion(t *testing.T) {
 		dep("no-containers", "ns", nil),
 	}}
 
-	got := BuildUnmanaged(list, Options{})
+	got := BuildUnmanaged(list, Options{}, nil)
 	by := map[string]Workload{}
 	for _, w := range got.Items {
 		by[w.Name] = w
@@ -200,7 +223,7 @@ func TestUnmanagedSortedWorstFirstThenNamespaceThenName(t *testing.T) {
 		dep("bad", "zzz", func(w *kube.Workload) { w.Status = kube.WorkloadStatus{Replicas: 2} }),
 	}}
 
-	got := names(BuildUnmanaged(list, Options{}))
+	got := names(BuildUnmanaged(list, Options{}, nil))
 
 	// Same severity order the service table uses: DEGRADED, then SUSPENDED, then OK.
 	want := []string{"bad", "susp", "b-ok", "z-ok", "a-ok"}
@@ -215,10 +238,10 @@ func TestUnmanagedSortedWorstFirstThenNamespaceThenName(t *testing.T) {
 }
 
 func TestBuildUnmanagedNilAndEmpty(t *testing.T) {
-	if got := BuildUnmanaged(nil, Options{}); got.Count != 0 || len(got.Items) != 0 {
+	if got := BuildUnmanaged(nil, Options{}, nil); got.Count != 0 || len(got.Items) != 0 {
 		t.Errorf("nil list = %+v", got)
 	}
-	if got := BuildUnmanaged(&kube.WorkloadList{}, Options{}); got.Count != 0 || got.Scanned != 0 {
+	if got := BuildUnmanaged(&kube.WorkloadList{}, Options{}, nil); got.Count != 0 || got.Scanned != 0 {
 		t.Errorf("empty list = %+v", got)
 	}
 }
@@ -350,7 +373,7 @@ func TestHelmReleaseIsNotMistakenForArgoCD(t *testing.T) {
 		"app.kubernetes.io/instance":   "istiod",
 		"app.kubernetes.io/managed-by": "Helm",
 	}
-	if !isUnmanaged(helm) {
+	if !isUnmanaged(helm, nil) {
 		t.Error("a Helm release with no ArgoCD marker must be reported as unmanaged")
 	}
 
@@ -358,8 +381,83 @@ func TestHelmReleaseIsNotMistakenForArgoCD(t *testing.T) {
 	// it still means ArgoCD, and must stay out of the list.
 	argo := helm
 	argo.Metadata.Labels = map[string]string{"app.kubernetes.io/instance": "some-app"}
-	if isUnmanaged(argo) {
+	if isUnmanaged(argo, nil) {
 		t.Error("app.kubernetes.io/instance without Helm should still count as ArgoCD-tracked")
+	}
+}
+
+// helm-controller drives an ordinary Helm install under the hood: same managed-by
+// label, same instance label, no ownerReferences to the HelmRelease. Without
+// fluxReleases, this is indistinguishable from istiod above and was in fact reported
+// as an unmanaged Helm install -- this is the regression test for that report.
+func TestFluxManagedHelmReleaseIsNotMistakenForUnmanagedHelm(t *testing.T) {
+	w := kube.Workload{Kind: "Deployment"}
+	w.Metadata.Name = "podinfo"
+	w.Metadata.Namespace = "apps"
+	w.Metadata.Labels = map[string]string{
+		"app.kubernetes.io/instance":   "podinfo",
+		"app.kubernetes.io/managed-by": "Helm",
+	}
+
+	if !isUnmanaged(w, nil) {
+		t.Fatal("with no Flux data at all, a Helm-labeled workload must still default to unmanaged")
+	}
+
+	fluxReleases := map[string]struct{}{"apps/podinfo": {}}
+	if isUnmanaged(w, fluxReleases) {
+		t.Error("a release Flux's HelmRelease installs must not be reported as an unmanaged Helm install")
+	}
+
+	// A same-named release Flux does not actually own (different namespace) must not
+	// be excluded just because some other release key happens to be present.
+	other := map[string]struct{}{"other-ns/podinfo": {}}
+	if !isUnmanaged(w, other) {
+		t.Error("a release key for a different namespace must not suppress an unrelated workload")
+	}
+}
+
+// kustomize-controller applies plain manifests, no Helm release involved at all, so
+// the fluxReleases cross-check above cannot catch it -- only its own label can.
+func TestFluxKustomizationManagedWorkloadIsNotUnmanaged(t *testing.T) {
+	w := kube.Workload{Kind: "Deployment"}
+	w.Metadata.Name = "some-controller"
+	w.Metadata.Namespace = "kube-system"
+	w.Metadata.Labels = map[string]string{
+		labelKustomizeName: "infra",
+	}
+
+	if isUnmanaged(w, nil) {
+		t.Error("a workload kustomize-controller applied must not be reported as unmanaged")
+	}
+}
+
+// fluxReleaseKeys is what turns a Flux read into the lookup isUnmanaged needs; this
+// pins its two defaulting rules (release name and target namespace both fall back to
+// the HelmRelease's own metadata) so a future refactor cannot silently drop them.
+func TestFluxReleaseKeysDefaulting(t *testing.T) {
+	fl := &kube.FluxList{HelmReleases: []kube.HelmRelease{
+		{Metadata: kube.FluxMetadata{Name: "podinfo", Namespace: "apps"}},
+		{
+			Metadata: kube.FluxMetadata{Name: "cert-manager", Namespace: "flux-system"},
+			Spec: kube.HelmReleaseSpec{
+				ReleaseName:     "cert-manager",
+				TargetNamespace: "cert-manager",
+			},
+		},
+	}}
+
+	got := fluxReleaseKeys(fl)
+	for _, want := range []string{"apps/podinfo", "cert-manager/cert-manager"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("fluxReleaseKeys() missing %q, got %v", want, got)
+		}
+	}
+	if len(got) != 2 {
+		t.Errorf("fluxReleaseKeys() = %v, want exactly 2 keys", got)
+	}
+
+	if got := fluxReleaseKeys(nil); got != nil {
+		t.Errorf("fluxReleaseKeys(nil) = %v, want nil", got)
 	}
 }
 
@@ -383,7 +481,7 @@ func TestHelmReleaseCollapsesToOneRow(t *testing.T) {
 		mk("argocd-redis", "v3.4.6", 0, 1), // one member unhealthy
 	}}
 
-	u := BuildUnmanaged(list, Options{})
+	u := BuildUnmanaged(list, Options{}, nil)
 	if u.Count != 1 {
 		t.Fatalf("count = %d, want 1 collapsed row", u.Count)
 	}
@@ -433,7 +531,7 @@ func TestBuildUnmanagedSetsChartVersion(t *testing.T) {
 	w := dep("istiod", "istio-system", func(w *kube.Workload) {
 		w.Metadata.Labels["helm.sh/chart"] = "istiod-1.20.1"
 	})
-	u := BuildUnmanaged(&kube.WorkloadList{Items: []kube.Workload{w}}, Options{})
+	u := BuildUnmanaged(&kube.WorkloadList{Items: []kube.Workload{w}}, Options{}, nil)
 	if len(u.Items) != 1 {
 		t.Fatalf("items = %d, want 1", len(u.Items))
 	}
@@ -449,7 +547,7 @@ func TestNonHelmWorkloadsAreNotCollapsed(t *testing.T) {
 		w.Metadata.Name, w.Metadata.Namespace = name, "kube-system"
 		return w
 	}
-	u := BuildUnmanaged(&kube.WorkloadList{Items: []kube.Workload{mk("kube-proxy"), mk("ebs-csi-node")}}, Options{})
+	u := BuildUnmanaged(&kube.WorkloadList{Items: []kube.Workload{mk("kube-proxy"), mk("ebs-csi-node")}}, Options{}, nil)
 	if u.Count != 2 {
 		t.Fatalf("count = %d, want 2 separate rows", u.Count)
 	}
