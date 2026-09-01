@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>k8s-status: what's actually running in your cluster</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A single read-only binary that shows what's deployed in your Kubernetes cluster, its version, whether it's healthy, and whether Git agrees. No JavaScript, no database, no writes.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="k8s-status">
+<meta property="og:description" content="What's actually running in your cluster, and whether Git agrees.">
+<meta property="og:image" content="https://ntmggr.github.io/k8s-status/social-preview.png">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ntmggr.github.io/k8s-status/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="k8s-status">
+<meta name="twitter:description" content="What's actually running in your cluster, and whether Git agrees.">
+<meta name="twitter:image" content="https://ntmggr.github.io/k8s-status/social-preview.png">
+<link rel="icon" href="logo/logo.svg" type="image/svg+xml">
+<style>
+  :root {
+    --plane:   #f9f9f7;
+    --surface: #fcfcfb;
+    --ink:     #0b0b0b;
+    --ink-2:   #52514e;
+    --muted:   #898781;
+    --hair:    #e1e0d9;
+
+    --ok-fg:    #169c64;
+    --deg-fg:   #cf1736;
+    --warn-fg:  #c27e0a;
+    --prog-fg:  #1481b8;
+    --drift-fg: #8022c3;
+
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --plane:   #0d0d0d;
+      --surface: #1a1a19;
+      --ink:     #ffffff;
+      --ink-2:   #c3c2b7;
+      --muted:   #898781;
+      --hair:    #2c2c2a;
+
+      --ok-fg:    #00e686;
+      --deg-fg:   #ff1a40;
+      --warn-fg:  #ffa200;
+      --prog-fg:  #1ab2ff;
+      --drift-fg: #b54dff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--plane); color: var(--ink);
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+  }
+  code, .mono { font-family: var(--mono); }
+
+  /* header */
+  header { border-bottom: 1px solid var(--hair); }
+  .hd-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 0; gap: .75rem; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: .55rem; text-decoration: none; }
+  .brand img { width: 26px; height: 26px; display: block; }
+  .brand span { font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--ink); }
+  nav { display: flex; gap: 1.3rem; font-size: .84rem; flex-wrap: wrap; }
+  nav a { text-decoration: none; color: var(--ink-2); }
+  nav a:hover { color: var(--ink); text-decoration: underline; }
+
+  /* hero */
+  .hero { padding: 3.4rem 0 2.6rem; }
+  .hero-grid { display: flex; gap: 2.5rem; align-items: center; }
+  .hero-copy { flex: 1 1 480px; min-width: 0; }
+  .hero-widget { flex: 0 0 300px; min-width: 0; }
+  .hero .eyebrow { margin-bottom: .8rem; }
+  h1 {
+    font-size: 2.3rem; line-height: 1.18; letter-spacing: -.01em;
+    margin: 0 0 1rem; font-weight: 800;
+  }
+  .lede { color: var(--ink-2); font-size: 1.05rem; margin: 0 0 1.6rem; max-width: 46ch; }
+  .term {
+    background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
+    padding: .8rem 1rem; font-family: var(--mono); font-size: .86rem;
+    color: var(--ink); margin: 0 0 1rem; overflow-x: auto;
+  }
+  .term .p { color: var(--muted); user-select: none; }
+  .cta-row { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; font-family: var(--mono); font-size: .84rem; font-weight: 600;
+    text-decoration: none; padding: .6rem 1rem; border-radius: 8px;
+    border: 1px solid var(--ink); color: var(--ink);
+  }
+  .btn:hover { background: var(--ink); color: var(--plane); }
+  .link-more { font-size: .84rem; color: var(--ink-2); text-decoration: none; }
+  .link-more:hover { color: var(--ink); text-decoration: underline; }
+
+  /* hero widget: a real replica of the app's own tile grid + gauge */
+  .widget {
+    background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
+    padding: .85rem; box-shadow: none;
+  }
+  .widget .wk { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; font-family: var(--mono); margin-bottom: .6rem; }
+  .gauge-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .7rem; }
+  .gauge {
+    width: 64px; height: 32px; position: relative; overflow: hidden;
+  }
+  .gauge::before {
+    content: ""; position: absolute; inset: 0; border-radius: 64px 64px 0 0;
+    background: conic-gradient(from -90deg at 50% 100%,
+      var(--deg-fg) 0deg, var(--warn-fg) 65deg, var(--ok-fg) 145deg, var(--ok-fg) 180deg);
+  }
+  .gauge::after {
+    content: ""; position: absolute; left: 8px; right: 8px; top: 8px; bottom: 0;
+    border-radius: 48px 48px 0 0; background: var(--surface);
+  }
+  .gauge-num { font-family: var(--mono); font-weight: 800; font-size: 1.15rem; }
+  .gauge-num small { font-family: var(--sans); font-weight: 600; color: var(--muted); font-size: .68rem;
+    text-transform: uppercase; letter-spacing: .06em; display: block; margin-top: .1rem; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+  .tile {
+    border: 1px solid var(--hair); border-radius: 6px; padding: .4rem .5rem;
+    font-family: var(--mono);
+  }
+  .tile .n { font-weight: 800; font-size: 1rem; display: block; }
+  .tile .k { font-size: .6rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .tile.ok    { background: color-mix(in srgb, var(--ok-fg) 12%, var(--surface)); }
+  .tile.ok .n { color: var(--ok-fg); }
+  .tile.deg   { background: color-mix(in srgb, var(--deg-fg) 10%, var(--surface)); }
+  .tile.deg .n{ color: var(--deg-fg); }
+  .tile.warn  { background: color-mix(in srgb, var(--warn-fg) 10%, var(--surface)); }
+  .tile.warn .n{ color: var(--warn-fg); }
+  .tile.plain .n { color: var(--ink); }
+
+  /* spec strip */
+  .strip {
+    border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+    background: var(--surface);
+  }
+  .strip .wrap {
+    display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; justify-content: center;
+    padding: .9rem 1.5rem; font-family: var(--mono); font-size: .76rem;
+    letter-spacing: .03em; color: var(--ink-2);
+  }
+  .strip b { color: var(--ink); }
+
+  /* screenshot */
+  .shot { padding: 3rem 0; }
+  .shot .eyebrow { text-align: center; margin-bottom: 1rem; }
+  .shot-frame {
+    border: 1px solid var(--hair); border-radius: 8px; overflow: hidden; line-height: 0;
+  }
+  .shot-frame img { width: 100%; display: block; }
+  .shot-frame picture img.dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    .shot-frame picture img.light { display: none; }
+    .shot-frame picture img.dark { display: block; }
+  }
+  .shot-cap {
+    text-align: center; color: var(--muted); font-size: .82rem; margin-top: .8rem;
+  }
+  .shot-cap code { background: var(--surface); border: 1px solid var(--hair); border-radius: 4px;
+    padding: .05rem .35rem; }
+
+  /* features */
+  .features { padding: 1rem 0 3rem; }
+  .feat-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem;
+  }
+  @media (max-width: 720px) {
+    .feat-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  .feat {
+    border: 1px solid var(--hair); border-radius: 8px; padding: 1rem 1.1rem;
+    background: var(--surface); min-width: 0;
+  }
+  .feat .eyebrow { margin-bottom: .5rem; }
+  .feat p { margin: 0; color: var(--ink-2); font-size: .89rem; }
+
+  /* why not an agent */
+  .compare { padding: 1rem 0 3rem; border-top: 1px solid var(--hair); }
+  .compare h2 { font-size: 1.25rem; line-height: 1.35; margin: 0 0 .6rem; max-width: 56ch; }
+  .compare .lede { margin: 0 0 1.5rem; }
+  .cmp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; }
+  .cmp-grid code { background: var(--plane); border: 1px solid var(--hair); border-radius: 4px;
+    padding: .05rem .3rem; }
+  @media (max-width: 720px) {
+    .cmp-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* quickstart */
+  .quick { padding: 1rem 0 3.4rem; }
+  .quick h2 { font-size: 1.3rem; margin: 0 0 .3rem; }
+  .quick .lede { margin-bottom: 1.3rem; }
+  .quick-links { margin-top: 1rem; font-size: .86rem; color: var(--ink-2); display: flex; gap: 1.4rem; flex-wrap: wrap; }
+  .quick-links a { text-decoration: none; color: var(--ink-2); border-bottom: 1px dotted var(--muted); }
+  .quick-links a:hover { color: var(--ink); border-color: var(--ink); }
+
+  /* footer, mirrors the app's own footer */
+  footer {
+    display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+    border-top: 1px solid var(--hair); padding: 1rem 1.5rem; color: var(--muted);
+    font-size: .74rem; font-family: var(--mono);
+  }
+  footer nav { gap: 1rem; }
+  footer a { text-decoration: none; color: var(--muted); }
+  footer a:hover { color: var(--ink); }
+
+  @media (max-width: 720px) {
+    .hero-grid { flex-direction: column; align-items: stretch; }
+    .hero-widget { flex-basis: auto; max-width: 320px; }
+    h1 { font-size: 1.8rem; }
+    footer { flex-direction: column; text-align: center; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, nav a, .quick-links a, footer a { transition: background .12s, color .12s, border-color .12s; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hd-row">
+    <a class="brand" href="#top">
+      <img src="logo/logo.svg" alt="">
+      <span>k8s-status</span>
+    </a>
+    <nav>
+      <a href="https://github.com/ntmggr/k8s-status">GitHub</a>
+      <a href="https://github.com/ntmggr/k8s-status/releases">Releases</a>
+      <a href="https://artifacthub.io/packages/helm/k8s-status/k8s-status">Artifact&nbsp;Hub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <div class="eyebrow">Kubernetes · read-only · single binary</div>
+        <h1>What's actually running in your cluster, and whether Git agrees.</h1>
+        <p class="lede">I built this to answer one question before every production push:
+          what version is actually running, and is this environment in a state I'd trust.
+          One page, one binary, no JavaScript, no login of its own.</p>
+        <div class="term"><span class="p">$</span> ./scripts/local-test.sh fixture</div>
+        <div class="cta-row">
+          <a class="btn" href="https://github.com/ntmggr/k8s-status">View on GitHub ↗</a>
+          <a class="link-more" href="#screenshot">See what it looks like ↓</a>
+        </div>
+      </div>
+      <div class="hero-widget" aria-hidden="true">
+        <div class="widget">
+          <div class="wk">Health</div>
+          <div class="gauge-row">
+            <div class="gauge"></div>
+            <div class="gauge-num">64<small>7 of 11 counted</small></div>
+          </div>
+          <div class="tiles">
+            <div class="tile plain"><span class="n">14</span><span class="k">Services</span></div>
+            <div class="tile ok"><span class="n">6</span><span class="k">OK</span></div>
+            <div class="tile deg"><span class="n">2</span><span class="k">Degraded</span></div>
+            <div class="tile warn"><span class="n">1</span><span class="k">Warning</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="strip">
+    <div class="wrap">
+      <span><b>get + list</b> only</span>
+      <span><b>0</b> lines of JavaScript</span>
+      <span><b>1</b> binary</span>
+      <span><b>Apache-2.0</b></span>
+    </div>
+  </div>
+
+  <section class="shot" id="screenshot">
+    <div class="wrap">
+      <div class="eyebrow">What it looks like</div>
+      <div class="shot-frame">
+        <picture>
+          <img class="light" src="screenshot.png" alt="k8s-status page showing service health, HA and Istio mTLS gauges, and a table of services with their versions and sync status">
+          <img class="dark" src="screenshot-dark.png" alt="k8s-status page in dark mode showing service health, HA and Istio mTLS gauges, and a table of services with their versions and sync status">
+        </picture>
+      </div>
+      <p class="shot-cap">Made-up data from the repo's own fixture. Reproduce it with
+        <code>./scripts/local-test.sh fixture</code>. No cluster required.</p>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="wrap feat-grid">
+      <div class="feat">
+        <div class="eyebrow">Health</div>
+        <p>Every service, its app version and chart version, whether it's healthy, and
+          whether that matches what's in Git.</p>
+      </div>
+      <div class="feat">
+        <div class="eyebrow">HA</div>
+        <p>How well your services survive losing one zone or one node, scored from
+          actual pod placement, not from replica counts alone.</p>
+      </div>
+      <div class="feat">
+        <div class="eyebrow">Istio</div>
+        <p>Cluster-wide mTLS policy and per-service sidecar injection, so you can tell
+          "permissive somewhere" from "strict everywhere."</p>
+      </div>
+      <div class="feat">
+        <div class="eyebrow">Not in GitOps</div>
+        <p>Whatever's running outside your GitOps controller gets its own table,
+          instead of being silently folded into what you actually control.</p>
+      </div>
+      <div class="feat">
+        <div class="eyebrow">Cluster</div>
+        <p>Nodes, zones, GPUs, and what's waiting for room to run, read straight from
+          the API server.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="compare">
+    <div class="wrap">
+      <div class="eyebrow">Why not just ask an agent</div>
+      <h2>An LLM with cluster access can answer this too. That's not the same as this
+        being free to ask.</h2>
+      <p class="lede">Give an agent kubectl or an MCP server and it can tell you what's
+        deployed. This page answers the exact same question for less: it's already
+        computed, sitting at a URL, before anyone asks.</p>
+      <div class="cmp-grid">
+        <div class="feat">
+          <div class="eyebrow">Zero tokens</div>
+          <p>The answer is already rendered. Loading a page costs nothing; asking a
+            model to run kubectl and summarize it costs a prompt, every single time.</p>
+        </div>
+        <div class="feat">
+          <div class="eyebrow">Always there</div>
+          <p>No prompt to write, no model to wait on, no quota to run out of the one
+            morning you actually need it, right before a production push.</p>
+        </div>
+        <div class="feat">
+          <div class="eyebrow">One answer, not five</div>
+          <p>Point everyone on the team at the same URL and they see the same numbers.
+            Five people asking five agents don't reliably land on the same one.</p>
+        </div>
+        <div class="feat">
+          <div class="eyebrow">Narrower access</div>
+          <p>One dedicated read-only ServiceAccount, scoped to <code>get</code> and
+            <code>list</code>. Not an agent holding standing credentials to your
+            cluster in case it's asked something later.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="quick">
+    <div class="wrap">
+      <div class="eyebrow">Get started</div>
+      <h2>Two minutes, no cluster required</h2>
+      <p class="lede">Try it against made-up data first, then point it at a cluster
+        you can already read.</p>
+      <div class="term"><span class="p">$</span> git clone https://github.com/ntmggr/k8s-status && cd k8s-status<br>
+        <span class="p">$</span> ./scripts/local-test.sh fixture</div>
+      <div class="quick-links">
+        <a href="https://github.com/ntmggr/k8s-status#quick-start">Read the docs ↗</a>
+        <a href="https://artifacthub.io/packages/helm/k8s-status/k8s-status">Install via Helm ↗</a>
+        <a href="https://github.com/ntmggr/k8s-status#what-access-does-it-need">What access does it need? ↗</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>k8s-status</span>
+  <nav>
+    <a href="https://github.com/ntmggr/k8s-status">GitHub</a>
+    <a href="https://github.com/ntmggr/k8s-status/releases">Releases</a>
+    <a href="https://artifacthub.io/packages/helm/k8s-status/k8s-status">Artifact Hub</a>
+    <a href="https://github.com/ntmggr/k8s-status/blob/main/LICENSE">Apache-2.0</a>
+  </nav>
+</footer>
+
+</body>
+</html>
