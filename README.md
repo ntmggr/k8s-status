@@ -306,11 +306,28 @@ proof of an outage.
   fact.
 - **No `PRUNE`.** That comes from the ArgoCD root app's `requiresPruning` flags. Flux
   prunes automatically when `spec.prune` is on, so there is no orphan backlog to report.
-- **No environment header.** Version, revision, last deploy and sync phase all come from
-  the ArgoCD root Application. On a Flux-only cluster there is none, so the line is
-  omitted rather than rendered as a row of blanks.
+- **No ArgoCD-style environment header.** Version, revision, last deploy and sync phase
+  there all come from the ArgoCD root Application; a Flux-only cluster has none, so that
+  specific line is omitted. Flux gets a narrower line of its own instead, see below.
 - **`?sync=Unknown`** is how you select Flux rows in the filter, since they carry no sync
   value.
+
+### The Flux revision line
+
+Flux keeps no single object like ArgoCD's root Application, so there is no one revision
+that always stands for the whole cluster. A line above the table names one anyway when
+that reduces to an unambiguous answer:
+
+- there is exactly one `Kustomization` in the cluster, or
+- one of several is named `flux-system`, the name `flux bootstrap` gives the
+  `Kustomization` that applies the rest.
+
+That `Kustomization`'s own `status.lastAppliedRevision` and `Ready` condition are shown,
+labelled with its name so it reads as one object's own account, not a cluster-wide fact.
+With several `Kustomization`s and none named `flux-system`, no such line is shown --
+picking one of them would present a guess as fact. A short note above the table instead
+says how many `Kustomization`s and `HelmRelease`s are tracked, and each row keeps its own
+revision or chart version.
 
 ## Install it on a cluster
 
