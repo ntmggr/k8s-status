@@ -176,6 +176,99 @@ func TestParseFluxRevision(t *testing.T) {
 	}
 }
 
+func kustomization(name, revision string, conds []kube.Condition) kube.Kustomization {
+	return kube.Kustomization{
+		Metadata: kube.FluxMetadata{Name: name, Namespace: "sample-apps"},
+		Status:   kube.KustomizationStatus{Conditions: conds, LastAppliedRevision: revision},
+	}
+}
+
+func TestDetectFluxRoot(t *testing.T) {
+	ready := []kube.Condition{cond("Ready", "True", "ReconciliationSucceeded", "Applied revision: main@sha1:abc123")}
+
+	t.Run("no kustomizations", func(t *testing.T) {
+		if got := detectFluxRoot(nil); got != nil {
+			t.Errorf("got %+v, want nil", got)
+		}
+	})
+
+	t.Run("exactly one is the root regardless of its name", func(t *testing.T) {
+		only := []kube.Kustomization{kustomization("platform-config", "main@sha1:abc123", ready)}
+		got := detectFluxRoot(only)
+		if got == nil || got.Metadata.Name != "platform-config" {
+			t.Errorf("got %+v, want platform-config", got)
+		}
+	})
+
+	t.Run("several with none named flux-system: no root", func(t *testing.T) {
+		many := []kube.Kustomization{
+			kustomization("apps", "main@sha1:abc123", ready),
+			kustomization("infra", "main@sha1:abc123", ready),
+		}
+		if got := detectFluxRoot(many); got != nil {
+			t.Errorf("got %+v, want nil: picking either would be a guess", got)
+		}
+	})
+
+	t.Run("several, one named flux-system: that one is the root", func(t *testing.T) {
+		many := []kube.Kustomization{
+			kustomization("apps", "main@sha1:abc123", ready),
+			kustomization("flux-system", "main@sha1:def456", ready),
+		}
+		got := detectFluxRoot(many)
+		if got == nil || got.Metadata.Name != "flux-system" {
+			t.Errorf("got %+v, want flux-system", got)
+		}
+	})
+}
+
+func TestAppendFluxPopulatesRootWhenUnambiguous(t *testing.T) {
+	list := &kube.FluxList{Kustomizations: []kube.Kustomization{
+		kustomization("flux-system", "main@sha1:abc123def", []kube.Condition{
+			cond("Ready", "True", "ReconciliationSucceeded", "Applied revision: main@sha1:abc123def"),
+		}),
+	}}
+
+	var snap Snapshot
+	snap.AppendFlux(list, nil, Options{})
+
+	if snap.Flux == nil || snap.Flux.Root == nil {
+		t.Fatalf("flux section = %+v, want a populated Root", snap.Flux)
+	}
+	root := snap.Flux.Root
+	if root.Name != "flux-system" || root.Ref != "main" || root.SHA != "abc123def" || root.Health != healthHealthy {
+		t.Errorf("root = %+v", root)
+	}
+}
+
+func TestAppendFluxLeavesRootNilWhenAmbiguous(t *testing.T) {
+	// The default fixture has four Kustomizations, none named flux-system: this is
+	// exactly the everyday shape with no clean single answer.
+	var snap Snapshot
+	snap.AppendFlux(loadFluxFixture(t), nil, Options{})
+
+	if snap.Flux == nil {
+		t.Fatal("want a flux section")
+	}
+	if snap.Flux.Root != nil {
+		t.Errorf("root = %+v, want nil: several kustomizations and no flux-system", snap.Flux.Root)
+	}
+	if snap.Flux.Kustomizations != 4 {
+		t.Errorf("kustomizations = %d, want 4", snap.Flux.Kustomizations)
+	}
+}
+
+func TestAppendFluxLeavesRootNilWithNoKustomizations(t *testing.T) {
+	list := &kube.FluxList{} // no Kustomizations, no HelmReleases either
+
+	var snap Snapshot
+	snap.AppendFlux(list, nil, Options{})
+
+	if snap.Flux == nil || snap.Flux.Root != nil {
+		t.Errorf("flux section = %+v, want a non-nil section with a nil Root", snap.Flux)
+	}
+}
+
 func TestBuildFluxServicesFromFixtures(t *testing.T) {
 	svcs := BuildFluxServices(loadFluxFixture(t), Options{GPUGlobs: []string{"media-*"}})
 

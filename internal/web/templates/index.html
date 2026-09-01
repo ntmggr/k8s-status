@@ -917,6 +917,20 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </div>
 {{end}}{{end}}
 
+{{if .HasData}}{{with .Snapshot.Flux}}{{with .Root}}
+<div class="sub" title="Kustomization {{.Name}}{{if .Detail}} &middot; {{.Detail}}{{end}}">
+  {{/* Flux keeps no root object of its own: this is one Kustomization identified as
+       the cluster's entry point (see detectFluxRoot), not a summary of every
+       Flux-managed row -- other Kustomizations and every HelmRelease may track
+       something else entirely, so the name is always shown alongside the revision. */}}
+  <span class="src-tag" title="This line reflects one Kustomization identified as Flux's entry point, not every Flux-managed row.">Flux</span>
+  <span class="mono">{{.Name}}</span>
+  {{- if .Ref}} <strong class="mono">{{.Ref}}</strong>{{end}}
+  {{- if .SHA}} @ <span class="mono">{{short .SHA}}</span>{{end}}
+  {{- if .Health}} &middot; {{.Health}}{{end}}
+</div>
+{{end}}{{end}}{{end}}
+
 {{with .ClusterError}}
 <div class="banner err">
   <div class="berr-title">{{icon "warn"}}{{.Title}}</div>
@@ -1305,13 +1319,23 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
 </table>
 </div>
-{{with .Snapshot.Flux}}{{if .Error}}
+{{with .Snapshot.Flux}}
+{{if .Error}}
 <div class="cap-note">
   {{- if .Denied}}Flux rows need <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">helmreleases.helm.toolkit.fluxcd.io</span> and <span class="mono">kustomizations.kustomize.toolkit.fluxcd.io</span>; the default install grants neither.
   {{- else if .Missing}}this cluster does not serve the Flux APIs, so no Flux rows are listed.
   {{- else}}the Flux read did not complete, so this table may be missing rows.{{end}} ({{.Error}})
 </div>
-{{end}}{{end}}
+{{else if and (not .Root) (or .Kustomizations .HelmReleases)}}
+{{/* No single Kustomization stands in for the whole cluster's git state here (see
+     detectFluxRoot) -- several exist and none is named the conventional root, so
+     naming one revision as "the" answer would be a guess. Say what is tracked
+     instead of inventing a single ref; each row above still has its own. */}}
+<div class="cap-note">
+  Flux tracks {{.Kustomizations}} Kustomization{{if ne .Kustomizations 1}}s{{end}} and {{.HelmReleases}} HelmRelease{{if ne .HelmReleases 1}}s{{end}} here, each syncing its own revision or chart -- see each row above for what it tracks. Unlike ArgoCD's root Application, no single one of them stands for the whole cluster.
+</div>
+{{end}}
+{{end}}
 {{end}}
 
 {{if .Filter.ShowUnmanaged}}{{with .Snapshot.Unmanaged}}

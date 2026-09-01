@@ -46,6 +46,23 @@ type FluxSection struct {
 	// normal answer on a cluster that does not run Flux rather than a fault.
 	Missing bool
 	Error   string
+	// Root is the Flux equivalent of the environment header ArgoCD's root Application
+	// powers, populated only when detectFluxRoot found a single Kustomization it can
+	// point to without guessing. Nil otherwise, same as HasRoot being false for ArgoCD.
+	Root *FluxRoot
+}
+
+// FluxRoot is one Kustomization's tracked revision, standing in for "what git state is
+// this cluster at" the way ArgoCD's root Application does. Unlike the ArgoCD case, this
+// is never the whole story: other Kustomizations and every HelmRelease may track
+// something else entirely, so it is only ever shown alongside a label naming which
+// Kustomization it came from, never as an unqualified cluster-wide fact.
+type FluxRoot struct {
+	Name   string
+	Ref    string
+	SHA    string
+	Health string
+	Detail string
 }
 
 // BuildFluxServices maps Flux objects onto the same Service shape the ArgoCD rows use.
@@ -104,6 +121,11 @@ func (s *Snapshot) AppendFlux(list *kube.FluxList, err error, opts Options) {
 	if list != nil {
 		sec.HelmReleases = len(list.HelmReleases)
 		sec.Kustomizations = len(list.Kustomizations)
+		if root := detectFluxRoot(list.Kustomizations); root != nil {
+			ref, sha := parseFluxRevision(root.Status.LastAppliedRevision)
+			_, health, detail := fluxVerdict(root.Spec.Suspend, root.Status.Conditions)
+			sec.Root = &FluxRoot{Name: root.Metadata.Name, Ref: ref, SHA: sha, Health: health, Detail: detail}
+		}
 	}
 
 	for _, svc := range BuildFluxServices(list, opts) {
@@ -243,6 +265,32 @@ func parseFluxRevision(rev string) (ref, sha string) {
 		sha = sha[i+1:]
 	}
 	return ref, sha
+}
+
+// fluxRootName is the name flux bootstrap gives the Kustomization that applies the
+// rest of a cluster's manifests: the conventional entry point of a typical bootstrap
+// tree, and the one reasonable name-based guess when several Kustomizations exist.
+const fluxRootName = "flux-system"
+
+// detectFluxRoot returns the Kustomization equivalent of ArgoCD's root Application, or
+// nil when there is no unambiguous one to point to.
+//
+// Flux keeps no single object that stands for "the whole cluster's git state" the way
+// ArgoCD's root Application does: there can be zero, one or many Kustomizations, each
+// syncing its own revision. This only resolves to one when the answer is not a guess:
+// there is exactly one Kustomization, or one of several is named fluxRootName. Anything
+// else -- none, or several with no such candidate -- returns nil rather than presenting
+// an arbitrary pick as fact.
+func detectFluxRoot(kustomizations []kube.Kustomization) *kube.Kustomization {
+	if len(kustomizations) == 1 {
+		return &kustomizations[0]
+	}
+	for i := range kustomizations {
+		if kustomizations[i].Metadata.Name == fluxRootName {
+			return &kustomizations[i]
+		}
+	}
+	return nil
 }
 
 // looksLikeDigest reports whether s is a bare commit hash rather than a ref name.

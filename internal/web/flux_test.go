@@ -234,6 +234,107 @@ func TestFluxRowsCarrySourceNamespaceAndKindInJSON(t *testing.T) {
 	}
 }
 
+// fluxKustomization builds a minimal Kustomization for the root-line tests below,
+// with just enough of status.conditions to drive fluxVerdict to Ready=True.
+func fluxKustomization(name, revision string) kube.Kustomization {
+	return kube.Kustomization{
+		Metadata: kube.FluxMetadata{Name: name, Namespace: "sample-apps"},
+		Status: kube.KustomizationStatus{
+			Conditions:          []kube.Condition{{Type: "Ready", Status: "True", Reason: "ReconciliationSucceeded", Message: "Applied revision: " + revision}},
+			LastAppliedRevision: revision,
+		},
+	}
+}
+
+func TestFluxRootLineRendersWithASingleKustomization(t *testing.T) {
+	snap := status.Build(nil, status.Options{Sources: []status.Source{status.SourceFlux}})
+	snap.AppendFlux(&kube.FluxList{Kustomizations: []kube.Kustomization{
+		fluxKustomization("platform-config", "main@sha1:abc123def4567"),
+	}}, nil, status.Options{})
+	snap.CheckedAt = time.Now()
+
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: &snap})
+	body := get(t, h, "/k8s-status/").Body.String()
+
+	if !strings.Contains(body, `title="This line reflects one Kustomization identified as Flux's entry point, not every Flux-managed row.">Flux</span>`) {
+		t.Errorf("want the Flux root line, got:\n%s", body)
+	}
+	if !strings.Contains(body, "platform-config") {
+		t.Error("want the kustomization's own name in the line")
+	}
+	if !strings.Contains(body, ">main<") || !strings.Contains(body, "abc123d") {
+		t.Errorf("want the ref and short sha, got:\n%s", body)
+	}
+	if !strings.Contains(body, "Healthy") {
+		t.Error("want the health word")
+	}
+}
+
+func TestFluxRootLinePicksFluxSystemAmongMany(t *testing.T) {
+	snap := status.Build(nil, status.Options{Sources: []status.Source{status.SourceFlux}})
+	snap.AppendFlux(&kube.FluxList{Kustomizations: []kube.Kustomization{
+		fluxKustomization("apps", "main@sha1:aaa1111"),
+		fluxKustomization("flux-system", "main@sha1:bbb2222"),
+	}}, nil, status.Options{})
+	snap.CheckedAt = time.Now()
+
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: &snap})
+	body := get(t, h, "/k8s-status/").Body.String()
+
+	if !strings.Contains(body, "flux-system") {
+		t.Error("want flux-system named as the root, the conventional bootstrap entry point")
+	}
+	if !strings.Contains(body, "bbb2222") {
+		t.Error("want flux-system's own sha shown, not apps'")
+	}
+}
+
+func TestFluxAmbiguousKustomizationsShowNoRootLineButAModestNote(t *testing.T) {
+	// fluxFixture has four Kustomizations, none named flux-system: the everyday shape
+	// with no single clean answer.
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fluxOnlySnapshot(t)})
+	body := get(t, h, "/k8s-status/").Body.String()
+
+	if strings.Contains(body, "identified as Flux's entry point") {
+		t.Error("four kustomizations with none named flux-system: no single one should be picked")
+	}
+	if !strings.Contains(body, "Flux tracks 4 Kustomizations and 5 HelmReleases") {
+		t.Errorf("want the modest count note, got:\n%s", body)
+	}
+	if !strings.Contains(body, "no single one of them stands for the whole cluster") {
+		t.Error("want the note to say no single revision is claimed")
+	}
+}
+
+func TestFluxRootLineOmittedWhenTheReadFails(t *testing.T) {
+	snap := mixedSnapshot(t, &kube.StatusError{Code: 403, Body: "helmreleases.helm.toolkit.fluxcd.io is forbidden"})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+	body := get(t, h, "/k8s-status/").Body.String()
+
+	if strings.Contains(body, "identified as Flux's entry point") {
+		t.Error("a failed flux read must not show a root line")
+	}
+	if strings.Contains(body, "Flux tracks") {
+		t.Error("a failed flux read must not show the ambiguous-count note either, the error note covers it")
+	}
+}
+
+func TestFluxRootLineAbsentWithNoKustomizations(t *testing.T) {
+	snap := status.Build(nil, status.Options{Sources: []status.Source{status.SourceFlux}})
+	snap.AppendFlux(&kube.FluxList{}, nil, status.Options{})
+	snap.CheckedAt = time.Now()
+
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: &snap})
+	body := get(t, h, "/k8s-status/").Body.String()
+
+	if strings.Contains(body, "identified as Flux's entry point") {
+		t.Error("no kustomizations at all: no root line to show")
+	}
+	if strings.Contains(body, "Flux tracks") {
+		t.Error("nothing tracked: no note about counts either")
+	}
+}
+
 func TestFluxRowsAreFilterable(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: mixedSnapshot(t, nil)})
 
