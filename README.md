@@ -2,15 +2,6 @@
 
 # k8s-status
 
-**What's actually running in your cluster — and whether Git agrees.**
-
-**Rate your cluster: health and HA, at a glance.**
-
-- Want a list of every service and its version, deployed? Done.
-- Are your services fully HA? One glance.
-- Do you have strict mTLS enforced, cluster-wide? Same glance.
-- Are your services actually healthy? Done.
-
 [![ci](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml/badge.svg)](https://github.com/ntmggr/k8s-status/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ntmggr/k8s-status?sort=semver&logo=github&label=release)](https://github.com/ntmggr/k8s-status/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ntmggr/k8s-status/total?label=downloads)](https://github.com/ntmggr/k8s-status/releases)
@@ -21,6 +12,15 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14260/badge)](https://www.bestpractices.dev/projects/14260)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
+**What's actually running in your cluster — and whether Git agrees.**
+
+**Rate your cluster: health and HA, at a glance.**
+
+- Want a list of every service and its version, deployed? Done.
+- Are your services fully HA? One glance.
+- Do you have strict mTLS enforced, cluster-wide? Same glance.
+- Are your services actually healthy? Done.
 
 ## What is this?
 
