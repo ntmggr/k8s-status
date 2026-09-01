@@ -78,7 +78,12 @@ case "$MODE" in
     # (istio-system), namespace-wide PERMISSIVE (search-api), and a workload-scoped
     # DISABLE (admin-ui, matched on the "app: admin-ui" pod label added below).
     cp testdata/peerauthentications.json "$FAKE_DIR/apis/security.istio.io/v1/peerauthentications"
-    ( cd "$FAKE_DIR" && python3 -m http.server "$PROXY_PORT" >/dev/null 2>&1 ) &
+    # --directory instead of a `cd X && python3 ...` subshell: a subshell's PID is
+    # what $! captures, not python's own -- cleanup()'s kill on Ctrl-C then only
+    # signals the subshell wrapper, and python survives as an orphaned grandchild
+    # still holding the port. --directory (Python 3.7+) needs no subshell at all, so
+    # $! is python's real PID and cleanup's kill actually reaches it.
+    python3 -m http.server "$PROXY_PORT" --directory "$FAKE_DIR" >/dev/null 2>&1 &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-root-app}"   # the fixture's root app is named root-app

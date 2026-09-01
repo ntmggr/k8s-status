@@ -497,7 +497,7 @@ func TestPageWithoutUnmanagedHasNoSection(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, nil))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	if strings.Contains(body, "Not managed by ArgoCD") {
+	if strings.Contains(body, "Not managed by GitOps") {
 		t.Error("unmanaged section rendered while UNMANAGED is off")
 	}
 	if strings.Contains(body, "unmanaged workloads") {
@@ -520,7 +520,7 @@ func TestPageWithUnmanagedRendersSection(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		"Not managed by ArgoCD", "not in gitops",
+		"Not managed by GitOps", "not in gitops",
 		"csi-controller", "csi-node-windows", "kube-proxy",
 		"EKS", "unknown", "v1.2.3", "81/82", "0/0",
 	} {

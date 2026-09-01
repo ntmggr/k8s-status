@@ -138,16 +138,22 @@ func TestFluxOnlyOmitsTheRootAppHeader(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: fluxOnlySnapshot(t)})
 	body := get(t, h, "/k8s-status/").Body.String()
 
-	// Everything on that line comes from the ArgoCD root Application, so with no root
-	// app the whole line goes rather than rendering "unknown" and a row of blanks.
-	if strings.Contains(body, `class="sub"`) {
-		t.Error("the environment header should be omitted when there is no root app")
+	// Everything on the ArgoCD line comes from the root Application, so with no root
+	// app that specific line goes rather than rendering "unknown" and a row of blanks.
+	// A flux-only cluster still gets a .sub line of its own (the ambiguous-count one,
+	// fluxOnlySnapshot's fixture has no single flux-system Kustomization) -- that is
+	// the correct replacement, not something this test should treat as absent.
+	if strings.Contains(body, `>ArgoCD</span>`) {
+		t.Error("no root Application: the ArgoCD line must not render at all")
 	}
 	if strings.Contains(body, `<strong class="mono">unknown</strong>`) {
 		t.Error("the version must not render as unknown on a flux-only cluster")
 	}
 	if strings.Contains(body, "last deploy") {
 		t.Error("there is no deploy history without a root app")
+	}
+	if !strings.Contains(body, "see each row below for its own revision") {
+		t.Error("a flux-only cluster with no single root should still say Flux is the source")
 	}
 
 	// The table itself is unaffected.
@@ -298,11 +304,11 @@ func TestFluxAmbiguousKustomizationsShowNoRootLineButAModestNote(t *testing.T) {
 	if strings.Contains(body, "identified as Flux's entry point") {
 		t.Error("four kustomizations with none named flux-system: no single one should be picked")
 	}
-	if !strings.Contains(body, "Flux tracks 4 Kustomizations and 5 HelmReleases") {
-		t.Errorf("want the modest count note, got:\n%s", body)
+	if !strings.Contains(body, "4 Kustomizations, 5 HelmReleases tracked") {
+		t.Errorf("want the modest count line, got:\n%s", body)
 	}
-	if !strings.Contains(body, "no single one of them stands for the whole cluster") {
-		t.Error("want the note to say no single revision is claimed")
+	if !strings.Contains(body, "No single Kustomization stands for the whole cluster") {
+		t.Error("want the line to say no single revision is claimed")
 	}
 }
 
@@ -314,8 +320,8 @@ func TestFluxRootLineOmittedWhenTheReadFails(t *testing.T) {
 	if strings.Contains(body, "identified as Flux's entry point") {
 		t.Error("a failed flux read must not show a root line")
 	}
-	if strings.Contains(body, "Flux tracks") {
-		t.Error("a failed flux read must not show the ambiguous-count note either, the error note covers it")
+	if strings.Contains(body, "see each row below for its own revision") {
+		t.Error("a failed flux read must not show the ambiguous-count line either, the error note covers it")
 	}
 }
 
@@ -330,8 +336,8 @@ func TestFluxRootLineAbsentWithNoKustomizations(t *testing.T) {
 	if strings.Contains(body, "identified as Flux's entry point") {
 		t.Error("no kustomizations at all: no root line to show")
 	}
-	if strings.Contains(body, "Flux tracks") {
-		t.Error("nothing tracked: no note about counts either")
+	if strings.Contains(body, "see each row below for its own revision") {
+		t.Error("nothing tracked: no count line either")
 	}
 }
 

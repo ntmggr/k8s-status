@@ -917,19 +917,31 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </div>
 {{end}}{{end}}
 
-{{if .HasData}}{{with .Snapshot.Flux}}{{with .Root}}
-<div class="sub" title="Kustomization {{.Name}}{{if .Detail}} &middot; {{.Detail}}{{end}}">
+{{if .HasData}}{{with .Snapshot.Flux}}
+{{if .Root}}
+<div class="sub" title="Kustomization {{.Root.Name}}{{if .Root.Detail}} &middot; {{.Root.Detail}}{{end}}">
   {{/* Flux keeps no root object of its own: this is one Kustomization identified as
        the cluster's entry point (see detectFluxRoot), not a summary of every
        Flux-managed row -- other Kustomizations and every HelmRelease may track
        something else entirely, so the name is always shown alongside the revision. */}}
   <span class="src-tag" title="This line reflects one Kustomization identified as Flux's entry point, not every Flux-managed row.">Flux</span>
-  <span class="mono">{{.Name}}</span>
-  {{- if .Ref}} <strong class="mono">{{.Ref}}</strong>{{end}}
-  {{- if .SHA}} @ <span class="mono">{{short .SHA}}</span>{{end}}
-  {{- if .Health}} &middot; {{.Health}}{{end}}
+  <span class="mono">{{.Root.Name}}</span>
+  {{- if .Root.Ref}} <strong class="mono">{{.Root.Ref}}</strong>{{end}}
+  {{- if .Root.SHA}} @ <span class="mono">{{short .Root.SHA}}</span>{{end}}
+  {{- if .Root.Health}} &middot; {{.Root.Health}}{{end}}
 </div>
-{{end}}{{end}}{{end}}
+{{else if or .Kustomizations .HelmReleases}}
+<div class="sub" title="No single Kustomization stands for the whole cluster's git state; each row below tracks its own.">
+  {{/* Unlike the single-Kustomization case above, there is no one entry point here to
+       name a revision for -- naming one anyway would be a guess presented as fact.
+       This still says Flux is the source, which is the one thing that must never go
+       unsaid regardless of whether a root can be identified. */}}
+  <span class="src-tag" title="No single Kustomization or HelmRelease stands for the whole cluster here.">Flux</span>
+  {{.Kustomizations}} Kustomization{{if ne .Kustomizations 1}}s{{end}}, {{.HelmReleases}} HelmRelease{{if ne .HelmReleases 1}}s{{end}} tracked
+  &middot; see each row below for its own revision
+</div>
+{{end}}
+{{end}}{{end}}
 
 {{with .ClusterError}}
 <div class="banner err">
@@ -1194,7 +1206,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   <div class="legend-grid">
     <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>OK</span><span>Healthy and matching git.</span></div>
     <div class="legend-row"><span class="pill s-degraded"><span class="g">&#10005;</span>DEGRADED</span><span>Genuinely broken, needs attention.</span></div>
-    <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>WARNING</span><span>ArgoCD cannot determine health.</span></div>
+    <div class="legend-row"><span class="pill s-warning"><span class="g">!</span>WARNING</span><span>The GitOps controller cannot determine health yet.</span></div>
     <div class="legend-row"><span class="pill s-progressing"><span class="g">&#8635;</span>PROGRESSING</span><span>Rolling out. Not an error.</span></div>
     <div class="legend-row"><span class="pill s-drift"><span class="g">&#8800;</span>DRIFT</span><span>Pods healthy, config differs from git.</span></div>
     <div class="legend-row"><span class="pill s-prune"><span class="g">&#8856;</span>PRUNE</span><span>Orphan awaiting cleanup, not an outage.</span></div>
@@ -1321,30 +1333,25 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </div>
 {{with .Snapshot.Flux}}
 {{if .Error}}
+{{/* The ambiguous-root case (several Kustomizations, none the conventional root) has
+     its own line up in the header instead of a note here -- see .Root above -- since
+     "Flux is the source" must never be silent, error or not. */}}
 <div class="cap-note">
   {{- if .Denied}}Flux rows need <span class="mono">get</span>/<span class="mono">list</span> on <span class="mono">helmreleases.helm.toolkit.fluxcd.io</span> and <span class="mono">kustomizations.kustomize.toolkit.fluxcd.io</span>; the default install grants neither.
   {{- else if .Missing}}this cluster does not serve the Flux APIs, so no Flux rows are listed.
   {{- else}}the Flux read did not complete, so this table may be missing rows.{{end}} ({{.Error}})
-</div>
-{{else if and (not .Root) (or .Kustomizations .HelmReleases)}}
-{{/* No single Kustomization stands in for the whole cluster's git state here (see
-     detectFluxRoot) -- several exist and none is named the conventional root, so
-     naming one revision as "the" answer would be a guess. Say what is tracked
-     instead of inventing a single ref; each row above still has its own. */}}
-<div class="cap-note">
-  Flux tracks {{.Kustomizations}} Kustomization{{if ne .Kustomizations 1}}s{{end}} and {{.HelmReleases}} HelmRelease{{if ne .HelmReleases 1}}s{{end}} here, each syncing its own revision or chart -- see each row above for what it tracks. Unlike ArgoCD's root Application, no single one of them stands for the whole cluster.
 </div>
 {{end}}
 {{end}}
 {{end}}
 
 {{if .Filter.ShowUnmanaged}}{{with .Snapshot.Unmanaged}}
-<div class="sec-head" id="unmanaged">Not managed by ArgoCD
-  <span class="sec-sub">running in the cluster but outside GitOps, EKS addons, Terraform-installed
-  components, hand-installed Helm releases. These are not services above and are not in the Services counts --
-  the HA gauges' numbers are the one place they are folded in, since a zone or node failing affects them
-  exactly like it would any tracked service. The Istio gauges are GitOps-services only; their own sidecar
-  and policy coverage is mentioned separately in the Istio panel instead.</span>
+<div class="sec-head" id="unmanaged">Not managed by GitOps
+  <span class="sec-sub">running in the cluster but outside GitOps. See Installed By for what put each one there.
+  These are not services above and are not in the Services counts. The HA gauges' numbers are the one
+  place they are folded in, since a zone or node failing affects them exactly like it would any tracked
+  service. The Istio gauges are GitOps-services only; their own sidecar and policy coverage is mentioned
+  separately in the Istio panel instead.</span>
 </div>
 <div class="card">
 <table>
@@ -1373,7 +1380,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
 </tr>
 {{else}}
-<tr><td colspan="8" class="detail">{{if $.Filter.Spread}}no not-in-gitops workloads are single-{{$.Filter.Spread}}{{else if .Error}}no workloads read{{else}}every workload in the cluster is managed by ArgoCD{{end}}</td></tr>
+<tr><td colspan="8" class="detail">{{if $.Filter.Spread}}no not-in-gitops workloads are single-{{$.Filter.Spread}}{{else if .Error}}no workloads read{{else}}every workload in the cluster is managed by GitOps{{end}}</td></tr>
 {{end}}
 </tbody>
 </table>

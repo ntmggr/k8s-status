@@ -808,7 +808,7 @@ and add up to the service total, and a GPU service is already counted in `OK` or
 `DEGRADED`. Putting it in the tile row would break the arithmetic. The per-row `GPU` chip
 and the coloured row edge are unaffected.
 
-### Workloads that ArgoCD does not manage
+### Workloads that GitOps does not manage
 
 Shows what is running in the cluster **outside** of Git: EKS addons, components installed
 by Terraform, Helm releases somebody installed by hand. Nobody is watching these for you,
@@ -817,9 +817,12 @@ so this is where undetected drift lives.
 It reads every `Deployment`, `StatefulSet` and `DaemonSet` in the cluster. A workload is
 listed when **both** of these are true:
 
-1. It has no ArgoCD ownership marker. ArgoCD stamps everything it owns with at least one
+1. It has no GitOps ownership marker. ArgoCD stamps everything it owns with at least one
    of: the `argocd.argoproj.io/tracking-id` annotation, the `app.kubernetes.io/instance`
-   label, or the `argocd.argoproj.io/instance` label.
+   label, or the `argocd.argoproj.io/instance` label. Flux's kustomize-controller stamps
+   the `kustomize.toolkit.fluxcd.io/name` label; its helm-controller drives an ordinary
+   Helm install, so a Flux-managed release is recognized by matching its Helm release
+   identity against the HelmReleases Flux itself reports, not by a label on the workload.
 2. It has no `metadata.ownerReferences`, nothing in the cluster created it.
 
 Each row shows:
