@@ -21,6 +21,11 @@ const (
 // absent.
 const labelManagedBy = "app.kubernetes.io/managed-by"
 
+// labelKustomizeName is one of the two labels Flux's kustomize-controller writes on
+// every resource it applies (the other, labelKustomizeNamespace, is not needed here:
+// name alone is enough to tell a Flux-applied resource from an unmanaged one).
+const labelKustomizeName = "kustomize.toolkit.fluxcd.io/name"
+
 // Helm stamps these on everything in a release, which is what lets a release be
 // collapsed into one row.
 const (
@@ -84,9 +89,11 @@ type Unmanaged struct {
 	Error   string
 }
 
-// BuildUnmanaged selects the workloads that carry no ArgoCD ownership marker and have
-// no owner of their own.
-func BuildUnmanaged(list *kube.WorkloadList, opts Options) Unmanaged {
+// BuildUnmanaged selects the workloads that carry no ArgoCD or Flux ownership marker
+// and have no owner of their own. fluxReleases is the set of Helm releases Flux's
+// HelmReleases actually install, from fluxReleaseKeys; nil (Flux disabled, or not read
+// yet) just means nothing is excluded on that basis.
+func BuildUnmanaged(list *kube.WorkloadList, opts Options, fluxReleases map[string]struct{}) Unmanaged {
 	out := Unmanaged{Items: []Workload{}}
 	if list == nil {
 		return out
@@ -94,7 +101,7 @@ func BuildUnmanaged(list *kube.WorkloadList, opts Options) Unmanaged {
 
 	for _, w := range list.Items {
 		out.Scanned++
-		if !isUnmanaged(w) {
+		if !isUnmanaged(w, fluxReleases) {
 			continue
 		}
 		if matchesAny(w.Metadata.Namespace, opts.UnmanagedIgnoreNS) {
@@ -149,11 +156,16 @@ func BuildUnmanaged(list *kube.WorkloadList, opts Options) Unmanaged {
 // created by something already running in the cluster, not installed into it, and
 // leaves 11 rows that are all real infrastructure. Do not remove the ownerReferences
 // check to "simplify" this; the list becomes unreadable and the signal is lost.
-func isUnmanaged(w kube.Workload) bool {
+func isUnmanaged(w kube.Workload, fluxReleases map[string]struct{}) bool {
 	if len(w.Metadata.OwnerReferences) > 0 {
 		return false
 	}
 	if _, ok := w.Metadata.Annotations[annTrackingID]; ok {
+		return false
+	}
+	// kustomize-controller writes this on everything it applies. There is no Helm
+	// release involved, so nothing below would have caught it.
+	if _, ok := w.Metadata.Labels[labelKustomizeName]; ok {
 		return false
 	}
 	// app.kubernetes.io/instance is a standard Kubernetes label that Helm sets on
@@ -166,11 +178,35 @@ func isUnmanaged(w kube.Workload) bool {
 		if !strings.EqualFold(w.Metadata.Labels[labelManagedBy], "Helm") {
 			return false
 		}
+		// helm-controller drives an ordinary Helm install under the hood, so a
+		// Flux-managed release is stamped exactly like a manual "helm install" one:
+		// same managed-by label, same instance label, no ownerReferences to the
+		// HelmRelease. The only way to tell them apart is by release identity, which
+		// is why fluxReleases exists at all -- do not "simplify" this to the
+		// managed-by check alone, it is what silently miscategorized every
+		// Flux-managed release as an unmanaged Helm install.
+		if _, ok := fluxReleases[releaseOf(w)]; ok {
+			return false
+		}
 	}
 	if _, ok := w.Metadata.Labels[labelArgoInstance]; ok {
 		return false
 	}
 	return true
+}
+
+// fluxReleaseKeys collects the Helm release identity every Flux HelmRelease actually
+// installs (see HelmRelease.ReleaseKey), so isUnmanaged can recognize a Flux-managed
+// release for what it is instead of reporting it as an unmanaged Helm install.
+func fluxReleaseKeys(fl *kube.FluxList) map[string]struct{} {
+	if fl == nil {
+		return nil
+	}
+	out := make(map[string]struct{}, len(fl.HelmReleases))
+	for _, hr := range fl.HelmReleases {
+		out[hr.ReleaseKey()] = struct{}{}
+	}
+	return out
 }
 
 // readiness picks the counters the kind actually populates.

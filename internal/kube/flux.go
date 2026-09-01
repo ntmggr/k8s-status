@@ -54,9 +54,30 @@ type HelmRelease struct {
 	Status   HelmReleaseStatus `json:"status"`
 }
 
+// ReleaseKey identifies the underlying Helm release this HelmRelease actually installs,
+// in the same "<namespace>/<name>" shape a workload's own release identity is built in,
+// so the two can be compared directly.
+func (h HelmRelease) ReleaseKey() string {
+	ns := h.Spec.TargetNamespace
+	if ns == "" {
+		ns = h.Metadata.Namespace
+	}
+	name := h.Spec.ReleaseName
+	if name == "" {
+		name = h.Metadata.Name
+	}
+	return ns + "/" + name
+}
+
 type HelmReleaseSpec struct {
 	Suspend bool              `json:"suspend"`
 	Chart   HelmChartTemplate `json:"chart"`
+	// ReleaseName and TargetNamespace default to the HelmRelease's own name and
+	// namespace when unset, which is what the underlying Helm release actually ends up
+	// named/installed into. Read here so unmanaged-workload detection can tell a
+	// Flux-driven Helm release apart from one nothing in GitOps installed.
+	ReleaseName     string `json:"releaseName"`
+	TargetNamespace string `json:"targetNamespace"`
 }
 
 type HelmChartTemplate struct {

@@ -298,7 +298,7 @@ func zoneReadError(err error) *ZoneError {
 // -- ResolveServicePolicy in mesh.go -- from the namespace and labels of any one of
 // its running pods, since all of a workload's pods share both and this is therefore a
 // per-service property, not a per-pod one.
-func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList, meshNamespace string, peerAuths *kube.PeerAuthenticationList) {
+func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloads *kube.WorkloadList, meshNamespace string, peerAuths *kube.PeerAuthenticationList, fluxReleases map[string]struct{}) {
 	if snap == nil || pods == nil || nodes == nil {
 		return
 	}
@@ -386,7 +386,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			default:
 				continue
 			}
-			if !isUnmanaged(w) {
+			if !isUnmanaged(w, fluxReleases) {
 				continue
 			}
 			key := releaseOf(w)

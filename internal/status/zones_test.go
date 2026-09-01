@@ -34,9 +34,9 @@ func zoneSvc(name, ns, workload string) Service {
 func TestFillZonesNilInputsAreNoop(t *testing.T) {
 	snap := &Snapshot{}
 	snap.addService(zoneSvc("svc", "ml", "worker"))
-	FillZones(nil, nil, nil, nil, "", nil)
-	FillZones(snap, nil, &kube.NodeList{}, nil, "", nil)
-	FillZones(snap, &kube.PodList{}, nil, nil, "", nil)
+	FillZones(nil, nil, nil, nil, "", nil, nil)
+	FillZones(snap, nil, &kube.NodeList{}, nil, "", nil, nil)
+	FillZones(snap, &kube.PodList{}, nil, nil, "", nil, nil)
 	if snap.Services[0].Zones.Known() {
 		t.Fatal("no pods or nodes should mean no zone answer")
 	}
@@ -55,7 +55,7 @@ func TestFillZonesThreeZoneSpread(t *testing.T) {
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.2"),
 		zoneRunningPod("ml", "api-3", "api", "10.0.1.3"),
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	z := snap.Services[0].Zones
 	if z.Count() != 3 || z.Pods != 3 || z.Unplaced != 0 {
@@ -82,7 +82,7 @@ func TestFillZonesAllOnOneNodeIsSingleZone(t *testing.T) {
 		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.1"),
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	z := snap.Services[0].Zones
 	if z.Count() != 1 || z.Pods != 2 {
@@ -100,7 +100,7 @@ func TestFillZonesUnmatchedHostIPCountsAsUnplaced(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{
 		zoneRunningPod("ml", "api-1", "api", "10.0.9.99"), // no node has this IP
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	z := snap.Services[0].Zones
 	if z.Unplaced != 1 {
@@ -121,7 +121,7 @@ func TestFillZonesUnlabelledNodeCountsAsUnplaced(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{
 		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	z := snap.Services[0].Zones
 	if z.Unplaced != 1 || z.Count() != 0 {
@@ -136,7 +136,7 @@ func TestFillZonesIgnoresPendingPods(t *testing.T) {
 	pending := zoneRunningPod("ml", "api-1", "api", "10.0.1.1")
 	pending.Status.Phase = "Pending"
 	pods := &kube.PodList{Items: []kube.Pod{pending}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	z := snap.Services[0].Zones
 	if z.Pods != 0 || z.Known() {
@@ -151,7 +151,7 @@ func TestFillZonesResetsOnRepeatedCalls(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{zoneRunningPod("ml", "api-1", "api", "10.0.1.1")}}
 
 	for i := 0; i < 3; i++ {
-		FillZones(snap, pods, nodes, nil, "", nil)
+		FillZones(snap, pods, nodes, nil, "", nil, nil)
 	}
 	z := snap.Services[0].Zones
 	if z.Pods != 1 {
@@ -184,7 +184,7 @@ func TestFillZonesTracksNodesIndependentlyOfZones(t *testing.T) {
 		zoneRunningPod("ml", "api-1", "api", "10.0.1.1"),
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.2"),
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	z := snap.Services[0].Zones
 	if z.Count() != 1 {
@@ -287,7 +287,7 @@ func TestFillZonesFoldsUnmanagedWorkloadsIntoHA(t *testing.T) {
 	workloads := &kube.WorkloadList{Items: []kube.Workload{
 		unmanagedWorkload("batch", "Deployment", "worker"),
 	}}
-	FillZones(snap, pods, nodes, workloads, "", nil)
+	FillZones(snap, pods, nodes, workloads, "", nil, nil)
 
 	// The GitOps service still gets its own per-item answer, unaffected by the fold.
 	if z := snap.Services[0].Zones; z.Count() != 2 {
@@ -323,7 +323,7 @@ func TestFillZonesUnmanagedFoldIsIdempotent(t *testing.T) {
 	}}
 
 	for i := 0; i < 3; i++ {
-		FillZones(snap, pods, nodes, workloads, "", nil)
+		FillZones(snap, pods, nodes, workloads, "", nil, nil)
 	}
 	if snap.Summary.Zoned != 1 || snap.Summary.SingleZone != 1 {
 		t.Errorf("Zoned/SingleZone = %d/%d after 3 calls, want 1/1 (no accumulation)",
@@ -350,7 +350,7 @@ func TestFillZonesExcludesMeshNamespaceFromMeshCoverageOnly(t *testing.T) {
 	workloads := &kube.WorkloadList{Items: []kube.Workload{
 		unmanagedWorkload("istio-system", "Deployment", "istiod"),
 	}}
-	FillZones(snap, pods, nodes, workloads, "istio-system", nil)
+	FillZones(snap, pods, nodes, workloads, "istio-system", nil, nil)
 
 	if snap.Summary.MeshEligible != 0 || snap.Summary.MeshInjected != 0 {
 		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 0/0 (mesh namespace excluded)",
@@ -400,7 +400,7 @@ func TestFillZonesGroupsUnmanagedByReleaseNotByRawItem(t *testing.T) {
 		{Namespace: "gw", Kind: "Deployment", Name: "gw-b", Release: "gw/gw", Members: 1},
 	})
 
-	FillZones(snap, pods, nodes, workloads, "", nil)
+	FillZones(snap, pods, nodes, workloads, "", nil, nil)
 
 	if got := len(snap.Unmanaged.Items); got != 1 {
 		t.Fatalf("collapsed rows=%d, want 1 (one release row)", got)
@@ -463,7 +463,7 @@ func TestFillZonesMeshCoveragePartiallyInjected(t *testing.T) {
 		zoneRunningInjectedPod("ml", "api-1", "api", "10.0.1.1"),
 		zoneRunningPod("ml", "api-2", "api", "10.0.1.1"),
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	m := snap.Services[0].Mesh
 	if !m.Known() || m.Full() {
@@ -485,7 +485,7 @@ func TestFillZonesMeshCoverageFullyInjected(t *testing.T) {
 		zoneRunningInjectedPod("ml", "api-1", "api", "10.0.1.1"),
 		zoneRunningInjectedPod("ml", "api-2", "api", "10.0.1.1"),
 	}}
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	m := snap.Services[0].Mesh
 	if !m.Full() {
@@ -499,7 +499,7 @@ func TestFillZonesMeshCoverageFullyInjected(t *testing.T) {
 func TestFillZonesMeshCoverageNoPodsIsUnknown(t *testing.T) {
 	snap := &Snapshot{}
 	snap.addService(zoneSvc("api", "ml", "api"))
-	FillZones(snap, &kube.PodList{}, &kube.NodeList{}, nil, "", nil)
+	FillZones(snap, &kube.PodList{}, &kube.NodeList{}, nil, "", nil, nil)
 
 	if snap.Services[0].Mesh.Known() {
 		t.Fatal("no pods should mean no mesh answer")
@@ -517,7 +517,7 @@ func TestFillZonesMeshCoverageResetsOnRepeatedCalls(t *testing.T) {
 		zoneRunningInjectedPod("ml", "api-1", "api", "10.0.1.1"),
 	}}
 	for i := 0; i < 3; i++ {
-		FillZones(snap, pods, nodes, nil, "", nil)
+		FillZones(snap, pods, nodes, nil, "", nil, nil)
 	}
 	if m := snap.Services[0].Mesh; m.Pods != 1 || m.Injected != 1 {
 		t.Errorf("Mesh accumulated across repeated calls: %+v", m)
@@ -547,7 +547,7 @@ func TestFillZonesFoldsUnmanagedMeshCoverage(t *testing.T) {
 		{Namespace: "batch", Kind: "Deployment", Name: "worker", Members: 1},
 	})
 
-	FillZones(snap, pods, nodes, workloads, "", nil)
+	FillZones(snap, pods, nodes, workloads, "", nil, nil)
 
 	if snap.Summary.MeshEligible != 0 || snap.Summary.MeshInjected != 0 {
 		t.Errorf("MeshEligible/MeshInjected = %d/%d, want 0/0 (not-in-gitops must not move the Istio gauges)", snap.Summary.MeshEligible, snap.Summary.MeshInjected)
@@ -665,7 +665,7 @@ func TestFillZonesResolvesPerServicePolicyFromRunningPod(t *testing.T) {
 		peerAuth("payments", map[string]string{"app": "billing"}, "DISABLE"),
 	}}
 
-	FillZones(snap, pods, nodes, nil, "istio-system", peerAuths)
+	FillZones(snap, pods, nodes, nil, "istio-system", peerAuths, nil)
 
 	got := snap.Services[0].Policy
 	if !got.Known() || got.Effective != MeshDisabled || got.Scope != ScopeWorkload {
@@ -688,7 +688,7 @@ func TestFillZonesPolicyUnknownWithoutMesh(t *testing.T) {
 	pods := &kube.PodList{Items: []kube.Pod{pod}}
 	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.0.1")}}
 
-	FillZones(snap, pods, nodes, nil, "", nil)
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
 
 	if snap.Services[0].Policy.Known() {
 		t.Errorf("Policy = %+v, want unknown with MESH_MTLS off", snap.Services[0].Policy)

@@ -239,6 +239,11 @@ install behaves exactly as it always has and never calls a Flux API.
 | `argocd,flux` | Both, in one table |
 | `auto` | Whichever of the two the cluster actually serves |
 
+To see the Flux path without a cluster: `SOURCES=flux ./scripts/local-test.sh fixture`
+serves `testdata/helmreleases.json` and `testdata/kustomizations.json` instead of
+ArgoCD's fixture, same as `SOURCES=flux ./scripts/local-test.sh cluster <context>` does
+against a real one.
+
 Rules:
 
 - **A source that is not listed is never called.** No request is made to its API at all,
@@ -301,11 +306,28 @@ proof of an outage.
   fact.
 - **No `PRUNE`.** That comes from the ArgoCD root app's `requiresPruning` flags. Flux
   prunes automatically when `spec.prune` is on, so there is no orphan backlog to report.
-- **No environment header.** Version, revision, last deploy and sync phase all come from
-  the ArgoCD root Application. On a Flux-only cluster there is none, so the line is
-  omitted rather than rendered as a row of blanks.
+- **No ArgoCD-style environment header.** Version, revision, last deploy and sync phase
+  there all come from the ArgoCD root Application; a Flux-only cluster has none, so that
+  specific line is omitted. Flux gets a narrower line of its own instead, see below.
 - **`?sync=Unknown`** is how you select Flux rows in the filter, since they carry no sync
   value.
+
+### The Flux revision line
+
+Flux keeps no single object like ArgoCD's root Application, so there is no one revision
+that always stands for the whole cluster. A line above the table names one anyway when
+that reduces to an unambiguous answer:
+
+- there is exactly one `Kustomization` in the cluster, or
+- one of several is named `flux-system`, the name `flux bootstrap` gives the
+  `Kustomization` that applies the rest.
+
+That `Kustomization`'s own `status.lastAppliedRevision` and `Ready` condition are shown,
+labelled with its name so it reads as one object's own account, not a cluster-wide fact.
+With several `Kustomization`s and none named `flux-system`, no such line is shown --
+picking one of them would present a guess as fact. A short note above the table instead
+says how many `Kustomization`s and `HelmRelease`s are tracked, and each row keeps its own
+revision or chart version.
 
 ## Install it on a cluster
 
@@ -786,7 +808,7 @@ and add up to the service total, and a GPU service is already counted in `OK` or
 `DEGRADED`. Putting it in the tile row would break the arithmetic. The per-row `GPU` chip
 and the coloured row edge are unaffected.
 
-### Workloads that ArgoCD does not manage
+### Workloads that GitOps does not manage
 
 Shows what is running in the cluster **outside** of Git: EKS addons, components installed
 by Terraform, Helm releases somebody installed by hand. Nobody is watching these for you,
@@ -795,9 +817,12 @@ so this is where undetected drift lives.
 It reads every `Deployment`, `StatefulSet` and `DaemonSet` in the cluster. A workload is
 listed when **both** of these are true:
 
-1. It has no ArgoCD ownership marker. ArgoCD stamps everything it owns with at least one
+1. It has no GitOps ownership marker. ArgoCD stamps everything it owns with at least one
    of: the `argocd.argoproj.io/tracking-id` annotation, the `app.kubernetes.io/instance`
-   label, or the `argocd.argoproj.io/instance` label.
+   label, or the `argocd.argoproj.io/instance` label. Flux's kustomize-controller stamps
+   the `kustomize.toolkit.fluxcd.io/name` label; its helm-controller drives an ordinary
+   Helm install, so a Flux-managed release is recognized by matching its Helm release
+   identity against the HelmReleases Flux itself reports, not by a label on the workload.
 2. It has no `metadata.ownerReferences`, nothing in the cluster created it.
 
 Each row shows:

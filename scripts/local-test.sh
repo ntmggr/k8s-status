@@ -7,6 +7,11 @@
 # CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED,
 # UNMANAGED_IGNORE_NS, MESH_MTLS, MESH_NAMESPACE and AZ_SPREAD in the environment as
 # needed.
+#
+# SOURCES works the same way, inherited from your shell rather than set here:
+#   SOURCES=flux ./scripts/local-test.sh fixture
+# shows the fixture's Flux HelmRelease/Kustomization data (testdata/helmreleases.json,
+# testdata/kustomizations.json) instead of the default ArgoCD Applications.
 set -euo pipefail
 
 MODE="${1:-fixture}"
@@ -46,12 +51,20 @@ case "$MODE" in
     mkdir -p "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd"
     mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1"
     mkdir -p "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications"
+    mkdir -p "$FAKE_DIR/apis/helm.toolkit.fluxcd.io/v2" "$FAKE_DIR/apis/kustomize.toolkit.fluxcd.io/v1"
     cp testdata/applications.json "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd/applications"
     cp testdata/nodes.json        "$FAKE_DIR/api/v1/nodes"
     cp testdata/pods.json         "$FAKE_DIR/api/v1/pods"
     cp testdata/deployments.json  "$FAKE_DIR/apis/apps/v1/deployments"
     cp testdata/statefulsets.json "$FAKE_DIR/apis/apps/v1/statefulsets"
     cp testdata/daemonsets.json   "$FAKE_DIR/apis/apps/v1/daemonsets"
+    # Cluster-wide, same as the real Flux API: one collection per kind, no per-namespace
+    # split. Served regardless of SOURCES; the app just never asks for them unless
+    # SOURCES includes flux. podinfo (helmreleases.json) and network-policy-controller
+    # (in deployments.json, via a kustomize.toolkit.fluxcd.io/name label) exist to prove
+    # a Flux-managed workload lands in the service table, not "not managed by ArgoCD".
+    cp testdata/helmreleases.json   "$FAKE_DIR/apis/helm.toolkit.fluxcd.io/v2/helmreleases"
+    cp testdata/kustomizations.json "$FAKE_DIR/apis/kustomize.toolkit.fluxcd.io/v1/kustomizations"
     # The discovery document and the object collection both live under
     # .../security.istio.io/v1, so the discovery doc is served as index.html: a GET
     # with no trailing slash 301s to the directory, which python's http.server then
@@ -65,7 +78,12 @@ case "$MODE" in
     # (istio-system), namespace-wide PERMISSIVE (search-api), and a workload-scoped
     # DISABLE (admin-ui, matched on the "app: admin-ui" pod label added below).
     cp testdata/peerauthentications.json "$FAKE_DIR/apis/security.istio.io/v1/peerauthentications"
-    ( cd "$FAKE_DIR" && python3 -m http.server "$PROXY_PORT" >/dev/null 2>&1 ) &
+    # --directory instead of a `cd X && python3 ...` subshell: a subshell's PID is
+    # what $! captures, not python's own -- cleanup()'s kill on Ctrl-C then only
+    # signals the subshell wrapper, and python survives as an orphaned grandchild
+    # still holding the port. --directory (Python 3.7+) needs no subshell at all, so
+    # $! is python's real PID and cleanup's kill actually reaches it.
+    python3 -m http.server "$PROXY_PORT" --directory "$FAKE_DIR" >/dev/null 2>&1 &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-root-app}"   # the fixture's root app is named root-app

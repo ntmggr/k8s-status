@@ -1,3 +1,3 @@
 module github.com/ntmggr/k8s-status
 
-go 1.27
+go 1.27.0
