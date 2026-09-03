@@ -204,3 +204,57 @@ func TestNodesTransportErrorIsNotDenied(t *testing.T) {
 		t.Error("a transport error is not an RBAC denial")
 	}
 }
+
+func TestParseKubernetesVersion(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"v1.32.3-eks-be96eb4", "1.32"},
+		{"v1.29.0-gke.1234000", "1.29"},
+		{"v1.31.2", "1.31"},
+		{"1.31.2", "1.31"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := parseKubernetesVersion(c.in); got != c.want {
+			t.Errorf("parseKubernetesVersion(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestDetectProvider(t *testing.T) {
+	cases := []struct {
+		name, providerID, kubeletVersion, want string
+	}{
+		{"eks", "aws:///us-east-1a/i-0123456789abcdef0", "v1.32.3-eks-be96eb4", "AWS EKS"},
+		{"self-managed aws", "aws:///us-east-1a/i-0123456789abcdef0", "v1.32.3", "AWS"},
+		{"aks", "azure:///subscriptions/x/resourceGroups/MC_myrg_mycluster_eastus/providers/Microsoft.Compute/virtualMachineScaleSets/aks-nodepool1/virtualMachines/0", "v1.29.0", "Azure AKS"},
+		{"self-managed azure", "azure:///subscriptions/x/resourceGroups/myrg/providers/Microsoft.Compute/virtualMachines/vm1", "v1.29.0", "Azure"},
+		{"gke", "gce://my-project/us-central1-a/gke-node-1", "v1.29.0-gke.1234000", "Google GKE"},
+		{"self-managed gce", "gce://my-project/us-central1-a/vm-1", "v1.29.0", "Google Cloud"},
+		{"unrecognized", "", "v1.31.2", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := detectProvider(c.providerID, c.kubeletVersion); got != c.want {
+				t.Errorf("detectProvider(%q, %q) = %q, want %q", c.providerID, c.kubeletVersion, got, c.want)
+			}
+		})
+	}
+}
+
+// TestBuildNodeStatsPrefersReadyNodeForVersion covers a cluster mid-upgrade: a
+// NotReady node can be stale (shut down, or left over from a previous version), so
+// its kubelet version and ProviderID must not win over a Ready node's when one is
+// available in the same list.
+func TestBuildNodeStatsPrefersReadyNodeForVersion(t *testing.T) {
+	fixture := `{"items":[
+ {"metadata":{"name":"stale"},"spec":{"providerID":"aws:///us-east-1a/i-old"},"status":{"conditions":[{"type":"Ready","status":"False"}],"nodeInfo":{"kubeletVersion":"v1.31.0-eks-abc"}}},
+ {"metadata":{"name":"current"},"spec":{"providerID":"aws:///us-east-1a/i-new"},"status":{"conditions":[{"type":"Ready","status":"True"}],"nodeInfo":{"kubeletVersion":"v1.32.3-eks-be96eb4"}}}
+]}`
+	got := buildStats(decodeNodes(t, fixture))
+	if got.KubernetesVersion != "1.32" {
+		t.Errorf("KubernetesVersion = %q, want 1.32 (from the Ready node)", got.KubernetesVersion)
+	}
+	if got.Provider != "AWS EKS" {
+		t.Errorf("Provider = %q, want AWS EKS", got.Provider)
+	}
+}

@@ -247,10 +247,15 @@ type Tile struct {
 	IsOn  bool
 }
 
-// tiles builds the tile list in the same order and the same nonzero-count gating the
-// template used to apply inline. Kept as one Go-side list so TileRowTop/TileRowBottom
-// can split it by count rather than by whatever happens to fit a CSS row's width.
-func (d pageData) tiles() []Tile {
+// Tiles builds the tile list in the same order and the same nonzero-count gating the
+// template used to apply inline. Rendered as a single flex-wrap container: the
+// previous version split this into two Go-side row groups by count, which broke as
+// soon as either group held more tiles than fit on one physical line at the current
+// viewport width -- that group wrapped internally, stranding the extra tile mid-page
+// instead of at the bottom. A single continuous flex-wrap sequence wraps however many
+// fit per line at any width, and the one truly leftover tile (when the total is odd)
+// is always the last item in that sequence, so it always lands in the true last row.
+func (d pageData) Tiles() []Tile {
 	if d.Snapshot == nil {
 		return nil
 	}
@@ -274,25 +279,6 @@ func (d pageData) tiles() []Tile {
 		out = append(out, Tile{Count: s.Hidden, Label: "hidden"})
 	}
 	return out
-}
-
-// TileRowTop and TileRowBottom split the tiles into two rows by count, not by width:
-// CSS wrapping alone can't guarantee a stable split, since it wraps wherever a row
-// happens to run out of width for whatever content is actually in it.
-//
-// An odd count's extra tile goes to the bottom row, not the top: tiles() always
-// starts with "services" and ends with "ok", so the extra tile landing on top would
-// occasionally leave "ok" stranded alone on the bottom row, which reads like a
-// leftover rather than a deliberate group. "services" alone on top reads fine --
-// it's the header count, not a peer of the status breakdown below it.
-func (d pageData) TileRowTop() []Tile {
-	t := d.tiles()
-	return t[:len(t)/2]
-}
-
-func (d pageData) TileRowBottom() []Tile {
-	t := d.tiles()
-	return t[len(t)/2:]
 }
 
 func (d pageData) Chips() []Chip {
