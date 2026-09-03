@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// projectURL is k8s-status's own home, regardless of where this binary is
+// actually deployed from (the mirror, a fork, etc.).
+const projectURL = "https://github.com/ntmggr/k8s-status"
+
 // repoWebURL converts a git remote as ArgoCD stores it into a browsable URL.
 // Handles scp-style SSH ("git@host:group/proj.git"), ssh:// and https:// forms.
 // The "git-ssh." host prefix used for cloning is not browsable, so it is dropped.
@@ -67,4 +71,14 @@ func repoCommitURL(raw, sha string) string {
 		return ""
 	}
 	return fmt.Sprintf("%s/-/commit/%s", base, url.PathEscape(sha))
+}
+
+// releaseURL links k8s-status's own build version to its GitHub release,
+// regardless of where this binary is actually deployed from. "dev" is a
+// local/unreleased build with no matching release.
+func releaseURL(version string) string {
+	if version == "" || version == "dev" {
+		return ""
+	}
+	return projectURL + "/releases/tag/v" + url.PathEscape(version)
 }

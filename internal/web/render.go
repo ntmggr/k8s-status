@@ -32,6 +32,8 @@ func templateFuncs() template.FuncMap {
 		"appURL":     func(base, name string) string { return strings.TrimRight(base, "/") + "/applications/" + name },
 		"repoTree":   repoTreeURL,
 		"repoCommit": repoCommitURL,
+		"release":    releaseURL,
+		"project":    func() string { return projectURL },
 		"glyph":      stateGlyph,
 		"clip":       clip,
 		"icon":       icon,
