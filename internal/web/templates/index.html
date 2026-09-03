@@ -984,11 +984,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </div>
 {{end}}
 <div class="tiles-stack">
-  {{range $.TileRows}}
   <div class="tiles">
-    {{range .}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
+    {{range $.Tiles}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
   </div>
-  {{end}}
 </div>
 </div>
 </div>
@@ -1115,9 +1113,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     </div>
     {{end}}
   </div>
-  {{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
+  {{if $.Snapshot.MeshHA.Known}}{{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
   <div class="cap-note">+{{.UnmanagedMeshEligible}} not-in-gitops workload{{if ne .UnmanagedMeshEligible 1}}s{{end}} also checked here, not counted in the percentages above: {{.UnmanagedMeshInjected}} of {{.UnmanagedMeshEligible}} in mesh{{if .UnmanagedMeshPolicyEligible}}, {{.UnmanagedMeshPolicyPermissive}} of {{.UnmanagedMeshPolicyEligible}} permissive{{end}}.</div>
-  {{end}}{{end}}
+  {{end}}{{end}}{{end}}
 </div>
 {{end}}
 </div>

@@ -247,10 +247,15 @@ type Tile struct {
 	IsOn  bool
 }
 
-// tiles builds the tile list in the same order and the same nonzero-count gating the
-// template used to apply inline. Kept as one Go-side list so TileRows can chunk it by
-// a fixed row size rather than by whatever happens to fit a CSS row's width.
-func (d pageData) tiles() []Tile {
+// Tiles builds the tile list in the same order and the same nonzero-count gating the
+// template used to apply inline. Rendered as a single flex-wrap container: the
+// previous version split this into two Go-side row groups by count, which broke as
+// soon as either group held more tiles than fit on one physical line at the current
+// viewport width -- that group wrapped internally, stranding the extra tile mid-page
+// instead of at the bottom. A single continuous flex-wrap sequence wraps however many
+// fit per line at any width, and the one truly leftover tile (when the total is odd)
+// is always the last item in that sequence, so it always lands in the true last row.
+func (d pageData) Tiles() []Tile {
 	if d.Snapshot == nil {
 		return nil
 	}
@@ -276,31 +281,6 @@ func (d pageData) tiles() []Tile {
 	return out
 }
 
-// tilesPerRow is how many fixed-width tiles fit on one physical line in the health
-// panel's tile stack. It's a layout constant, not a guess: .tile is a fixed 7.4rem.
-const tilesPerRow = 2
-
-// TileRows chunks the tiles into fixed-size rows, each rendered as its own .tiles
-// flex container. This used to be a single count-based top/bottom split rendered as
-// two containers, which broke once either half held more than tilesPerRow items:
-// that container wrapped internally, stranding the extra tile mid-page instead of
-// at the bottom. Chunking up front instead means no single .tiles container ever
-// holds more than it can fit on one line, so the one truly leftover tile (when the
-// total is odd) always ends up alone in the last row -- the actual bottom of the
-// stack, not wherever an internal wrap happened to leave it.
-func (d pageData) TileRows() [][]Tile {
-	t := d.tiles()
-	var rows [][]Tile
-	for len(t) > 0 {
-		n := tilesPerRow
-		if n > len(t) {
-			n = len(t)
-		}
-		rows = append(rows, t[:n])
-		t = t[n:]
-	}
-	return rows
-}
 
 func (d pageData) Chips() []Chip {
 	var out []Chip
