@@ -24,7 +24,14 @@ type NodeList struct {
 // Node decodes only the fields the capacity section renders.
 type Node struct {
 	Metadata NodeMetadata `json:"metadata"`
+	Spec     NodeSpec     `json:"spec"`
 	Status   NodeStatus   `json:"status"`
+}
+
+// NodeSpec decodes only ProviderID, used to tell which cloud (and which managed
+// offering on it) the cluster runs on.
+type NodeSpec struct {
+	ProviderID string `json:"providerID"`
 }
 
 type NodeMetadata struct {
@@ -61,6 +68,10 @@ type NodeStatus struct {
 
 type NodeInfo struct {
 	Architecture string `json:"architecture"`
+	// KubeletVersion carries the managed-offering marker too (e.g. "v1.32.3-eks-...",
+	// "v1.29.0-gke.1234000"), which is more reliable than guessing from ProviderID
+	// alone: ProviderID says which cloud, not which managed control plane on it.
+	KubeletVersion string `json:"kubeletVersion"`
 }
 
 // Quantity is a Kubernetes resource quantity. The API serves them as strings, but a

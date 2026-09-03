@@ -1148,7 +1148,10 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 
 {{if and $.HasData $.Snapshot.Nodes}}
 <section class="capacity">
-  <div class="cap-head">Cluster<span class="cap-sub">the machines underneath, not the services above</span></div>
+  <div class="cap-head">
+    <span class="cap-head-row">Cluster{{with $.Snapshot.Nodes}}{{if not .Error}}{{if or .Provider .KubernetesVersion}}<span class="badge cap-head-badge" title="From a Ready node's own reported kubelet version.">{{if .Provider}}{{.Provider}} {{end}}{{.KubernetesVersion}}</span>{{end}}{{end}}{{end}}</span>
+    <span class="cap-sub">the machines underneath, not the services above</span>
+  </div>
   {{- with $.Snapshot.Nodes}}{{if not .Error}}
   {{/* Total first, its breakdown indented beneath: reads as "85 nodes, of which..."
        rather than as five unrelated numbers sitting in a row. */}}
