@@ -281,7 +281,6 @@ func (d pageData) Tiles() []Tile {
 	return out
 }
 
-
 func (d pageData) Chips() []Chip {
 	var out []Chip
 	add := func(kind, value string) {
