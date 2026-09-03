@@ -1083,7 +1083,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         </div>
         <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
       </div>
-      {{if .NotInMesh}}
+      {{if and .Known .NotInMesh}}
       <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
       {{else if .Known}}
       <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
