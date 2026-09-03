@@ -44,9 +44,17 @@ type NodeStats struct {
 	Arch                  []ArchCount
 	// Zones is sorted by zone name; nodes with no zone label bucket into a single
 	// zoneUnknown entry rather than being dropped from the tally.
-	Zones  []ZoneCount
-	Denied bool
-	Error  string
+	Zones []ZoneCount
+	// KubernetesVersion is the cluster's own major.minor (e.g. "1.32"), read from a
+	// Ready node's kubelet version where one exists, falling back to any node
+	// otherwise. Empty when there are no nodes to read it from.
+	KubernetesVersion string
+	// Provider names the cloud and, where the kubelet version or ProviderID gives a
+	// reliable signal, the managed offering on it (e.g. "AWS EKS"). Empty when
+	// neither gives one -- see detectProvider.
+	Provider string
+	Denied   bool
+	Error    string
 }
 
 // AcceleratorCount is one device type and how much of it the cluster has.
@@ -76,11 +84,21 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 	byArch := map[string]int{}
 	perRes := map[string][2]int{} // resource -> {nodes, devices}
 	byZone := map[string][2]int{} // zone -> {nodes, ready}
+	// versionSource/providerID are read from the first Ready node found, preferred
+	// over a NotReady one since a node the cloud has shut down can be stale --
+	// mid-upgrade, or left over from a previous cluster version entirely.
+	var versionSource, providerID string
+	haveReadySource := false
 	for _, n := range list.Items {
 		stats.Total++
 		ready := n.Ready()
 		if !ready {
 			stats.NotReady++
+		}
+		if versionSource == "" || (ready && !haveReadySource) {
+			versionSource = n.Status.NodeInfo.KubeletVersion
+			providerID = n.Spec.ProviderID
+			haveReadySource = ready
 		}
 
 		// A node with a device is a GPU node whether or not the scheduler can hand it
@@ -147,7 +165,56 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 		stats.Zones = append(stats.Zones, ZoneCount{Zone: z, Nodes: e[0], Ready: e[1]})
 	}
 	sort.Slice(stats.Zones, func(i, j int) bool { return stats.Zones[i].Zone < stats.Zones[j].Zone })
+	stats.KubernetesVersion = parseKubernetesVersion(versionSource)
+	stats.Provider = detectProvider(providerID, versionSource)
 	return stats
+}
+
+// parseKubernetesVersion reduces a kubelet version like "v1.32.3-eks-be96eb4" to
+// "1.32": patch versions can differ node to node during a rolling upgrade, so the
+// coarser major.minor is the more stable answer to "what does this cluster run".
+func parseKubernetesVersion(kubeletVersion string) string {
+	v := strings.TrimPrefix(kubeletVersion, "v")
+	if v == "" {
+		return ""
+	}
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
+	parts := strings.SplitN(v, ".", 3)
+	if len(parts) < 2 {
+		return v
+	}
+	return parts[0] + "." + parts[1]
+}
+
+// detectProvider names the cloud and, where the kubelet version or ProviderID gives
+// a reliable signal, the managed offering on it. Returns "" rather than guess when
+// neither gives one -- bare metal, kind, minikube and similar have no such marker.
+func detectProvider(providerID, kubeletVersion string) string {
+	switch {
+	case strings.HasPrefix(providerID, "aws:"):
+		if strings.Contains(kubeletVersion, "-eks-") {
+			return "AWS EKS"
+		}
+		return "AWS"
+	case strings.HasPrefix(providerID, "azure:"):
+		// AKS's own auto-generated node resource group is always named
+		// MC_<resourceGroup>_<clusterName>_<region> -- a reliable AKS signature,
+		// since ProviderID alone doesn't distinguish AKS from a self-managed
+		// cluster on Azure VMs.
+		if strings.Contains(providerID, "/resourceGroups/MC_") {
+			return "Azure AKS"
+		}
+		return "Azure"
+	case strings.HasPrefix(providerID, "gce:"):
+		if strings.Contains(kubeletVersion, "-gke.") {
+			return "Google GKE"
+		}
+		return "Google Cloud"
+	default:
+		return ""
+	}
 }
 
 // quantityInt reads a whole-unit resource quantity; anything unparseable counts as zero
