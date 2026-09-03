@@ -14,50 +14,77 @@ func tileLabels(tiles []Tile) []string {
 	return out
 }
 
-// TestTileRowSplitKeepsOKPaired is the case a real cluster hit: with only "services",
-// one attention tile (e.g. drift) and "ok" nonzero, the old ceil-on-top split left "ok"
-// stranded alone on the bottom row, reading like a leftover rather than a group. The
-// extra tile must go to the bottom instead, since "services" (always first) reads fine
-// alone as a header count but "ok" (always last) is a peer of the attention tiles.
-func TestTileRowSplitKeepsOKPaired(t *testing.T) {
+func rowLabels(rows [][]Tile) [][]string {
+	out := make([][]string, len(rows))
+	for i, r := range rows {
+		out[i] = tileLabels(r)
+	}
+	return out
+}
+
+func equalRows(a, b [][]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !equalStrings(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestTileRowsOddCountTrailsLastRow(t *testing.T) {
 	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 60, OK: 59, Drift: 1}}}
-
-	top := tileLabels(d.TileRowTop())
-	bottom := tileLabels(d.TileRowBottom())
-
-	if want := []string{"services"}; !equalStrings(top, want) {
-		t.Errorf("TileRowTop = %v, want %v", top, want)
-	}
-	if want := []string{"drift", "ok"}; !equalStrings(bottom, want) {
-		t.Errorf("TileRowBottom = %v, want %v (ok must not be alone)", bottom, want)
+	got := rowLabels(d.TileRows())
+	want := [][]string{{"services", "drift"}, {"ok"}}
+	if !equalRows(got, want) {
+		t.Errorf("TileRows = %v, want %v", got, want)
 	}
 }
 
-func TestTileRowSplitBalancesEvenCount(t *testing.T) {
+func TestTileRowsEvenCount(t *testing.T) {
 	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 10, OK: 8, Degraded: 1, Warning: 1}}}
-
-	top := tileLabels(d.TileRowTop())
-	bottom := tileLabels(d.TileRowBottom())
-
-	if want := []string{"services", "degraded"}; !equalStrings(top, want) {
-		t.Errorf("TileRowTop = %v, want %v", top, want)
-	}
-	if want := []string{"warning", "ok"}; !equalStrings(bottom, want) {
-		t.Errorf("TileRowBottom = %v, want %v", bottom, want)
+	got := rowLabels(d.TileRows())
+	want := [][]string{{"services", "degraded"}, {"warning", "ok"}}
+	if !equalRows(got, want) {
+		t.Errorf("TileRows = %v, want %v", got, want)
 	}
 }
 
-func TestTileRowSplitNoAttentionTiles(t *testing.T) {
+func TestTileRowsNoAttentionTiles(t *testing.T) {
 	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 5, OK: 5}}}
-
-	top := tileLabels(d.TileRowTop())
-	bottom := tileLabels(d.TileRowBottom())
-
-	if want := []string{"services"}; !equalStrings(top, want) {
-		t.Errorf("TileRowTop = %v, want %v", top, want)
+	got := rowLabels(d.TileRows())
+	want := [][]string{{"services", "ok"}}
+	if !equalRows(got, want) {
+		t.Errorf("TileRows = %v, want %v", got, want)
 	}
-	if want := []string{"ok"}; !equalStrings(bottom, want) {
-		t.Errorf("TileRowBottom = %v, want %v", bottom, want)
+}
+
+// TestTileRowsManyTilesNeverExceedsRowCapacity is the case a real cluster hit: with
+// enough nonzero categories to need more than two rows, the old top/bottom split by
+// count (not by physical capacity) put 3+ tiles in a single .tiles flex container,
+// which then wrapped internally and stranded the extra tile mid-page instead of at
+// the true bottom of the stack. Every row here must hold at most tilesPerRow tiles,
+// and the one truly leftover tile must be alone in the last row, not the third row.
+func TestTileRowsManyTilesNeverExceedsRowCapacity(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{
+		Total: 100, OK: 89, Degraded: 7, Progressing: 5, Drift: 30, Prune: 9, Suspended: 1,
+	}}}
+	got := d.TileRows()
+	for i, row := range got {
+		if len(row) > tilesPerRow {
+			t.Errorf("row %d has %d tiles, want at most %d: %v", i, len(row), tilesPerRow, tileLabels(row))
+		}
+	}
+	want := [][]string{
+		{"services", "degraded"},
+		{"progressing", "drift"},
+		{"prune", "suspended"},
+		{"ok"},
+	}
+	if got := rowLabels(got); !equalRows(got, want) {
+		t.Errorf("TileRows = %v, want %v", got, want)
 	}
 }
 

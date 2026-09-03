@@ -984,10 +984,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </div>
 {{end}}
 <div class="tiles-stack">
-  <div class="tiles">
-    {{range $.TileRowTop}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
-  </div>
-  {{with $.TileRowBottom}}
+  {{range $.TileRows}}
   <div class="tiles">
     {{range .}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
   </div>
