@@ -985,13 +985,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
 <div class="tiles-stack">
   <div class="tiles">
-    {{range $.TileRowTop}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
+    {{range $.Tiles}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
   </div>
-  {{with $.TileRowBottom}}
-  <div class="tiles">
-    {{range .}}{{if .Href}}<a class="tile {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></a>{{else}}<div class="tile"><div class="n">{{.Count}}</div><div class="k">{{.Label}}</div></div>{{end}}{{end}}
-  </div>
-  {{end}}
 </div>
 </div>
 </div>
@@ -1086,7 +1081,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         </div>
         <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
       </div>
-      {{if .NotInMesh}}
+      {{if and .Known .NotInMesh}}
       <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
       {{else if .Known}}
       <div class="tile t-ok"><div class="n">0</div><div class="k">not in mesh</div></div>
@@ -1118,9 +1113,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     </div>
     {{end}}
   </div>
-  {{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
+  {{if $.Snapshot.MeshHA.Known}}{{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
   <div class="cap-note">+{{.UnmanagedMeshEligible}} not-in-gitops workload{{if ne .UnmanagedMeshEligible 1}}s{{end}} also checked here, not counted in the percentages above: {{.UnmanagedMeshInjected}} of {{.UnmanagedMeshEligible}} in mesh{{if .UnmanagedMeshPolicyEligible}}, {{.UnmanagedMeshPolicyPermissive}} of {{.UnmanagedMeshPolicyEligible}} permissive{{end}}.</div>
-  {{end}}{{end}}
+  {{end}}{{end}}{{end}}
 </div>
 {{end}}
 </div>

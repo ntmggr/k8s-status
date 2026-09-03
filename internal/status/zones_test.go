@@ -613,9 +613,11 @@ func TestMeshHANilMeshIsUnknown(t *testing.T) {
 }
 
 // TestMeshPolicyHA mirrors TestMeshHA for the per-service policy question: what
-// share of policy-eligible services are NOT permissive. Unlike MeshHA there is no
-// "Istio not installed" case to gate on -- MeshPolicyEligible is already zero
-// whenever mesh mTLS or AZ_SPREAD is off, so zero-eligible alone covers it.
+// share of policy-eligible services are NOT permissive. This operates purely on the
+// already-aggregated Summary counts; the "Istio not installed" case is covered
+// upstream of this, in resolvePolicy (see TestFillZonesPolicyUnknownWhenMeshNotInstalled)
+// -- MeshPolicyEligible never becomes nonzero in the first place, so zero-eligible
+// here is sufficient.
 func TestMeshPolicyHA(t *testing.T) {
 	cases := []struct {
 		name                 string
@@ -692,5 +694,29 @@ func TestFillZonesPolicyUnknownWithoutMesh(t *testing.T) {
 
 	if snap.Services[0].Policy.Known() {
 		t.Errorf("Policy = %+v, want unknown with MESH_MTLS off", snap.Services[0].Policy)
+	}
+}
+
+// TestFillZonesPolicyUnknownWhenMeshNotInstalled is the case a real cluster hit:
+// snap.Mesh was non-nil (mesh mTLS reporting is on) but Installed was false (no
+// service mesh at all), so resolvePolicy's old `snap.Mesh == nil` check alone let it
+// fall through to ResolveServicePolicy and resolve a PeerAuthentication fallback
+// policy anyway -- the ISTIO panel then showed a misleading "100% strict" gauge for
+// a mesh question that didn't apply, right next to a correctly-unknown "IN MESH"
+// gauge for the same nonexistent mesh.
+func TestFillZonesPolicyUnknownWhenMeshNotInstalled(t *testing.T) {
+	snap := &Snapshot{Mesh: &MeshSection{Installed: false, Effective: MeshStrict}}
+	snap.addService(zoneSvc("billing", "payments", "billing"))
+	pod := zoneRunningPod("payments", "billing-abc", "billing", "10.0.0.1")
+	pods := &kube.PodList{Items: []kube.Pod{pod}}
+	nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "eu-west-1a", "10.0.0.1")}}
+
+	FillZones(snap, pods, nodes, nil, "", nil, nil)
+
+	if snap.Services[0].Policy.Known() {
+		t.Errorf("Policy = %+v, want unknown when Mesh.Installed is false", snap.Services[0].Policy)
+	}
+	if snap.Summary.MeshPolicyEligible != 0 {
+		t.Errorf("MeshPolicyEligible = %d, want 0 when Mesh.Installed is false", snap.Summary.MeshPolicyEligible)
 	}
 }

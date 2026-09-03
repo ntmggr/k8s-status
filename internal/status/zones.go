@@ -485,9 +485,12 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	// resolvePolicy is answered once per workload, from whichever running pod's
 	// namespace/labels were captured first above. Known() stays false (the zero
 	// value) when mesh mTLS is off entirely, since there is then no meshEffective to
-	// fall back to and no policy question worth asking.
+	// fall back to and no policy question worth asking. The Installed check mirrors
+	// MeshHA's: without it, a cluster with no service mesh at all could still resolve
+	// a PeerAuthentication fallback policy per service, showing e.g. "100% strict" for
+	// a mesh question that doesn't apply here.
 	resolvePolicy := func(seen bool, namespace string, labels map[string]string) ServicePolicy {
-		if !seen || snap.Mesh == nil {
+		if !seen || snap.Mesh == nil || !snap.Mesh.Installed {
 			return ServicePolicy{}
 		}
 		return ResolveServicePolicy(peerAuths, meshNamespace, namespace, labels, snap.Mesh.Effective)

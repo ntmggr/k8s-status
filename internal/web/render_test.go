@@ -14,50 +14,28 @@ func tileLabels(tiles []Tile) []string {
 	return out
 }
 
-// TestTileRowSplitKeepsOKPaired is the case a real cluster hit: with only "services",
-// one attention tile (e.g. drift) and "ok" nonzero, the old ceil-on-top split left "ok"
-// stranded alone on the bottom row, reading like a leftover rather than a group. The
-// extra tile must go to the bottom instead, since "services" (always first) reads fine
-// alone as a header count but "ok" (always last) is a peer of the attention tiles.
-func TestTileRowSplitKeepsOKPaired(t *testing.T) {
-	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 60, OK: 59, Drift: 1}}}
-
-	top := tileLabels(d.TileRowTop())
-	bottom := tileLabels(d.TileRowBottom())
-
-	if want := []string{"services"}; !equalStrings(top, want) {
-		t.Errorf("TileRowTop = %v, want %v", top, want)
-	}
-	if want := []string{"drift", "ok"}; !equalStrings(bottom, want) {
-		t.Errorf("TileRowBottom = %v, want %v (ok must not be alone)", bottom, want)
+// TestTilesOrder covers the fixed order Tiles() builds in, and that zero-count
+// categories are skipped rather than rendered as empty tiles. Rendering is a single
+// flex-wrap container (see index.html), so unlike the old two-row split there is no
+// row-chunking left to test here: wrapping at any viewport width, and keeping the one
+// truly leftover tile in the true last line, is CSS's job now, not Go's.
+func TestTilesOrder(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{
+		Total: 100, OK: 89, Degraded: 7, Progressing: 5, Drift: 30, Prune: 9, Suspended: 1,
+	}}}
+	got := tileLabels(d.Tiles())
+	want := []string{"services", "degraded", "progressing", "drift", "prune", "suspended", "ok"}
+	if !equalStrings(got, want) {
+		t.Errorf("Tiles = %v, want %v", got, want)
 	}
 }
 
-func TestTileRowSplitBalancesEvenCount(t *testing.T) {
-	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 10, OK: 8, Degraded: 1, Warning: 1}}}
-
-	top := tileLabels(d.TileRowTop())
-	bottom := tileLabels(d.TileRowBottom())
-
-	if want := []string{"services", "degraded"}; !equalStrings(top, want) {
-		t.Errorf("TileRowTop = %v, want %v", top, want)
-	}
-	if want := []string{"warning", "ok"}; !equalStrings(bottom, want) {
-		t.Errorf("TileRowBottom = %v, want %v", bottom, want)
-	}
-}
-
-func TestTileRowSplitNoAttentionTiles(t *testing.T) {
+func TestTilesSkipsZeroCategories(t *testing.T) {
 	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 5, OK: 5}}}
-
-	top := tileLabels(d.TileRowTop())
-	bottom := tileLabels(d.TileRowBottom())
-
-	if want := []string{"services"}; !equalStrings(top, want) {
-		t.Errorf("TileRowTop = %v, want %v", top, want)
-	}
-	if want := []string{"ok"}; !equalStrings(bottom, want) {
-		t.Errorf("TileRowBottom = %v, want %v", bottom, want)
+	got := tileLabels(d.Tiles())
+	want := []string{"services", "ok"}
+	if !equalStrings(got, want) {
+		t.Errorf("Tiles = %v, want %v", got, want)
 	}
 }
 
