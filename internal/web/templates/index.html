@@ -1396,6 +1396,9 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
 
 
-<footer><span>k8s-status{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</span><span title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">v{{.BuildVersion}}{{if .ChartVersion}} &middot; chart {{.ChartVersion}}{{end}}</span></footer>
+<footer><span>k8s-status{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</span><span title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">
+  {{- $rel := release .BuildVersion}}
+  {{- if $rel}}<a href="{{$rel}}">v{{.BuildVersion}}</a>{{else}}v{{.BuildVersion}}{{end}}
+  {{- if .ChartVersion}} &middot; chart {{.ChartVersion}}{{end}}</span></footer>
 </body>
 </html>

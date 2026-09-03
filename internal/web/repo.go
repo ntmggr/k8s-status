@@ -68,3 +68,13 @@ func repoCommitURL(raw, sha string) string {
 	}
 	return fmt.Sprintf("%s/-/commit/%s", base, url.PathEscape(sha))
 }
+
+// releaseURL links k8s-status's own build version to its GitHub release,
+// regardless of where this binary is actually deployed from. "dev" is a
+// local/unreleased build with no matching release.
+func releaseURL(version string) string {
+	if version == "" || version == "dev" {
+		return ""
+	}
+	return "https://github.com/ntmggr/k8s-status/releases/tag/v" + url.PathEscape(version)
+}

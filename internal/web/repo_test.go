@@ -37,3 +37,18 @@ func TestRepoTreeAndCommitURL(t *testing.T) {
 		t.Errorf("commit with no sha = %q, want empty", got)
 	}
 }
+
+func TestReleaseURL(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"released version", "0.19.3", "https://github.com/ntmggr/k8s-status/releases/tag/v0.19.3"},
+		{"dev build", "dev", ""},
+		{"empty", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := releaseURL(c.in); got != c.want {
+				t.Errorf("releaseURL(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
