@@ -33,6 +33,7 @@ func templateFuncs() template.FuncMap {
 		"repoTree":   repoTreeURL,
 		"repoCommit": repoCommitURL,
 		"release":    releaseURL,
+		"project":    func() string { return projectURL },
 		"glyph":      stateGlyph,
 		"clip":       clip,
 		"icon":       icon,
