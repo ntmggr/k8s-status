@@ -147,6 +147,11 @@ type Service struct {
 	// default alone. Zero value (Known() false) when MESH_MTLS or AZ_SPREAD is off, or
 	// the service matched no running pod to read a namespace/labels from.
 	Policy ServicePolicy
+	// Jobs lists this service's owned Job and CronJob objects, informational only:
+	// nothing here affects Health/State, since a Job's own pod is expected to exit
+	// once it completes rather than stay Running the way a Deployment's does. Empty
+	// when JOBS is off, or the service owns none.
+	Jobs []JobInfo
 }
 
 type Summary struct {
@@ -531,7 +536,7 @@ func ownedWorkloads(app argocd.Application) []Component {
 	var out []Component
 	for _, r := range app.Status.Resources {
 		switch r.Kind {
-		case "Deployment", "StatefulSet", "DaemonSet":
+		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob":
 			out = append(out, Component{Kind: r.Kind, Name: r.Name, Namespace: r.Namespace})
 		}
 	}

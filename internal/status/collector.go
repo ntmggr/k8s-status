@@ -32,6 +32,12 @@ type WorkloadLister interface {
 	ListWorkloads(ctx context.Context) (*kube.WorkloadList, error)
 }
 
+// JobLister is optional in the same way, for JOBS. Job and CronJob are cluster-wide
+// reads like Deployment/StatefulSet/DaemonSet, so this needs its own ClusterRole too.
+type JobLister interface {
+	ListJobs(ctx context.Context) (*kube.JobList, *kube.CronJobList, error)
+}
+
 // FluxLister is optional in the same way, for SOURCES. It is only wired up when flux is
 // one of the enabled sources, so an ArgoCD-only deployment never calls the Flux APIs.
 type FluxLister interface {
@@ -73,6 +79,7 @@ type Collector struct {
 	nodes     NodeLister
 	pending   PendingLister
 	workloads WorkloadLister
+	jobs      JobLister
 	flux      FluxLister
 	mesh      MeshLister
 	// meshNamespace is where the mesh-wide PeerAuthentication lives; set alongside mesh
@@ -89,6 +96,10 @@ type Collector struct {
 	unmanaged    *Unmanaged
 	unmanagedAt  time.Time
 	workloadList *kube.WorkloadList
+
+	jobsAt      time.Time
+	jobList     *kube.JobList
+	cronJobList *kube.CronJobList
 	// fluxList is the most recent Flux read, kept so fetchWorkloads can tell a
 	// Flux-managed Helm release apart from an unmanaged one. Set alongside snap.Flux,
 	// so it is nil exactly when Flux is disabled or has not been read yet.
@@ -128,6 +139,15 @@ func (c *Collector) WithUnmanaged(wl WorkloadLister) *Collector {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.workloads = wl
+	return c
+}
+
+// WithJobs enables Job/CronJob reporting. Not called means the batch APIs are never
+// queried and every service's Jobs list stays empty.
+func (c *Collector) WithJobs(jl JobLister) *Collector {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.jobs = jl
 	return c
 }
 
@@ -227,6 +247,9 @@ func (c *Collector) decorate(ctx context.Context, snap Snapshot) *Snapshot {
 	c.refreshSources(ctx)
 	c.attachNodes(ctx, &snap)
 	c.attachUnmanaged(ctx, &snap)
+	// After attachUnmanaged, same reason attachZones is: needs svc.Owned populated,
+	// either from ArgoCD's own resource tree or FillOwnedFromLabels's fallback.
+	c.attachJobs(ctx, &snap)
 	c.attachPending(ctx, &snap)
 	c.attachMesh(ctx, &snap)
 	// After attachUnmanaged: FillOwnedFromLabels there populates svc.Owned, and
@@ -276,6 +299,13 @@ func (c *Collector) refreshSources(ctx context.Context) {
 		go func() {
 			defer wg.Done()
 			c.fetchWorkloads(ctx)
+		}()
+	}
+	if c.jobs != nil && stale(c.jobsAt, c.jobList == nil) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.fetchJobs(ctx)
 		}()
 	}
 	if c.pending != nil && stale(c.pendingAt, c.pendingPods == nil) {
@@ -330,6 +360,19 @@ func (c *Collector) fetchWorkloads(ctx context.Context) {
 	c.unmanaged = &u
 	c.unmanagedAt = c.now()
 	c.workloadList = list
+}
+
+// fetchJobs keeps the last good read on failure, the same as fetchWorkloads: Jobs is
+// informational only, so a transient error here must not blank out what was already
+// known about a service's Jobs.
+func (c *Collector) fetchJobs(ctx context.Context) {
+	jobs, cronJobs, err := c.jobs.ListJobs(ctx)
+	if err != nil {
+		return
+	}
+	c.jobList = jobs
+	c.cronJobList = cronJobs
+	c.jobsAt = c.now()
 }
 
 func (c *Collector) fetchPending(ctx context.Context) {
@@ -433,6 +476,13 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
+}
+
+func (c *Collector) attachJobs(_ context.Context, snap *Snapshot) {
+	if c.jobs == nil {
+		return
+	}
+	FillJobs(snap, c.jobList, c.cronJobList)
 }
 
 func (c *Collector) attachMesh(_ context.Context, snap *Snapshot) {
