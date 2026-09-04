@@ -96,13 +96,13 @@ Reading across a row: the service, the version running, its pods, whether it is
 healthy, and whether that matches Git. The Pods column shows `2/3` (ready of desired,
 summed across every Deployment/StatefulSet/DaemonSet the service owns, needs
 `config.unmanaged`) when that is available, falling back to a plain running count
-(needs `config.azSpread` instead) otherwise, followed by `name: 1/1` for each of the
-service's own Job or CronJob objects — for a Job, how many of its desired completions
-have succeeded, informational, does not affect this row's health (needs `config.jobs`;
-see [Jobs and CronJobs](#jobs-and-cronjobs)). Badges on the name add what the row alone
-cannot say: `GPU 2` is holding two devices, `GPU waiting` wants one and has not got it,
-`GPU 0 pods` is scaled to zero. `arm64` means it can only run on that architecture. An
-amber chip means the scheduler could not place it, and says what ran out.
+(needs `config.azSpread` instead) otherwise. A service's own Job/CronJob objects are
+tracked too (needs `config.jobs`) but not shown on this page; see
+[Jobs and CronJobs](#jobs-and-cronjobs) for where to read them. Badges on the name add
+what the row alone cannot say: `GPU 2` is holding two devices, `GPU waiting` wants one
+and has not got it, `GPU 0 pods` is scaled to zero. `arm64` means it can only run on
+that architecture. An amber chip means the scheduler could not place it, and says what
+ran out.
 
 <sub>Made-up data from `testdata/`, so anyone can reproduce it with
 `./scripts/local-test.sh fixture`. There is a dark theme
@@ -947,22 +947,23 @@ fetches, no separate fetch of their own:
 
 ### Jobs and CronJobs
 
-Shows each service's own `Job` and `CronJob` objects and their run status: a badge
-naming the object, and for a `Job` its `succeeded`/`completions` ratio (e.g. `1/1`),
-`completions` defaulted to 1 the same way Kubernetes itself does when a Job leaves it
-unset. For a `CronJob` the badge shows its schedule and when it last ran instead, since
-a `CronJob` has no completions count of its own.
+Tracks each service's own `Job` and `CronJob` objects and their run status, exposed
+through the `jobs` field on [`/api/status`](#json-output) rather than on the page itself:
+for a `Job`, its name and `succeeded`/`completions` ratio (e.g. `1/1`), `completions`
+defaulted to 1 the same way Kubernetes itself does when a Job leaves it unset. For a
+`CronJob`, its schedule and when it last ran instead, since a `CronJob` has no
+completions count of its own.
 
 **Informational only.** None of this affects a service's `Health`/`State`. A `Job`'s
 own pod is expected to exit once it completes, unlike a `Deployment`'s, which is
 expected to keep running — the same population that makes a Deployment `DEGRADED`
 when it crash-loops would make every migration Job "broken" the moment it finishes
-successfully. So a failed Job's badge is coloured to flag it, but it never turns the
-service row itself red.
+successfully. So a `Job`'s own `State` field (in the JSON) flags a failure, but it
+never turns the owning service's row itself red.
 
-A `CronJob`'s badge shows its schedule and `lastScheduleTime`/`lastSuccessfulTime`
-as-is rather than a derived "succeeded"/"failed" verdict: whether the most recent
-schedule also succeeded is not something the API states directly, and guessing at it
+A `CronJob`'s `lastScheduleTime`/`lastSuccessfulTime` are reported as-is rather than a
+derived "succeeded"/"failed" verdict: whether the most recent schedule also succeeded
+is not something the API states directly, and guessing at it
 from two timestamps is not a contract worth relying on.
 
 Matched by name and namespace against ArgoCD's own resource tree — the same
