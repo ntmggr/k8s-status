@@ -83,6 +83,10 @@ cover more of the API than a status page needs to. `k8s-status` is narrower on
 purpose: one read-only page, answering "is this healthy and does it match Git",
 cheap enough to leave running for everyone.
 
+Concretely: the image is under 5MB (4.9MB amd64, 4.5MB arm64, distroless), and the
+default install asks for 50m CPU and 64Mi memory. No sidecar, no separate database,
+nothing else to run alongside it.
+
 ## What it looks like
 
 ![k8s-status](docs/screenshot.png)
