@@ -92,14 +92,16 @@ nothing else to run alongside it.
 
 ![k8s-status](docs/screenshot.png)
 
-Reading across a row: the service, the version running, how many pods are running right
-now (needs `config.azSpread`), whether it is healthy, and whether that matches Git.
-Badges add what the row alone cannot say. `GPU 2` is holding two devices, `GPU waiting`
-wants one and has not got it, `GPU 0 pods` is scaled to zero. `arm64` means it can only
-run on that architecture. An amber chip means the scheduler could not place it, and says
-what ran out. `job: name`/`cron: name` show a service's own Job and CronJob objects and
-whether they succeeded, are running, failed, or (for a CronJob) their schedule —
-informational, does not affect this row's health (needs `config.jobs`; see
+Reading across a row: the service, the version running, its pods, whether it is
+healthy, and whether that matches Git. The Pods column shows `2/3` (ready of desired,
+summed across every Deployment/StatefulSet/DaemonSet the service owns, needs
+`config.unmanaged`) when that is available, falling back to a plain running count
+(needs `config.azSpread` instead) otherwise. Badges add what the row alone cannot say.
+`GPU 2` is holding two devices, `GPU waiting` wants one and has not got it, `GPU 0 pods`
+is scaled to zero. `arm64` means it can only run on that architecture. An amber chip
+means the scheduler could not place it, and says what ran out. `name: 1/1` shows a
+service's own Job or CronJob, and (for a Job) how many of its desired completions have
+succeeded — informational, does not affect this row's health (needs `config.jobs`; see
 [Jobs and CronJobs](#jobs-and-cronjobs)).
 
 <sub>Made-up data from `testdata/`, so anyone can reproduce it with
@@ -946,8 +948,10 @@ fetches, no separate fetch of their own:
 ### Jobs and CronJobs
 
 Shows each service's own `Job` and `CronJob` objects and their run status: a badge
-naming the object and whether it succeeded, is running, or failed, and for a `CronJob`
-its schedule and when it last ran.
+naming the object, and for a `Job` its `succeeded`/`completions` ratio (e.g. `1/1`),
+`completions` defaulted to 1 the same way Kubernetes itself does when a Job leaves it
+unset. For a `CronJob` the badge shows its schedule and when it last ran instead, since
+a `CronJob` has no completions count of its own.
 
 **Informational only.** None of this affects a service's `Health`/`State`. A `Job`'s
 own pod is expected to exit once it completes, unlike a `Deployment`'s, which is
