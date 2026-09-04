@@ -64,15 +64,45 @@ object called an `Application`. **Flux** uses two objects instead, a `HelmReleas
 `Kustomization`. `k8s-status` lists whichever of those the cluster has and reports on
 each one. ArgoCD alone is the default; see [`SOURCES`](#choosing-the-source).
 
+## How it compares
+
+These all show you what's in a cluster. What differs is whether they can change it,
+whether they know what Git says should be there, and what it costs to run one.
+
+| | k8s-status | Kubernetes Dashboard | Lens / OpenLens | k9s | Headlamp | ArgoCD's own UI | Radar |
+|---|---|---|---|---|---|---|---|
+| Read-only | Yes | No | No | No | No | No | No |
+| Knows what Git says (GitOps-aware) | Yes | No | No | No | No | Its own apps only | Yes |
+| No login of its own | Yes | No | N/A (local) | N/A (local) | No | No | Yes (local mode) |
+| No JavaScript, no database | Yes | No | No | Yes (terminal) | No | No | No |
+| Shared team page, not per-user | Yes | Yes | No (desktop app) | No (CLI) | Yes | Yes | Either |
+
+None of this makes the others worse at what they do — Lens and k9s are built for
+someone actively working a cluster, edits included, and the Dashboard, Headlamp and
+Radar cover more of the API than a status page needs to (Radar in particular is
+closest in spirit, being GitOps-aware too, but it edits the cluster and ships a full
+JS frontend). `k8s-status` is narrower on purpose: one read-only page, answering
+"is this healthy and does it match Git", cheap enough to leave running for everyone.
+
+Concretely: the image is under 5MB (4.9MB amd64, 4.5MB arm64, distroless), and the
+default install asks for 50m CPU and 64Mi memory. No sidecar, no separate database,
+nothing else to run alongside it.
+
 ## What it looks like
 
 ![k8s-status](docs/screenshot.png)
 
-Reading across a row: the service, the version running, whether it is healthy, and
-whether that matches Git. Badges add what the row alone cannot say. `GPU 2` is holding
-two devices, `GPU waiting` wants one and has not got it, `GPU 0 pods` is scaled to zero.
-`arm64` means it can only run on that architecture. An amber chip means the scheduler
-could not place it, and says what ran out.
+Reading across a row: the service, the version running, its pods, whether it is
+healthy, and whether that matches Git. The Pods column shows `2/3` (ready of desired,
+summed across every Deployment/StatefulSet/DaemonSet the service owns, needs
+`config.unmanaged`) when that is available, falling back to a plain running count
+(needs `config.azSpread` instead) otherwise. A service's own Job/CronJob objects are
+tracked too (needs `config.jobs`) but not shown on this page; see
+[Jobs and CronJobs](#jobs-and-cronjobs) for where to read them. Badges on the name add
+what the row alone cannot say: `GPU 2` is holding two devices, `GPU waiting` wants one
+and has not got it, `GPU 0 pods` is scaled to zero. `arm64` means it can only run on
+that architecture. An amber chip means the scheduler could not place it, and says what
+ran out.
 
 <sub>Made-up data from `testdata/`, so anyone can reproduce it with
 `./scripts/local-test.sh fixture`. There is a dark theme
@@ -101,6 +131,7 @@ on requires `rbac.clusterRole=true`, because these resources are not namespaced:
 |---|---|---|
 | Cluster capacity | `config.nodeStats` | `get`, `list` on `nodes` |
 | Workloads outside GitOps | `config.unmanaged` | `get`, `list` on `deployments`, `statefulsets`, `daemonsets` |
+| Jobs and CronJobs | `config.jobs` | `get`, `list` on `jobs`, `cronjobs` |
 | Flux support | `config.sources` includes `flux` | `get`, `list` on `helmreleases`, `kustomizations` |
 
 **Mesh mTLS's own Role needs no ClusterRole at all.** It reads one named object in one
@@ -557,8 +588,8 @@ $ curl -s http://localhost:8080/k8s-status/api/versions | jq '.services[0]'
 things and the endpoint reports both.
 
 It takes the same filters as the page, so `?status=DEGRADED` or `?gpu=true` narrows it.
-`/api/status` returns the same facts plus health, counts and components, if you want
-everything in one call.
+`/api/status` returns the same facts plus health, counts, components, pods and jobs, if
+you want everything in one call.
 
 Just the name and version of every service, one line each:
 
@@ -593,6 +624,7 @@ can run it with none of them set.
 | `NODE_STATS` | `false` | Show the cluster capacity section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
+| `JOBS` | `false` | Show each service's own Job/CronJob objects and their run status. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `MESH_MTLS` | `false` | Show the cluster-wide Istio mTLS gauge. Needs a namespaced Role, see [Optional extras](#optional-extras) |
 | `MESH_NAMESPACE` | `istio-system` | Namespace holding the mesh-wide `PeerAuthentication` object |
 | `CACHE_TTL_SECONDS` | `15` | How long a fetched snapshot is reused |
@@ -913,6 +945,32 @@ fetches, no separate fetch of their own:
   of their own, only the row badge — nobody asked to filter on those, and adding a
   tile with no way to discover it from would be dead weight.
 
+### Jobs and CronJobs
+
+Tracks each service's own `Job` and `CronJob` objects and their run status, exposed
+through the `jobs` field on [`/api/status`](#json-output) rather than on the page itself:
+for a `Job`, its name and `succeeded`/`completions` ratio (e.g. `1/1`), `completions`
+defaulted to 1 the same way Kubernetes itself does when a Job leaves it unset. For a
+`CronJob`, its schedule and when it last ran instead, since a `CronJob` has no
+completions count of its own.
+
+**Informational only.** None of this affects a service's `Health`/`State`. A `Job`'s
+own pod is expected to exit once it completes, unlike a `Deployment`'s, which is
+expected to keep running — the same population that makes a Deployment `DEGRADED`
+when it crash-loops would make every migration Job "broken" the moment it finishes
+successfully. So a `Job`'s own `State` field (in the JSON) flags a failure, but it
+never turns the owning service's row itself red.
+
+A `CronJob`'s `lastScheduleTime`/`lastSuccessfulTime` are reported as-is rather than a
+derived "succeeded"/"failed" verdict: whether the most recent schedule also succeeded
+is not something the API states directly, and guessing at it
+from two timestamps is not a contract worth relying on.
+
+Matched by name and namespace against ArgoCD's own resource tree — the same
+`Owned` list version/GPU/architecture detection already uses — not by owner reference:
+ArgoCD already names the `Job`/`CronJob` itself, not an intermediate controller it
+created.
+
 ## How it works
 
 ### Where the numbers come from
@@ -1023,6 +1081,7 @@ Endpoints read, and what each needs:
 | `/apis/argoproj.io/v1alpha1/namespaces/<ns>/applications` | always | Role in `ARGOCD_NAMESPACE` |
 | `/api/v1/nodes` | `NODE_STATS=true` | ClusterRole |
 | `/apis/apps/v1/{deployments,statefulsets,daemonsets}` | `UNMANAGED=true` | ClusterRole |
+| `/apis/batch/v1/{jobs,cronjobs}` | `JOBS=true` | ClusterRole |
 | `/apis/security.istio.io/{v1,v1beta1}` (discovery) | `MESH_MTLS=true` | none, discovery is always readable |
 | `/apis/security.istio.io/v1/namespaces/<ns>/peerauthentications/default` | `MESH_MTLS=true` and Istio detected | Role in `MESH_NAMESPACE` |
 | `/apis/security.istio.io/v1/peerauthentications` (cluster-wide list) | `MESH_MTLS=true` and `AZ_SPREAD=true`, Istio detected | ClusterRole |

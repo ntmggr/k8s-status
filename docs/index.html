@@ -155,6 +155,26 @@
   }
   .strip b { color: var(--ink); }
 
+  /* comparison table */
+  .cmp-table-wrap { padding: 3rem 0 1rem; }
+  .cmp-table-wrap .lede { margin: 0 0 1.6rem; }
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .cmp-table th, .cmp-table td {
+    border: 1px solid var(--hair); padding: .55rem .8rem; text-align: left;
+  }
+  .cmp-table thead th {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--muted); background: var(--surface); font-weight: 600;
+  }
+  .cmp-table tbody th { font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+  .cmp-table td { font-family: var(--mono); font-size: .8rem; }
+  .cmp-table td.yes { color: var(--ok-fg); font-weight: 600; }
+  .cmp-table td.no { color: var(--muted); }
+  .cmp-table-scroll { overflow-x: auto; }
+  .cmp-note { color: var(--ink-2); font-size: .89rem; margin: 1.4rem 0 0; }
+  .cmp-note code { background: var(--surface); border: 1px solid var(--hair); border-radius: 4px;
+    padding: .05rem .3rem; }
+
   /* screenshot */
   .shot { padding: 3rem 0; }
   .shot .eyebrow { text-align: center; margin-bottom: 1rem; }
@@ -237,6 +257,7 @@
       <span>k8s-status</span>
     </a>
     <nav>
+      <a href="#compare-table">Compare</a>
       <a href="https://github.com/ntmggr/k8s-status">GitHub</a>
       <a href="https://github.com/ntmggr/k8s-status/releases">Releases</a>
       <a href="https://artifacthub.io/packages/helm/k8s-status/k8s-status">Artifact&nbsp;Hub</a>
@@ -285,6 +306,68 @@
       <span><b>Apache-2.0</b></span>
     </div>
   </div>
+
+  <section class="cmp-table-wrap" id="compare-table">
+    <div class="wrap">
+      <div class="eyebrow">How it compares</div>
+      <p class="lede">These all show you what's in a cluster. What differs is whether they
+        can change it, whether they know what Git says should be there, and what it
+        costs to run one.</p>
+      <div class="cmp-table-scroll">
+        <table class="cmp-table">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">k8s-status</th>
+              <th scope="col">Kubernetes Dashboard</th>
+              <th scope="col">Lens / OpenLens</th>
+              <th scope="col">k9s</th>
+              <th scope="col">Headlamp</th>
+              <th scope="col">ArgoCD's own UI</th>
+              <th scope="col">Radar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Read-only</th>
+              <td class="yes">Yes</td><td class="no">No</td><td class="no">No</td>
+              <td class="no">No</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
+            </tr>
+            <tr>
+              <th scope="row">Knows what Git says (GitOps-aware)</th>
+              <td class="yes">Yes</td><td class="no">No</td><td class="no">No</td>
+              <td class="no">No</td><td class="no">No</td><td class="no">Its own apps only</td><td class="yes">Yes</td>
+            </tr>
+            <tr>
+              <th scope="row">No login of its own</th>
+              <td class="yes">Yes</td><td class="no">No</td><td class="no">N/A (local)</td>
+              <td class="no">N/A (local)</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes (local mode)</td>
+            </tr>
+            <tr>
+              <th scope="row">No JavaScript, no database</th>
+              <td class="yes">Yes</td><td class="no">No</td><td class="no">No</td>
+              <td class="yes">Yes (terminal)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
+            </tr>
+            <tr>
+              <th scope="row">Shared team page, not per-user</th>
+              <td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No (desktop app)</td>
+              <td class="no">No (CLI)</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">Either</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cmp-note">None of this makes the others worse at what they do — Lens and k9s
+        are built for someone actively working a cluster, edits included, and the
+        Dashboard, Headlamp and Radar cover more of the API than a status page needs to
+        (Radar in particular is closest in spirit, being GitOps-aware too, but it edits
+        the cluster and ships a full JS frontend). <code>k8s-status</code> is narrower on
+        purpose: one read-only page, answering "is this healthy and does it match Git",
+        cheap enough to leave running for everyone.</p>
+      <p class="cmp-note">Concretely: the image is under 5MB (4.9MB amd64, 4.5MB arm64,
+        distroless), and the default install asks for 50m CPU and 64Mi memory. No
+        sidecar, no separate database, nothing else to run alongside it.</p>
+    </div>
+  </section>
 
   <section class="shot" id="screenshot">
     <div class="wrap">

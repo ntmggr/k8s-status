@@ -55,6 +55,7 @@ func main() {
 	pendingReasons := envBool("PENDING_REASONS", false)
 	unmanaged := envBool("UNMANAGED", false)
 	unmanagedIgnoreNS := splitGlobs(env("UNMANAGED_IGNORE_NS", ""))
+	jobsEnabled := envBool("JOBS", false)
 	meshMTLS := envBool("MESH_MTLS", false)
 	meshNamespace := env("MESH_NAMESPACE", "istio-system")
 	// AZ_SPREAD needs the node list to resolve a pod's zone, which only NODE_STATS
@@ -122,6 +123,15 @@ func main() {
 		collector.WithUnmanaged(workloadLister)
 	}
 
+	if jobsEnabled {
+		jobLister, jerr := buildJobLister()
+		if jerr != nil {
+			log.Printf("jobs enabled but the jobs client is unavailable: %v", jerr)
+			jobLister = failingJobLister{err: jerr}
+		}
+		collector.WithJobs(jobLister)
+	}
+
 	if meshMTLS {
 		meshLister, merr := buildMeshLister()
 		if merr != nil {
@@ -162,8 +172,8 @@ func main() {
 		log.Fatalf("build server: %v", err)
 	}
 
-	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v meshMTLS=%t meshNamespace=%q azSpread=%t",
-		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS, meshMTLS, meshNamespace, azSpread)
+	log.Printf("k8s-status %s starting: env=%q type=%q region=%q cluster=%q base=%q sources=%v namespace=%q rootApp=%q ttl=%s refresh=%ds port=%s ignore=%v argocdUI=%q nodeStats=%t pendingReasons=%t unmanaged=%t unmanagedIgnoreNS=%v meshMTLS=%t meshNamespace=%q azSpread=%t jobs=%t",
+		version, envName, envType, region, clusterName, basePath, sources, namespace, rootApp, cacheTTL, refresh, port, ignoreGlobs, argocdUI, nodeStats, pendingReasons, unmanaged, unmanagedIgnoreNS, meshMTLS, meshNamespace, azSpread, jobsEnabled)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + port,
@@ -262,6 +272,15 @@ func buildWorkloadLister() (status.WorkloadLister, error) {
 	return c, nil
 }
 
+// buildJobLister is only called when JOBS is on: Job and CronJob are cluster-scoped.
+func buildJobLister() (status.JobLister, error) {
+	c, err := buildKubeClient()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // buildMeshLister is only called when MESH_MTLS is on. DetectIstio reads discovery,
 // which needs no extra RBAC; MeshPolicy is a single-object namespaced read.
 func buildMeshLister() (status.MeshLister, error) {
@@ -323,6 +342,12 @@ type failingWorkloadLister struct{ err error }
 
 func (f failingWorkloadLister) ListWorkloads(context.Context) (*kube.WorkloadList, error) {
 	return nil, f.err
+}
+
+type failingJobLister struct{ err error }
+
+func (f failingJobLister) ListJobs(context.Context) (*kube.JobList, *kube.CronJobList, error) {
+	return nil, nil, f.err
 }
 
 type failingMeshLister struct{ err error }

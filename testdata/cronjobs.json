@@ -1,0 +1,19 @@
+{
+ "apiVersion": "batch/v1",
+ "kind": "CronJobList",
+ "items": [
+  {
+   "metadata": {
+    "name": "accounts-api-cleanup",
+    "namespace": "accounts-api"
+   },
+   "spec": {
+    "schedule": "0 3 * * *"
+   },
+   "status": {
+    "lastScheduleTime": "2026-08-21T03:00:00Z",
+    "lastSuccessfulTime": "2026-08-21T03:00:12Z"
+   }
+  }
+ ]
+}

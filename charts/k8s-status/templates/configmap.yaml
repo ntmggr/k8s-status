@@ -22,6 +22,7 @@ data:
   PENDING_REASONS: {{ .Values.config.pendingReasons | quote }}
   UNMANAGED: {{ .Values.config.unmanaged | quote }}
   UNMANAGED_IGNORE_NS: {{ .Values.config.unmanagedIgnoreNamespaces | quote }}
+  JOBS: {{ .Values.config.jobs | quote }}
   MESH_MTLS: {{ .Values.config.meshMTLS | quote }}
   MESH_NAMESPACE: {{ .Values.rbac.istioNamespace | quote }}
   AZ_SPREAD: {{ .Values.config.azSpread | quote }}

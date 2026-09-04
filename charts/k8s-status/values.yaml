@@ -81,6 +81,9 @@ config:
   unmanaged: false
   # UNMANAGED_IGNORE_NS - comma-separated namespace globs excluded from that list.
   unmanagedIgnoreNamespaces: ""
+  # JOBS - list each service's own Job and CronJob objects and their run status.
+  # Informational only, never affects Health/State. Requires rbac.clusterRole.
+  jobs: false
   # MESH_MTLS - show the cluster-wide Istio mTLS gauge. Reads one named
   # PeerAuthentication object via a namespaced Role in rbac.istioNamespace, independent
   # of rbac.clusterRole. Also reads every PeerAuthentication in every namespace, via

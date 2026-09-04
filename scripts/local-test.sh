@@ -5,8 +5,8 @@
 #
 # Deployment-specific values are not baked in. Override ENV_NAME, ENV_TYPE, REGION,
 # CLUSTER_NAME, ARGOCD_UI_BASE, ROOT_APP_NAME, IGNORE_GLOBS, NODE_STATS, UNMANAGED,
-# UNMANAGED_IGNORE_NS, MESH_MTLS, MESH_NAMESPACE and AZ_SPREAD in the environment as
-# needed.
+# UNMANAGED_IGNORE_NS, MESH_MTLS, MESH_NAMESPACE, AZ_SPREAD and JOBS in the
+# environment as needed.
 #
 # SOURCES works the same way, inherited from your shell rather than set here:
 #   SOURCES=flux ./scripts/local-test.sh fixture
@@ -49,7 +49,7 @@ case "$MODE" in
   fixture)
     FAKE_DIR="$(mktemp -d)"
     mkdir -p "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd"
-    mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1"
+    mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1" "$FAKE_DIR/apis/batch/v1"
     mkdir -p "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications"
     mkdir -p "$FAKE_DIR/apis/helm.toolkit.fluxcd.io/v2" "$FAKE_DIR/apis/kustomize.toolkit.fluxcd.io/v1"
     cp testdata/applications.json "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd/applications"
@@ -58,6 +58,10 @@ case "$MODE" in
     cp testdata/deployments.json  "$FAKE_DIR/apis/apps/v1/deployments"
     cp testdata/statefulsets.json "$FAKE_DIR/apis/apps/v1/statefulsets"
     cp testdata/daemonsets.json   "$FAKE_DIR/apis/apps/v1/daemonsets"
+    # accounts-api owns both, in applications.json's own resources list: proves a
+    # Job/CronJob shows up per service instead of being silently dropped.
+    cp testdata/jobs.json      "$FAKE_DIR/apis/batch/v1/jobs"
+    cp testdata/cronjobs.json  "$FAKE_DIR/apis/batch/v1/cronjobs"
     # Cluster-wide, same as the real Flux API: one collection per kind, no per-namespace
     # split. Served regardless of SOURCES; the app just never asks for them unless
     # SOURCES includes flux. podinfo (helmreleases.json) and network-policy-controller
@@ -123,7 +127,8 @@ case "$MODE" in
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-}"
-    # Your kubeconfig can already read nodes and workloads, so show both by default locally.
+    # Your kubeconfig can already read nodes, workloads and batch jobs, so show all
+    # three by default locally.
     NODE_STATS_DEFAULT=true
     UNMANAGED_DEFAULT=true
     # Degrades to "no service mesh detected" on a cluster without Istio, so it is safe
@@ -143,7 +148,7 @@ ARGOCD_UI_BASE="${ARGOCD_UI_BASE:-}" \
 IGNORE_GLOBS="${IGNORE_GLOBS:-}" NODE_STATS="${NODE_STATS:-$NODE_STATS_DEFAULT}" \
 PENDING_REASONS="${PENDING_REASONS:-$UNMANAGED_DEFAULT}" UNMANAGED="${UNMANAGED:-$UNMANAGED_DEFAULT}" UNMANAGED_IGNORE_NS="${UNMANAGED_IGNORE_NS:-}" \
 MESH_MTLS="${MESH_MTLS:-$MESH_MTLS_DEFAULT}" MESH_NAMESPACE="${MESH_NAMESPACE:-istio-system}" \
-AZ_SPREAD="${AZ_SPREAD:-$UNMANAGED_DEFAULT}" \
+AZ_SPREAD="${AZ_SPREAD:-$UNMANAGED_DEFAULT}" JOBS="${JOBS:-$UNMANAGED_DEFAULT}" \
 PORT="$PORT" \
 /tmp/k8s-status-local &
 PIDS+=($!)

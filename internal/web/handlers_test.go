@@ -1016,8 +1016,8 @@ func TestColspansMatchTheColumnCount(t *testing.T) {
 			t.Fatalf("%s: no thead rendered", path)
 		}
 		columns := len(regexp.MustCompile(`<th[ >]`).FindAllString(head, -1))
-		if columns != 6 {
-			t.Errorf("%s: header cells = %d, want 6", path, columns)
+		if columns != 7 {
+			t.Errorf("%s: header cells = %d, want 7", path, columns)
 		}
 		for _, m := range regexp.MustCompile(`colspan="(\d+)"`).FindAllStringSubmatch(body, -1) {
 			if m[1] != strconv.Itoa(columns) {
@@ -1050,5 +1050,75 @@ func TestVersionColumnsAreSeparate(t *testing.T) {
 	}
 	if !strings.Contains(body, "no-image-app") {
 		t.Error("the image-less service should still be listed")
+	}
+}
+
+func TestAPIIncludesPodsAndJobs(t *testing.T) {
+	snap := &status.Snapshot{}
+	svc := status.Service{
+		Name:      "billing",
+		State:     status.StateOK,
+		Zones:     status.ZoneSpread{Pods: 3},
+		PodsReady: status.Readiness{Ready: 2, Desired: 3, Found: true},
+		Jobs: []status.JobInfo{
+			{Kind: "Job", Name: "billing-migrate", Succeeded: 1, Completions: 1, CompletionTime: "2026-01-01T00:00:00Z"},
+			{Kind: "CronJob", Name: "billing-nightly", Schedule: "0 0 * * *"},
+		},
+	}
+	snap.Services = append(snap.Services, svc)
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+
+	rec := get(t, h, "/k8s-status/api/status")
+	var resp struct {
+		Services []struct {
+			Name      string         `json:"name"`
+			Pods      int            `json:"pods"`
+			PodsReady *podsReadyJSON `json:"podsReady"`
+			Jobs      []jobJSON      `json:"jobs"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Services) != 1 {
+		t.Fatalf("services = %d, want 1", len(resp.Services))
+	}
+	got := resp.Services[0]
+	if got.Pods != 3 {
+		t.Errorf("pods = %d, want 3", got.Pods)
+	}
+	if got.PodsReady == nil || got.PodsReady.Ready != 2 || got.PodsReady.Desired != 3 {
+		t.Errorf("podsReady = %+v, want {Ready:2 Desired:3}", got.PodsReady)
+	}
+	if len(got.Jobs) != 2 {
+		t.Fatalf("jobs = %+v, want 2", got.Jobs)
+	}
+	if got.Jobs[0].Kind != "Job" || got.Jobs[0].State != "Succeeded" || got.Jobs[0].Completions != 1 {
+		t.Errorf("jobs[0] = %+v, want Job/Succeeded/Completions=1", got.Jobs[0])
+	}
+	if got.Jobs[1].Kind != "CronJob" || got.Jobs[1].Schedule != "0 0 * * *" || got.Jobs[1].State != "" {
+		t.Errorf("jobs[1] = %+v, want CronJob with schedule and no derived state", got.Jobs[1])
+	}
+}
+
+func TestAPIOmitsPodsReadyWhenNotFound(t *testing.T) {
+	snap := &status.Snapshot{}
+	snap.Services = append(snap.Services, status.Service{Name: "billing", State: status.StateOK})
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+
+	rec := get(t, h, "/k8s-status/api/status")
+	var resp struct {
+		Services []struct {
+			PodsReady *podsReadyJSON `json:"podsReady"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Services) != 1 {
+		t.Fatalf("services = %d, want 1", len(resp.Services))
+	}
+	if resp.Services[0].PodsReady != nil {
+		t.Errorf("podsReady = %+v, want nil when UNMANAGED found nothing to read", resp.Services[0].PodsReady)
 	}
 }

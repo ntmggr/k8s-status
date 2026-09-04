@@ -124,6 +124,11 @@ rules:
     resources: ["deployments", "statefulsets", "daemonsets"]
     verbs: ["get", "list"]
   {{- end }}
+  {{- if .Values.config.jobs }}
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list"]
+  {{- end }}
   {{- if or .Values.config.pendingReasons .Values.config.azSpread }}
   {{- /* The widest grant this chart makes, which is why it is opt-in. The scheduler's
          verdict lives on the pod, and it is current: an Event outlives the problem it

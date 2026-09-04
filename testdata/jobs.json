@@ -1,0 +1,19 @@
+{
+ "apiVersion": "batch/v1",
+ "kind": "JobList",
+ "items": [
+  {
+   "metadata": {
+    "name": "accounts-api-migrate",
+    "namespace": "accounts-api"
+   },
+   "spec": {
+    "completions": 1
+   },
+   "status": {
+    "succeeded": 1,
+    "completionTime": "2026-08-21T11:29:10Z"
+   }
+  }
+ ]
+}
