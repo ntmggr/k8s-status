@@ -197,6 +197,22 @@
       "namespace": "accounts-api",
       "name": "accounts-api",
       "status": "Synced"
+     },
+     {
+      "group": "batch",
+      "version": "v1",
+      "kind": "Job",
+      "namespace": "accounts-api",
+      "name": "accounts-api-migrate",
+      "status": "Synced"
+     },
+     {
+      "group": "batch",
+      "version": "v1",
+      "kind": "CronJob",
+      "namespace": "accounts-api",
+      "name": "accounts-api-cleanup",
+      "status": "Synced"
      }
     ]
    }
