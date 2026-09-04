@@ -258,3 +258,38 @@ func TestBuildNodeStatsPrefersReadyNodeForVersion(t *testing.T) {
 		t.Errorf("Provider = %q, want AWS EKS", got.Provider)
 	}
 }
+
+const nodeRowFixture = `{"items":[
+ {"metadata":{"name":"node-b","labels":{"topology.kubernetes.io/zone":"eu-west-1b"}},
+  "status":{"capacity":{"cpu":"4","memory":"16Gi"},"allocatable":{"cpu":"3800m","memory":"15Gi"},
+  "nodeInfo":{"architecture":"arm64"},"conditions":[{"type":"Ready","status":"True"}]}},
+ {"metadata":{"name":"node-a","labels":{"topology.kubernetes.io/zone":"eu-west-1a"}},
+  "status":{"capacity":{"cpu":"8","memory":"32Gi","nvidia.com/gpu":"2"},"allocatable":{"cpu":"8","memory":"31Gi","nvidia.com/gpu":"2"},
+  "nodeInfo":{"architecture":"amd64"},"conditions":[{"type":"Ready","status":"False"}]}}
+]}`
+
+func TestBuildNodeStatsRows(t *testing.T) {
+	got := buildStats(decodeNodes(t, nodeRowFixture))
+	if len(got.Rows) != 2 {
+		t.Fatalf("len(Rows) = %d, want 2", len(got.Rows))
+	}
+	// NotReady first, regardless of name.
+	if got.Rows[0].Name != "node-a" || got.Rows[0].Ready {
+		t.Errorf("Rows[0] = %+v, want not-ready node-a first", got.Rows[0])
+	}
+	if got.Rows[0].GPU != 2 || got.Rows[0].GPUResource != "nvidia.com/gpu" {
+		t.Errorf("Rows[0] GPU = %d/%q, want 2/nvidia.com/gpu", got.Rows[0].GPU, got.Rows[0].GPUResource)
+	}
+	if got.Rows[0].CPU != "8" || got.Rows[0].Memory != "31.0" {
+		t.Errorf("Rows[0] CPU/Memory = %s/%s, want 8/31.0", got.Rows[0].CPU, got.Rows[0].Memory)
+	}
+	if got.Rows[1].Name != "node-b" || !got.Rows[1].Ready {
+		t.Errorf("Rows[1] = %+v, want ready node-b second", got.Rows[1])
+	}
+	if got.Rows[1].CPU != "3.8" || got.Rows[1].Zone != "eu-west-1b" {
+		t.Errorf("Rows[1] CPU/Zone = %s/%s, want 3.8/eu-west-1b", got.Rows[1].CPU, got.Rows[1].Zone)
+	}
+	if got.Rows[1].GPUResource != "" || got.Rows[1].GPU != 0 {
+		t.Errorf("Rows[1] should have no GPU, got %+v", got.Rows[1])
+	}
+}
