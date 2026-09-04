@@ -60,7 +60,12 @@ type NodeStatus struct {
 	// cluster advertises is not knowable in advance: NVIDIA full cards, NVIDIA MIG
 	// slices, AMD, Intel, AWS Neuron and TPUs all use different resource names.
 	Capacity map[string]Quantity `json:"capacity"`
-	NodeInfo NodeInfo            `json:"nodeInfo"`
+	// Allocatable is Capacity minus what the kubelet/OS reserve for itself, i.e. what
+	// a pod can actually request. Decoded the same whole-map way as Capacity, for the
+	// same reason: cpu/memory are the only keys this project reads from it, but which
+	// other keys exist is not knowable in advance.
+	Allocatable map[string]Quantity `json:"allocatable"`
+	NodeInfo    NodeInfo            `json:"nodeInfo"`
 	// Addresses carries the node's InternalIP, used elsewhere to join running pods
 	// to the node they landed on via status.hostIP.
 	Addresses []NodeAddress `json:"addresses"`

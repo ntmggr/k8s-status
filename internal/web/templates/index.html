@@ -506,6 +506,19 @@ table.components th { position: static; background: none; border: 0; padding: .1
 table.components td { border: 0; padding: .1rem 1.1rem .1rem 0; color: var(--ink-2); font-size: .78rem; }
 table.components td.k { color: var(--muted); }
 
+/* Node table: same disclosure pattern as the out-of-sync components list, one row
+   per machine so a problem node (not ready, short on room) is a name, not a guess
+   from the aggregate counts above. All from data already fetched for those counts:
+   no new read, no new RBAC. */
+.node-table { margin-top: .6rem; }
+.node-table summary { cursor: pointer; color: var(--prog-fg); font-size: .8rem; padding: .15rem 0; width: fit-content; }
+.node-table summary:hover { text-decoration: underline; }
+.node-table table { width: 100%; border-collapse: collapse; margin-top: .4rem; font-size: .78rem; }
+.node-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: .62rem;
+                 text-transform: uppercase; letter-spacing: .05em; padding: .3rem .8rem .3rem 0; }
+.node-table td { padding: .3rem .8rem .3rem 0; border-top: 1px solid var(--hair); }
+.node-table tr.is-warn td:first-child { color: var(--warn-fg); font-weight: 600; }
+
 .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem;
             margin: 1.9rem 0 -.2rem; font-size: .8rem; font-weight: 600;
             letter-spacing: .02em; color: var(--ink-2); }
@@ -1227,6 +1240,25 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
       </div>
       {{- end}}
   </div>
+  {{- if .Rows}}
+  <details class="node-table">
+    <summary>{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one</summary>
+    <table>
+      <tr><th>Name</th><th>Zone</th><th>Arch</th><th>Ready</th><th>CPU</th><th>Memory</th><th>{{$.Snapshot.AcceleratorLabel}}</th></tr>
+      {{- range .Rows}}
+      <tr class="{{if not .Ready}}is-warn{{end}}">
+        <td>{{.Name}}</td>
+        <td>{{if .Zone}}{{.Zone}}{{else}}&mdash;{{end}}</td>
+        <td>{{.Arch}}</td>
+        <td>{{if .Ready}}Ready{{else}}{{icon "warn"}}NotReady{{end}}</td>
+        <td>{{.CPU}}</td>
+        <td>{{.Memory}} Gi</td>
+        <td>{{if .GPU}}{{.GPU}}{{end}}</td>
+      </tr>
+      {{- end}}
+    </table>
+  </details>
+  {{- end}}
   {{- end}}{{end}}
   {{- with $.Snapshot.Nodes}}{{if .Error}}
   <div class="cap-note">
