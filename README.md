@@ -64,6 +64,25 @@ object called an `Application`. **Flux** uses two objects instead, a `HelmReleas
 `Kustomization`. `k8s-status` lists whichever of those the cluster has and reports on
 each one. ArgoCD alone is the default; see [`SOURCES`](#choosing-the-source).
 
+## How it compares
+
+These all show you what's in a cluster. What differs is whether they can change it,
+whether they know what Git says should be there, and what it costs to run one.
+
+| | k8s-status | Kubernetes Dashboard | Lens / OpenLens | k9s | Headlamp | ArgoCD's own UI |
+|---|---|---|---|---|---|---|
+| Read-only | Yes | No | No | No | No | No |
+| Knows what Git says (GitOps-aware) | Yes | No | No | No | No | Its own apps only |
+| No login of its own | Yes | No | N/A (local) | N/A (local) | No | No |
+| No JavaScript, no database | Yes | No | No | Yes (terminal) | No | No |
+| Shared team page, not per-user | Yes | Yes | No (desktop app) | No (CLI) | Yes | Yes |
+
+None of this makes the others worse at what they do — Lens and k9s are built for
+someone actively working a cluster, edits included, and the Dashboard and Headlamp
+cover more of the API than a status page needs to. `k8s-status` is narrower on
+purpose: one read-only page, answering "is this healthy and does it match Git",
+cheap enough to leave running for everyone.
+
 ## What it looks like
 
 ![k8s-status](docs/screenshot.png)
