@@ -21,6 +21,8 @@
 - Are your services fully HA? One glance.
 - Do you have strict mTLS enforced, cluster-wide? Same glance.
 - Are your services actually healthy? Done.
+- Something degraded, warning, or stuck unable to schedule? It's called out at the
+  top, before you have to scan the table for it.
 
 ## What is this?
 

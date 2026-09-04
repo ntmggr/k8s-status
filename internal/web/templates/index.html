@@ -216,6 +216,28 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-item.is-gpu .cv { color: var(--gpu-fg); }
 .cap-note { margin-top: .4rem; font-size: .74rem; color: var(--muted); }
 
+/* Attention digest: everything NeedsAttention() across the whole cluster, in one
+   scannable list, so a reader does not have to scan the full table below to find
+   the handful of rows that actually need a look. Pure re-presentation of data the
+   table already has -- no new fetch, no new permission. */
+.attn { border: 1px solid var(--deg-fg); border-radius: 8px; margin: .8rem 0 1.1rem;
+        background: color-mix(in srgb, var(--deg-fg) 4%, var(--surface)); overflow: hidden; }
+.attn-head { display: flex; align-items: center; gap: .4rem; padding: .55rem .9rem;
+             font-size: .68rem; letter-spacing: .07em; text-transform: uppercase;
+             font-weight: 700; color: var(--deg-fg); }
+.attn-head .ic { opacity: 1; }
+.attn-count { font-family: var(--mono); font-size: .68rem; font-weight: 700;
+              background: var(--deg-fg); color: var(--surface); border-radius: 999px;
+              padding: .02rem .45rem; }
+.attn-list { list-style: none; margin: 0; padding: 0; }
+.attn-item { display: flex; align-items: center; gap: .6rem; padding: .4rem .9rem;
+             text-decoration: none; color: var(--ink); border-top: 1px solid var(--hair); }
+.attn-list li:first-child .attn-item { border-top: 1px solid var(--hair); }
+.attn-item:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.attn-name { font-weight: 600; font-size: .84rem; flex: none; }
+.attn-reason { color: var(--ink-2); font-size: .78rem; flex: 1 1 auto; min-width: 0;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
 .gauge {
   /* Flat and bordered like .capacity/.tile, not its own elevated card -- a drop
@@ -972,6 +994,21 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
      to count only the filtered rows: every other tile would read 0 as soon as one filter
      is applied and the reader would lose their bearings. Filtering picks rows, not counts. */}}
 <div class="cap-head">Services<span class="cap-sub">what's deployed, and whether it's healthy</span></div>
+{{$attn := $.AttentionItems}}
+{{if $attn}}
+<div class="attn">
+  <div class="attn-head">{{icon "warn"}}Attention needed<span class="attn-count">{{len $attn}}</span></div>
+  <ul class="attn-list">
+    {{range $attn}}
+    <li><a class="attn-item" href="#{{.Anchor}}">
+      <span class="pill s-{{lower .State}}"><span class="g">{{glyph .State}}</span>{{.State}}</span>
+      <span class="attn-name">{{.Name}}</span>
+      {{- if .Reason}}<span class="attn-reason">{{.Reason}}</span>{{end}}
+    </a></li>
+    {{end}}
+  </ul>
+</div>
+{{end}}
 <div class="areas">
 <div class="area">
 <div class="cap-head">Health</div>
@@ -1287,7 +1324,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{$ui := .ArgoCDUIBase}}
 {{$multi := .MultiSource}}
 {{range .Services}}
-<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}} is-{{lower (printf "%s" .State)}}">
+<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}} is-{{lower (printf "%s" .State)}}" id="{{anchor (printf "%s" .Source) .Namespace .Name}}">
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
     {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
