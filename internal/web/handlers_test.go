@@ -226,6 +226,59 @@ func TestPageRenders(t *testing.T) {
 	}
 }
 
+// A handful of Job/CronJob badges should render inline in the Pods column, right
+// next to the ready/desired count, with no wrapper around them.
+func TestFewJobsRenderInline(t *testing.T) {
+	snap := fixtureSnapshot(t)
+	setJobs(t, snap, "accounts-api", 2)
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+
+	body := get(t, h, "/k8s-status/").Body.String()
+	if !strings.Contains(body, "job-0: 1/1") || !strings.Contains(body, "job-1: 1/1") {
+		t.Error("page missing inline job badges")
+	}
+	if strings.Contains(body, `<details class="jobs-details">`) {
+		t.Error("2 jobs should render inline, not collapsed behind a details toggle")
+	}
+}
+
+// A service with many one-off Jobs (Kafka Connect setup, migration hooks, etc.)
+// must collapse behind a <details> toggle. Left inline, an HTML table sizes a
+// column by its widest cell across every row, so one such service would crowd
+// every other row's Status/Sync/Detail columns down to an unreadable sliver.
+func TestManyJobsCollapseIntoDetails(t *testing.T) {
+	snap := fixtureSnapshot(t)
+	setJobs(t, snap, "accounts-api", 4)
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+
+	body := get(t, h, "/k8s-status/").Body.String()
+	if !strings.Contains(body, `<details class="jobs-details">`) {
+		t.Error("page missing the jobs-details collapse for a 4-job service")
+	}
+	if !strings.Contains(body, "<summary>4 jobs</summary>") {
+		t.Error("page missing the job count in the collapsed summary")
+	}
+	if !strings.Contains(body, "job-3: 1/1") {
+		t.Error("collapsed jobs must still be present in the markup, just hidden by default")
+	}
+}
+
+func setJobs(t *testing.T, snap *status.Snapshot, service string, n int) {
+	t.Helper()
+	for i := range snap.Services {
+		if snap.Services[i].Name != service {
+			continue
+		}
+		jobs := make([]status.JobInfo, n)
+		for j := range jobs {
+			jobs[j] = status.JobInfo{Kind: "Job", Name: "job-" + strconv.Itoa(j), Succeeded: 1, Completions: 1}
+		}
+		snap.Services[i].Jobs = jobs
+		return
+	}
+	t.Fatalf("service %q not found in fixture", service)
+}
+
 // The chart version is a Helm/Kubernetes-level fact (which chart install this is),
 // distinct from BuildVersion (which code is actually running) -- worth mentioning
 // only when it is actually known, i.e. installed via the chart at all.

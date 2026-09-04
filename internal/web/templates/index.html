@@ -421,6 +421,16 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
 /* Same reasoning as .name above: the ready/desired span and any Job/CronJob
    badges that follow it have no whitespace between them either. */
 .pods { display: flex; flex-wrap: wrap; align-items: baseline; }
+/* A service that owns many one-off Jobs (Kafka Connect setup, migration hooks)
+   would otherwise print every one of them inline, and an HTML table sizes a
+   column by its widest cell across every row -- one such service silently
+   crowds Status/Sync/Detail into an unreadable sliver for every other row too.
+   Past a handful, collapse behind a native disclosure so the column's natural
+   width tracks the summary text, not the full list. */
+.jobs-details summary { cursor: pointer; color: var(--muted); font-size: .6rem; }
+.jobs-details summary:hover { text-decoration: underline; }
+.jobs-details[open] summary { margin-bottom: .25rem; }
+.jobs-list { display: flex; flex-wrap: wrap; column-gap: .4rem; row-gap: .15rem; }
 .appver, .chartver { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                     white-space: nowrap; }
 .appver { font-size: .8rem; color: var(--ink); font-weight: 600; }
@@ -894,6 +904,13 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 /* <<< instrument refresh (generated) <<< */
 </style>
 </head>
+{{define "jobBadge"}}
+  {{- if eq .State "Failed"}}<span class="blocked" title="Job {{.Name}} failed{{if .CompletionTime}}, last attempt {{relTime .CompletionTime}}{{end}}. Informational only, does not affect this service's health.">{{icon "warn"}}{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+  {{- else if eq .State "Active"}}<span class="pod-count" title="Job {{.Name}} is running now, {{.Succeeded}} of {{.Completions}} completions so far.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+  {{- else if eq .State "Succeeded"}}<span class="pod-count" title="Job {{.Name}} completed{{if .CompletionTime}} {{relTime .CompletionTime}}{{end}}.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+  {{- else if eq .Kind "CronJob"}}<span class="pod-count" title="CronJob {{.Name}}, schedule {{.Schedule}}{{if .Suspended}}, suspended{{end}}{{if .LastScheduleTime}}. Last scheduled {{relTime .LastScheduleTime}}{{end}}{{if .LastSuccessfulTime}}, last succeeded {{relTime .LastSuccessfulTime}}{{end}}.">{{.Name}}{{if .Suspended}} (suspended){{end}}</span>
+  {{- end}}
+{{- end}}
 <body>
 <header>
   <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
@@ -1320,12 +1337,13 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{- if .PodsReady.Found}}<span title="{{.PodsReady.Ready}} of {{.PodsReady.Desired}} pods ready, summed across every Deployment/StatefulSet/DaemonSet this service owns">{{.PodsReady.Ready}}/{{.PodsReady.Desired}}</span>
     {{- else if .Zones.Pods}}<span title="{{.Zones.Pods}} running pod{{if ne .Zones.Pods 1}}s{{end}} matched to this service (needs config.unmanaged too, for a ready/desired count instead)">{{.Zones.Pods}}</span>
     {{- end}}
-    {{- range .Jobs}}
-      {{- if eq .State "Failed"}}<span class="blocked" title="Job {{.Name}} failed{{if .CompletionTime}}, last attempt {{relTime .CompletionTime}}{{end}}. Informational only, does not affect this service's health.">{{icon "warn"}}{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
-      {{- else if eq .State "Active"}}<span class="pod-count" title="Job {{.Name}} is running now, {{.Succeeded}} of {{.Completions}} completions so far.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
-      {{- else if eq .State "Succeeded"}}<span class="pod-count" title="Job {{.Name}} completed{{if .CompletionTime}} {{relTime .CompletionTime}}{{end}}.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
-      {{- else if eq .Kind "CronJob"}}<span class="pod-count" title="CronJob {{.Name}}, schedule {{.Schedule}}{{if .Suspended}}, suspended{{end}}{{if .LastScheduleTime}}. Last scheduled {{relTime .LastScheduleTime}}{{end}}{{if .LastSuccessfulTime}}, last succeeded {{relTime .LastSuccessfulTime}}{{end}}.">{{.Name}}{{if .Suspended}} (suspended){{end}}</span>
-      {{- end}}
+    {{- if .Jobs}}
+      {{- if gt (len .Jobs) 3}}
+      <details class="jobs-details">
+        <summary>{{len .Jobs}} jobs</summary>
+        <span class="jobs-list">{{range .Jobs}}{{template "jobBadge" .}}{{end}}</span>
+      </details>
+      {{- else}}{{range .Jobs}}{{template "jobBadge" .}}{{end}}{{end}}
     {{- end}}
   </td>
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
