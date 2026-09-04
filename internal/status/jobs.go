@@ -10,9 +10,12 @@ type JobInfo struct {
 	Name string
 
 	// Job fields. Zero value for a CronJob.
-	Active         int
-	Succeeded      int
-	Failed         int
+	Active    int
+	Succeeded int
+	Failed    int
+	// Completions is spec.completions, defaulted to 1 the same way Kubernetes itself
+	// does when a Job leaves it unset (a plain, non-parallel, run-once Job).
+	Completions    int
 	CompletionTime string
 
 	// CronJob fields. Zero value for a Job.
@@ -79,12 +82,17 @@ func FillJobs(snap *Snapshot, jobs *kube.JobList, cronJobs *kube.CronJobList) {
 				if !ok {
 					continue
 				}
+				completions := 1
+				if j.Spec.Completions != nil {
+					completions = *j.Spec.Completions
+				}
 				snap.Services[i].Jobs = append(snap.Services[i].Jobs, JobInfo{
 					Kind:           "Job",
 					Name:           o.Name,
 					Active:         j.Status.Active,
 					Succeeded:      j.Status.Succeeded,
 					Failed:         j.Status.Failed,
+					Completions:    completions,
 					CompletionTime: j.Status.CompletionTime,
 				})
 			case "CronJob":

@@ -152,6 +152,10 @@ type Service struct {
 	// once it completes rather than stay Running the way a Deployment's does. Empty
 	// when JOBS is off, or the service owns none.
 	Jobs []JobInfo
+	// PodsReady is this service's own ready/desired count, summed across its owned
+	// Deployment/StatefulSet/DaemonSet objects. Zero value (Found false) when
+	// UNMANAGED is off.
+	PodsReady Readiness
 }
 
 type Summary struct {

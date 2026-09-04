@@ -188,8 +188,16 @@ type serviceJSON struct {
 	// Pods is the running-pod count AZ_SPREAD already computes. Omitted at zero,
 	// same as the page's own badge: AZ_SPREAD being off and a service genuinely
 	// having no running pods are not distinguished here either.
-	Pods int       `json:"pods,omitempty"`
-	Jobs []jobJSON `json:"jobs,omitempty"`
+	Pods int `json:"pods,omitempty"`
+	// PodsReady is present only when UNMANAGED found at least one of this service's
+	// owned Deployment/StatefulSet/DaemonSet objects to read ready/desired from.
+	PodsReady *podsReadyJSON `json:"podsReady,omitempty"`
+	Jobs      []jobJSON      `json:"jobs,omitempty"`
+}
+
+type podsReadyJSON struct {
+	Ready   int `json:"ready"`
+	Desired int `json:"desired"`
 }
 
 type componentJSON struct {
@@ -207,6 +215,8 @@ type jobJSON struct {
 	// State is present only for a Job ("Active"/"Succeeded"/"Failed"); empty for a
 	// CronJob, whose raw fields are reported instead of a derived verdict.
 	State          string `json:"state,omitempty"`
+	Succeeded      int    `json:"succeeded,omitempty"`
+	Completions    int    `json:"completions,omitempty"`
 	CompletionTime string `json:"completionTime,omitempty"`
 	// CronJob fields, omitted for a Job.
 	Schedule           string `json:"schedule,omitempty"`
@@ -391,6 +401,7 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 				Detail:     svc.Detail,
 				Components: components(svc),
 				Pods:       svc.Zones.Pods,
+				PodsReady:  podsReady(svc),
 				Jobs:       jobs(svc),
 			})
 		}
@@ -547,6 +558,8 @@ func jobs(svc status.Service) []jobJSON {
 			Kind:               j.Kind,
 			Name:               j.Name,
 			State:              j.State(),
+			Succeeded:          j.Succeeded,
+			Completions:        j.Completions,
 			CompletionTime:     j.CompletionTime,
 			Schedule:           j.Schedule,
 			Suspended:          j.Suspended,
@@ -555,6 +568,13 @@ func jobs(svc status.Service) []jobJSON {
 		})
 	}
 	return out
+}
+
+func podsReady(svc status.Service) *podsReadyJSON {
+	if !svc.PodsReady.Found {
+		return nil
+	}
+	return &podsReadyJSON{Ready: svc.PodsReady.Ready, Desired: svc.PodsReady.Desired}
 }
 
 // gpuAlloc renders the allocation block, and only for GPU rows. The state word is what

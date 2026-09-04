@@ -476,6 +476,7 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	FillMissingVersions(snap, c.workloadList)
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
+	FillReadiness(snap, c.workloadList)
 }
 
 func (c *Collector) attachJobs(_ context.Context, snap *Snapshot) {

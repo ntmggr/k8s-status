@@ -1291,10 +1291,10 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{- if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}
     {{- if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This service's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}
     {{- range .Jobs}}
-      {{- if eq .State "Failed"}}<span class="blocked" title="Job {{.Name}} failed{{if .CompletionTime}}, last attempt {{relTime .CompletionTime}}{{end}}. Informational only, does not affect this service's health.">{{icon "warn"}}job failed: {{.Name}}</span>
-      {{- else if eq .State "Active"}}<span class="pod-count" title="Job {{.Name}} is running now.">job: {{.Name}}</span>
-      {{- else if eq .State "Succeeded"}}<span class="pod-count" title="Job {{.Name}} completed{{if .CompletionTime}} {{relTime .CompletionTime}}{{end}}.">job: {{.Name}}</span>
-      {{- else if eq .Kind "CronJob"}}<span class="pod-count" title="CronJob {{.Name}}, schedule {{.Schedule}}{{if .Suspended}}, suspended{{end}}{{if .LastScheduleTime}}. Last scheduled {{relTime .LastScheduleTime}}{{end}}{{if .LastSuccessfulTime}}, last succeeded {{relTime .LastSuccessfulTime}}{{end}}.">cron: {{.Name}}{{if .Suspended}} (suspended){{end}}</span>
+      {{- if eq .State "Failed"}}<span class="blocked" title="Job {{.Name}} failed{{if .CompletionTime}}, last attempt {{relTime .CompletionTime}}{{end}}. Informational only, does not affect this service's health.">{{icon "warn"}}{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+      {{- else if eq .State "Active"}}<span class="pod-count" title="Job {{.Name}} is running now, {{.Succeeded}} of {{.Completions}} completions so far.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+      {{- else if eq .State "Succeeded"}}<span class="pod-count" title="Job {{.Name}} completed{{if .CompletionTime}} {{relTime .CompletionTime}}{{end}}.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+      {{- else if eq .Kind "CronJob"}}<span class="pod-count" title="CronJob {{.Name}}, schedule {{.Schedule}}{{if .Suspended}}, suspended{{end}}{{if .LastScheduleTime}}. Last scheduled {{relTime .LastScheduleTime}}{{end}}{{if .LastSuccessfulTime}}, last succeeded {{relTime .LastSuccessfulTime}}{{end}}.">{{.Name}}{{if .Suspended}} (suspended){{end}}</span>
       {{- end}}
     {{- end}}
     {{- if .GPU}}
@@ -1314,7 +1314,11 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
       {{- if $c}} <a class="sha" href="{{$c}}">{{short .Revision}}</a>{{else}} <span class="sha">{{short .Revision}}</span>{{end}}
     {{- end}}
   </td>
-  <td class="pods hide-sm"{{if .Zones.Pods}} title="{{.Zones.Pods}} running pod{{if ne .Zones.Pods 1}}s{{end}} matched to this service"{{end}}>{{if .Zones.Pods}}{{.Zones.Pods}}{{end}}</td>
+  <td class="pods hide-sm">
+    {{- if .PodsReady.Found}}<span title="{{.PodsReady.Ready}} of {{.PodsReady.Desired}} pods ready, summed across every Deployment/StatefulSet/DaemonSet this service owns">{{.PodsReady.Ready}}/{{.PodsReady.Desired}}</span>
+    {{- else if .Zones.Pods}}<span title="{{.Zones.Pods}} running pod{{if ne .Zones.Pods 1}}s{{end}} matched to this service (needs config.unmanaged too, for a ready/desired count instead)">{{.Zones.Pods}}</span>
+    {{- end}}
+  </td>
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
   <td class="sync hide-sm">{{.Sync}}</td>
   <td class="detail hide-sm">{{.Detail}}</td>

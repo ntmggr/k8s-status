@@ -24,7 +24,15 @@ type JobList struct {
 // Job decodes only the fields the Jobs section needs.
 type Job struct {
 	Metadata WorkloadMetadata `json:"metadata"`
+	Spec     JobSpec          `json:"spec"`
 	Status   JobStatus        `json:"status"`
+}
+
+type JobSpec struct {
+	// Completions is a pointer so "absent" (Kubernetes defaults it to 1) is
+	// distinguishable from an explicit value, the same reason WorkloadSpec.Replicas
+	// and CronJobSpec.Suspend are pointers too.
+	Completions *int `json:"completions"`
 }
 
 type JobStatus struct {

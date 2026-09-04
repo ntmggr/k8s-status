@@ -65,6 +65,9 @@ func TestFillJobsMatchesOwnedByNameAndNamespace(t *testing.T) {
 	if job == nil || job.Name != "billing-migrate" || job.Succeeded != 1 || job.State() != "Succeeded" {
 		t.Errorf("job = %+v, want billing-migrate/Succeeded", job)
 	}
+	if job != nil && job.Completions != 1 {
+		t.Errorf("job.Completions = %d, want 1 (spec.completions unset, Kubernetes' own default)", job.Completions)
+	}
 	if cron == nil || cron.Name != "billing-nightly" || cron.Schedule != "0 0 * * *" {
 		t.Errorf("cron = %+v, want billing-nightly on schedule 0 0 * * *", cron)
 	}
@@ -97,6 +100,26 @@ func TestFillJobsResetsOnRepeatedCalls(t *testing.T) {
 	}
 	if got := len(snap.Services[0].Jobs); got != 1 {
 		t.Errorf("Jobs count after 3 calls = %d, want 1 (must not accumulate)", got)
+	}
+}
+
+func TestFillJobsRespectsExplicitCompletions(t *testing.T) {
+	snap := &Snapshot{}
+	snap.addService(Service{Name: "billing", Owned: []Component{
+		{Kind: "Job", Name: "batch", Namespace: "billing"},
+	}})
+	five := 5
+	jobs := &kube.JobList{Items: []kube.Job{
+		{Metadata: kube.WorkloadMetadata{Name: "batch", Namespace: "billing"},
+			Spec:   kube.JobSpec{Completions: &five},
+			Status: kube.JobStatus{Succeeded: 3}},
+	}}
+
+	FillJobs(snap, jobs, &kube.CronJobList{})
+
+	got := snap.Services[0].Jobs
+	if len(got) != 1 || got[0].Completions != 5 || got[0].Succeeded != 3 {
+		t.Errorf("Jobs = %+v, want one job with Completions=5 Succeeded=3", got)
 	}
 }
 
