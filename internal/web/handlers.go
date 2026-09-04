@@ -185,6 +185,11 @@ type serviceJSON struct {
 	Health     string          `json:"health"`
 	Detail     string          `json:"detail"`
 	Components []componentJSON `json:"components,omitempty"`
+	// Pods is the running-pod count AZ_SPREAD already computes. Omitted at zero,
+	// same as the page's own badge: AZ_SPREAD being off and a service genuinely
+	// having no running pods are not distinguished here either.
+	Pods int       `json:"pods,omitempty"`
+	Jobs []jobJSON `json:"jobs,omitempty"`
 }
 
 type componentJSON struct {
@@ -192,6 +197,22 @@ type componentJSON struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 	Sync      string `json:"sync"`
+}
+
+// jobJSON mirrors status.JobInfo. Informational only, same as the page: nothing here
+// is read into Health/State.
+type jobJSON struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+	// State is present only for a Job ("Active"/"Succeeded"/"Failed"); empty for a
+	// CronJob, whose raw fields are reported instead of a derived verdict.
+	State          string `json:"state,omitempty"`
+	CompletionTime string `json:"completionTime,omitempty"`
+	// CronJob fields, omitted for a Job.
+	Schedule           string `json:"schedule,omitempty"`
+	Suspended          bool   `json:"suspended,omitempty"`
+	LastScheduleTime   string `json:"lastScheduleTime,omitempty"`
+	LastSuccessfulTime string `json:"lastSuccessfulTime,omitempty"`
 }
 
 // nodesJSON is omitted entirely when NODE_STATS is off.
@@ -369,6 +390,8 @@ func (s *Server) handleAPI(w http.ResponseWriter, r *http.Request) {
 				Health:     svc.Health,
 				Detail:     svc.Detail,
 				Components: components(svc),
+				Pods:       svc.Zones.Pods,
+				Jobs:       jobs(svc),
 			})
 		}
 		if !snap.CheckedAt.IsZero() {
@@ -510,6 +533,26 @@ func components(svc status.Service) []componentJSON {
 	out := make([]componentJSON, 0, len(svc.Components))
 	for _, c := range svc.Components {
 		out = append(out, componentJSON{Kind: c.Kind, Name: c.Name, Namespace: c.Namespace, Sync: c.Sync})
+	}
+	return out
+}
+
+func jobs(svc status.Service) []jobJSON {
+	if len(svc.Jobs) == 0 {
+		return nil
+	}
+	out := make([]jobJSON, 0, len(svc.Jobs))
+	for _, j := range svc.Jobs {
+		out = append(out, jobJSON{
+			Kind:               j.Kind,
+			Name:               j.Name,
+			State:              j.State(),
+			CompletionTime:     j.CompletionTime,
+			Schedule:           j.Schedule,
+			Suspended:          j.Suspended,
+			LastScheduleTime:   j.LastScheduleTime,
+			LastSuccessfulTime: j.LastSuccessfulTime,
+		})
 	}
 	return out
 }
