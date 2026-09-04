@@ -146,8 +146,8 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
    two sub-areas. Each gets its own inset box rather than a divider line between them:
    a border-left reads fine side by side but dangles disconnected once a narrow
    viewport wraps them onto separate rows, where a box still reads correctly either
-   way. --plane (the page background, not --surface's card tone) is what .hd-mask
-   already uses for the same "recessed within this card" look. */
+   way. --plane (the page background, not --surface's card tone) is the same
+   "recessed within this card" look used elsewhere on the page. */
 .areas { display: flex; flex-wrap: wrap; gap: .9rem; margin-top: .5rem; }
 .area {
   display: flex; flex-direction: column;
@@ -239,125 +239,47 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
+/* Gauge: a plain ring, not a dial -- closer to a fleet-status page's own instrument
+   than a speedometer's. A colored arc up to --pct, flat red/yellow/green by threshold
+   rather than a needle's smooth gradient, a plain track for the rest, and the number
+   in the middle. No needle, no pivot, no 25/50/75 scale to read against. */
 .gauge {
-  /* Flat and bordered like .capacity/.tile, not its own elevated card -- a drop
-     shadow here would make this the only "raised" element on the whole page.
-     Stretched to match the tiles-stack's height (align-items: stretch on the parent
-     row) rather than a hand-picked height, so it stays right if the tile styling
-     ever changes. justify-content spaces its own content out to fill that height. */
-  --pct: 0;
-  flex: none; width: 124px;
-  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-  box-sizing: border-box;
-  padding: .55rem .8rem .5rem;
-  border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--ring);
+  --pct: 0; flex: none; width: 108px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: .4rem; box-sizing: border-box;
 }
 .gauge .hd-face {
-  position: relative; width: 100%; height: 58px;
+  position: relative; width: 76px; height: 76px; border-radius: 50%; margin-top: 2px;
+  background: conic-gradient(var(--ring, var(--muted)) calc(var(--pct) * 3.6deg), var(--track) 0);
 }
-.gauge .hd-arc {
-  /* A smooth blend, not hard blocks: mapping severity thresholds (75/90) straight onto
-     arc degrees made red cover ~73% of the face and look alarming regardless of the
-     actual number. The needle position and the number's color still track the real
-     Health.State() thresholds -- only the background band is now a gradient. */
-  width: 100%; height: 100%;
-  border-radius: 108px 108px 0 0;
-  background: conic-gradient(from 270deg at 50% 100%,
-    var(--deg-fg) 0deg, var(--warn-fg) 90deg, var(--ok-fg) 180deg);
-  box-shadow: inset 0 -3px 6px rgba(0,0,0,.1), inset 0 0 0 1px rgba(0,0,0,.04);
-}
-.gauge .hd-tick {
-  position: absolute; left: 50%; bottom: 0; width: 2px; height: 54px;
-  margin-left: -1px; transform-origin: bottom center;
-}
-.gauge .hd-tick::after {
-  content: ""; position: absolute; left: 0; top: 0; width: 2px; height: 7px;
-  background: var(--plane); box-shadow: 0 0 0 1px rgba(0,0,0,.1);
-}
-.gauge .hd-scale {
-  /* Counter-rotated so the digits stay upright regardless of which tick they sit on. */
-  position: absolute; top: -13px; left: 50%; margin-left: -7px; width: 14px;
-  text-align: center; font-size: .5rem; font-weight: 700; color: var(--muted);
-}
-.gauge .hd-mask {
-  position: absolute; left: 9px; right: 9px; bottom: 0; top: 9px;
-  border-radius: 92px 92px 0 0;
-  background: var(--plane);
-  box-shadow: inset 0 2px 4px rgba(0,0,0,.07);
-}
-.gauge .hd-needle {
-  /* An arrowhead on a thin shaft, not a wide taper starting from the pivot: a wide
-     base sweeps directly over the number at low/high percentages, where the needle
-     lies close to horizontal, but the arrowhead itself sits far enough out along
-     the needle's length that it clears the number even then. */
-  position: absolute; left: 50%; bottom: 0; width: 10px; height: 42px;
-  margin-left: -5px;
-  clip-path: polygon(50% 0%, 100% 24%, 64% 24%, 64% 100%, 36% 100%, 36% 24%, 0% 24%);
-  /* Softened --ink (not --muted): the needle still needs to read against all three
-     arc colors, and a light grey nearly disappears against the amber band. A
-     translucent dark keeps contrast everywhere while staying secondary to the number. */
-  background: color-mix(in srgb, var(--ink) 78%, transparent);
-  transform-origin: bottom center;
-  /* Sweeps from horizontal up to --pct's angle rather than snapping there: "to" reads
-     the same var()/calc() the static angle would, so each gauge animates toward its
-     own value with no JS to set it after the fact. `both` holds that end frame. */
-  animation: hd-sweep .8s cubic-bezier(.22, 1, .36, 1) both;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,.3));
-}
-@keyframes hd-sweep {
-  from { transform: rotate(-90deg); }
-  to   { transform: rotate(calc(var(--pct) * 1.8deg - 90deg)); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .gauge .hd-needle { animation: none; transform: rotate(calc(var(--pct) * 1.8deg - 90deg)); }
-}
-.gauge .hd-pivot {
-  position: absolute; left: 50%; bottom: -1px; width: 10px; height: 10px;
-  margin-left: -5px; border-radius: 50%;
-  background: color-mix(in srgb, var(--ink) 78%, transparent);
-  box-shadow: 0 0 0 3px var(--plane), 0 1px 3px rgba(0,0,0,.35);
+.gauge .hd-face::after {
+  /* The donut hole: a plain inset circle in the page's own surface color, cut into
+     the conic-gradient ring above it rather than a second stacked element. */
+  content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--surface);
 }
 .gauge .hd-num {
-  /* Matches the arc's own gradient at the needle's exact position, not the
-     Health.State() thresholds -- otherwise the number can land on a color the
-     needle visually isn't pointing at. Two chained color-mixes reproduce the arc's
-     two-segment gradient: clamped so segment two only kicks in past the midpoint. */
-  --seg1: clamp(0%, calc(var(--pct) * 2%), 100%);
-  --seg2: clamp(0%, calc((var(--pct) - 50) * 2%), 100%);
-  --hd-mid: color-mix(in srgb, var(--deg-fg), var(--warn-fg) var(--seg1));
-  /* Sits inside the arc face, above the pivot hub and the needle's rotation band so
-     the needle never sweeps across it even at 0%/100% (near-horizontal). */
-  position: absolute; left: 0; right: 0; bottom: 11px; z-index: 1;
-  text-align: center; line-height: 1;
-  font-size: 1.1rem; font-weight: 800; font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--hd-mid), var(--ok-fg) var(--seg2));
+  /* z-index, not just a later rule: .hd-face::after is also position:absolute for the
+     donut-hole cutout, and a pseudo-element stacks as though it were the box's last
+     child, so without this it painted over the number instead of under it. */
+  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; font-weight: 800; letter-spacing: -.02em; color: var(--ring, var(--muted));
 }
-.gauge .hd-num small { font-size: .6em; font-weight: 700; margin-left: .05em; }
+.gauge .hd-num small { font-size: .5em; font-weight: 700; color: var(--muted); margin-left: .1em; }
 .gauge .hd-cap {
-  margin-top: .15rem; text-align: center;
-  font-size: .62rem; color: var(--muted); white-space: nowrap;
+  text-align: center; font-size: .62rem; color: var(--muted); white-space: nowrap;
 }
-.gauge.is-unknown .hd-arc { background: var(--track, var(--hair)); box-shadow: none; }
-.gauge.is-unknown .hd-needle, .gauge.is-unknown .hd-pivot { background: var(--muted); filter: none; }
+.gauge.is-ok   { --ring: var(--ok-fg); }
+.gauge.is-warn { --ring: var(--warn-fg); }
+.gauge.is-bad  { --ring: var(--deg-fg); }
+.gauge.is-unknown .hd-face { background: var(--track); }
 .gauge.is-unknown .hd-num { color: var(--muted); }
 
 /* Health is the one gauge worth a bigger presentation -- it is the headline number
-   for the whole page, not one of several equal-weight spread checks. Every value
-   below is the base gauge's own value scaled by the same ~1.6x, so the geometry
-   (arc radius, needle length, mask insets) stays proportional rather than drifting. */
-.gauge.gauge-lg { width: 200px; padding: .75rem 1.05rem .7rem; }
-.gauge.gauge-lg .hd-face { height: 92px; }
-.gauge.gauge-lg .hd-arc { border-radius: 173px 173px 0 0; }
-.gauge.gauge-lg .hd-tick { height: 86px; }
-.gauge.gauge-lg .hd-tick::after { height: 11px; }
-.gauge.gauge-lg .hd-scale { top: -16px; margin-left: -9px; width: 18px; font-size: .62rem; }
-.gauge.gauge-lg .hd-mask { left: 14px; right: 14px; top: 14px; border-radius: 147px 147px 0 0; }
-.gauge.gauge-lg .hd-needle { width: 16px; height: 67px; margin-left: -8px; }
-.gauge.gauge-lg .hd-pivot { width: 16px; height: 16px; margin-left: -8px; }
-.gauge.gauge-lg .hd-num { bottom: 18px; font-size: 1.75rem; }
-.gauge.gauge-lg .hd-cap { font-size: .75rem; margin-top: .25rem; }
+   for the whole page, not one of several equal-weight spread checks. */
+.gauge.gauge-lg { width: 156px; }
+.gauge.gauge-lg .hd-face { width: 112px; height: 112px; }
+.gauge.gauge-lg .hd-num { font-size: 1.75rem; }
+.gauge.gauge-lg .hd-cap { font-size: .75rem; }
 
 /* The gauge's own percentage only says how many are at risk, not which -- the at-risk
    tile is what actually answers that, by filtering the table to those exact rows.
@@ -728,98 +650,6 @@ a.cap-part:hover { text-decoration: underline; }
 .tile.t-ok .k, .tile.t-degraded .k, .tile.t-warning .k, .tile.t-progressing .k,
 .tile.t-drift .k, .tile.t-prune .k, .tile.t-suspended .k { color: var(--muted); }
 
-/* Gauge: an instrument, not a dial. No card, no tick marks, no 25/50/75 furniture,
-   no pivot hub — a track, a sweep to --pct, a slim marker and the number. */
-.gauge { background: transparent; border: 0; padding: 0; width: auto; gap: .3rem; }
-.gauge .hd-face {
-  position: relative; width: 108px; height: 54px; margin: 26px auto 0;
-  /* Own stacking context, so the z-index:-1 graduation layers below sit behind the
-     arc (a static in-flow child) but still in front of the face's own background. */
-  isolation: isolate;
-}
-.gauge.gauge-lg .hd-face { width: 156px; height: 78px; margin-top: 30px; }
-.gauge .hd-pivot { display: none; }
-/* Ticks, done properly: a fine graduation fringe drawn OUTSIDE the arc, so the ring
-   itself stays clean. Two layers — minor every 9°, major every 45° and longer — both
-   painted by the face's own pseudo-elements, which the arc then covers from the
-   inside. No extra markup: the stock .hd-tick <i> elements only carry the digits. */
-.gauge .hd-face::before, .gauge .hd-face::after {
-  content: ""; position: absolute; bottom: 0; border-radius: 999px 999px 0 0;
-  pointer-events: none;
-  /* Without this the fringe paints OVER .hd-arc — positioned descendants outrank an
-     in-flow static sibling — and the graduations stripe straight across the band. */
-  z-index: -1;
-}
-.gauge .hd-face::before {                       /* minor graduations */
-  left: -5px; right: -5px; top: -5px;
-  background: repeating-conic-gradient(from 270deg at 50% 100%,
-    var(--muted) 0 .55deg, transparent .55deg 9deg);
-  opacity: .38;
-}
-.gauge .hd-face::after {                        /* major graduations */
-  left: -9px; right: -9px; top: -9px;
-  background: repeating-conic-gradient(from 270deg at 50% 100%,
-    var(--ink-2) 0 .75deg, transparent .75deg 45deg);
-  opacity: .55;
-}
-.gauge.gauge-lg .hd-face::before { left: -6px; right: -6px; top: -6px; }
-.gauge.gauge-lg .hd-face::after  { left: -11px; right: -11px; top: -11px; }
-/* The stock tick <i> keeps only its digit; its own line is now the fringe's job. */
-.gauge .hd-tick { background: none; }
-.gauge .hd-tick::after { display: none; }
-.gauge .hd-scale {
-  top: -22px; font-family: var(--mono); font-size: .52rem; font-weight: 600;
-  letter-spacing: .04em; color: var(--muted); opacity: .8;
-}
-.gauge.gauge-lg .hd-scale { top: -26px; font-size: .58rem; }
-.gauge {
-  --seg1: clamp(0%, calc(var(--pct) * 2%), 100%);
-  --seg2: clamp(0%, calc((var(--pct) - 50) * 2%), 100%);
-  --arc: color-mix(in srgb,
-           color-mix(in srgb, var(--deg-fg), var(--warn-arc) var(--seg1)),
-           var(--ok-fg) var(--seg2));
-}
-.gauge .hd-arc {
-  border-radius: 999px 999px 0 0; box-shadow: none;
-  background: conic-gradient(from 270deg at 50% 100%,
-    var(--arc) 0deg calc(var(--pct) * 1.8deg),
-    var(--track) calc(var(--pct) * 1.8deg) 180deg);
-}
-.gauge .hd-mask {
-  left: 9px; right: 9px; top: 9px; border-radius: 999px 999px 0 0;
-  background: var(--surface); box-shadow: none;
-}
-.gauge.gauge-lg .hd-mask { left: 13px; right: 13px; top: 13px; }
-/* Marker: a small ringed dot riding the arc's tip, not an arrow. The spoke itself
-   (.hd-needle, still rotated by the base rule's own transform/animation) stays
-   invisible -- only its ::after dot renders, at the spoke's tip. This face is a
-   true 2:1 semicircle (width = 2 x height, checked below), so rotate() lands the
-   dot exactly on the ring at every value with no drift to correct for. */
-.gauge .hd-needle {
-  width: 2px; margin-left: -1px; height: 54px; clip-path: none; filter: none;
-  background: none;
-}
-.gauge .hd-needle::after {
-  content: ""; position: absolute; top: -3px; left: 50%; width: 9px; height: 9px;
-  margin-left: -4.5px; border-radius: 50%; background: var(--surface);
-  box-shadow: 0 0 0 2.25px var(--arc), 0 1px 2px rgba(0,0,0,.25);
-}
-.gauge.gauge-lg .hd-needle { height: 78px; }
-.gauge.gauge-lg .hd-needle::after {
-  top: -4px; width: 12px; height: 12px; margin-left: -6px;
-  box-shadow: 0 0 0 2.75px var(--arc), 0 1px 2px rgba(0,0,0,.25);
-}
-.gauge.is-unknown .hd-needle::after { display: none; }
-.gauge .hd-num {
-  bottom: 1px; font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em;
-  color: var(--arc);
-}
-.gauge.gauge-lg .hd-num { bottom: 3px; font-size: 2rem; }
-.gauge .hd-num small { font-size: .5em; color: var(--muted); margin-left: .1em; }
-.gauge .hd-cap { font-family: var(--mono); font-size: .6rem; letter-spacing: .04em; }
-.gauge.is-unknown { --arc: var(--muted); }
-.gauge.is-unknown .hd-arc { background: var(--track); }
-.gauge.is-unknown .hd-needle { background: none; }
 
 /* Views + cluster: hairline chips, no fills. */
 .views, .capacity { padding: .6rem .9rem; }
@@ -1027,16 +857,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 <div class="cap-head">Health</div>
 <div class="tiles-row is-top">
 {{with .Health}}
-<div class="gauge gauge-lg{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+<div class="gauge gauge-lg{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
   <div class="hd-face">
-    <div class="hd-arc"></div>
-    <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-    <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
-    <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
-    <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
-    <i class="hd-tick" style="transform: rotate(90deg)"></i>
-    <div class="hd-mask"></div>
-    {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
     <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
   </div>
   <span class="hd-cap">{{if .Known}}{{.OK}} of {{.Counted}} counted{{else}}no services counted{{end}}</span>
@@ -1055,16 +877,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   <div class="ha-rows">
     <div class="tiles-row">
       <span class="spread-lab">Zones</span>
-      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of zone-eligible services spread across 2+ zones &middot; {{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
+      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of zone-eligible services spread across 2+ zones &middot; {{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
         <div class="hd-face">
-          <div class="hd-arc"></div>
-          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
-          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
-          <i class="hd-tick" style="transform: rotate(90deg)"></i>
-          <div class="hd-mask"></div>
-          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
           <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
         </div>
         <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
@@ -1079,16 +893,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{with $.Snapshot.NodeHA}}
     <div class="tiles-row">
       <span class="spread-lab">Nodes</span>
-      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of node-eligible services spread across 2+ nodes &middot; {{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
+      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of node-eligible services spread across 2+ nodes &middot; {{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
         <div class="hd-face">
-          <div class="hd-arc"></div>
-          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
-          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
-          <i class="hd-tick" style="transform: rotate(90deg)"></i>
-          <div class="hd-mask"></div>
-          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
           <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
         </div>
         <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
@@ -1126,16 +932,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{with $.Snapshot.MeshHA}}
     <div class="tiles-row is-top">
       <span class="spread-lab" title="Sidecar injection only: a service having the sidecar on every running pod is not the same as mTLS being enforced for it. An Istio ingress gateway reads as 'in mesh' too, but that's its own Envoy engine, not an injected sidecar -- gateways are never sidecar-injected by design.">In mesh</span>
-      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar on every running pod &middot; {{.Injected}} of {{.Eligible}} counted{{if .NotInMesh}} &middot; {{.NotInMesh}} not in mesh{{end}}{{else}}no services counted{{end}}">
+      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar on every running pod &middot; {{.Injected}} of {{.Eligible}} counted{{if .NotInMesh}} &middot; {{.NotInMesh}} not in mesh{{end}}{{else}}no services counted{{end}}">
         <div class="hd-face">
-          <div class="hd-arc"></div>
-          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
-          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
-          <i class="hd-tick" style="transform: rotate(90deg)"></i>
-          <div class="hd-mask"></div>
-          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
           <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
         </div>
         <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
@@ -1150,16 +948,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{with $.Snapshot.MeshPolicyHA}}
     <div class="tiles-row">
       <span class="spread-lab" title="Effective policy only -- not sidecar injection. A service counts here if AZ_SPREAD and mesh mTLS are both on and it resolved to an effective mode; DISABLE is not tracked per-service, so this is permissive vs. everything else, not a three-way severity ranking.">Strict</span>
-      <div class="gauge{{if not .Known}} is-unknown{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of policy-eligible services are NOT permissive &middot; {{.Compliant}} of {{.Eligible}} counted{{if .Permissive}} &middot; {{.Permissive}} permissive{{end}}{{else}}no services counted{{end}}">
+      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}"{{end}} title="{{if .Known}}{{.Percent}}% of policy-eligible services are NOT permissive &middot; {{.Compliant}} of {{.Eligible}} counted{{if .Permissive}} &middot; {{.Permissive}} permissive{{end}}{{else}}no services counted{{end}}">
         <div class="hd-face">
-          <div class="hd-arc"></div>
-          <i class="hd-tick" style="transform: rotate(-90deg)"></i>
-          <i class="hd-tick" style="transform: rotate(-45deg)"><span class="hd-scale" style="transform: rotate(45deg)">25</span></i>
-          <i class="hd-tick" style="transform: rotate(0deg)"><span class="hd-scale">50</span></i>
-          <i class="hd-tick" style="transform: rotate(45deg)"><span class="hd-scale" style="transform: rotate(-45deg)">75</span></i>
-          <i class="hd-tick" style="transform: rotate(90deg)"></i>
-          <div class="hd-mask"></div>
-          {{if .Known}}<div class="hd-needle"></div><div class="hd-pivot"></div>{{end}}
           <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
         </div>
         <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
