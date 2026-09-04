@@ -411,7 +411,13 @@ thead th {
 tbody td { padding: .4rem .8rem; border-top: 1px solid var(--hair); vertical-align: top; }
 tbody tr:first-child td { border-top: 0; }
 tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent); }
-.name { font-weight: 500; }
+/* flex, not inline text: the name and its badges (arch, az, mesh, jobs, gpu...) are
+   emitted with no whitespace between them, so plain inline flow gives the browser no
+   wrap opportunity between adjacent badges. Enough badges on one service then makes
+   the whole cluster one unbreakable run, stretching the table past the card's width
+   -- and since overflow-x is hidden (for the rounded corners), every column after
+   Name silently clips off-screen instead of wrapping or showing a scrollbar. */
+.name { display: flex; flex-wrap: wrap; align-items: baseline; font-weight: 500; }
 .appver, .chartver { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                     white-space: nowrap; }
 .appver { font-size: .8rem; color: var(--ink); font-weight: 600; }
