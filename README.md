@@ -95,7 +95,8 @@ Reading across a row: the service, the version running, whether it is healthy, a
 whether that matches Git. Badges add what the row alone cannot say. `GPU 2` is holding
 two devices, `GPU waiting` wants one and has not got it, `GPU 0 pods` is scaled to zero.
 `arm64` means it can only run on that architecture. An amber chip means the scheduler
-could not place it, and says what ran out.
+could not place it, and says what ran out. `3 pods` is how many of this service's pods
+are running right now (needs `config.azSpread`).
 
 <sub>Made-up data from `testdata/`, so anyone can reproduce it with
 `./scripts/local-test.sh fixture`. There is a dark theme
