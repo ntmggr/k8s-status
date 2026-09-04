@@ -96,13 +96,13 @@ Reading across a row: the service, the version running, its pods, whether it is
 healthy, and whether that matches Git. The Pods column shows `2/3` (ready of desired,
 summed across every Deployment/StatefulSet/DaemonSet the service owns, needs
 `config.unmanaged`) when that is available, falling back to a plain running count
-(needs `config.azSpread` instead) otherwise. Badges add what the row alone cannot say.
-`GPU 2` is holding two devices, `GPU waiting` wants one and has not got it, `GPU 0 pods`
-is scaled to zero. `arm64` means it can only run on that architecture. An amber chip
-means the scheduler could not place it, and says what ran out. `name: 1/1` shows a
-service's own Job or CronJob, and (for a Job) how many of its desired completions have
-succeeded — informational, does not affect this row's health (needs `config.jobs`; see
-[Jobs and CronJobs](#jobs-and-cronjobs)).
+(needs `config.azSpread` instead) otherwise, followed by `name: 1/1` for each of the
+service's own Job or CronJob objects — for a Job, how many of its desired completions
+have succeeded, informational, does not affect this row's health (needs `config.jobs`;
+see [Jobs and CronJobs](#jobs-and-cronjobs)). Badges on the name add what the row alone
+cannot say: `GPU 2` is holding two devices, `GPU waiting` wants one and has not got it,
+`GPU 0 pods` is scaled to zero. `arm64` means it can only run on that architecture. An
+amber chip means the scheduler could not place it, and says what ran out.
 
 <sub>Made-up data from `testdata/`, so anyone can reproduce it with
 `./scripts/local-test.sh fixture`. There is a dark theme

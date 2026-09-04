@@ -418,6 +418,9 @@ tbody.svc:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent);
    -- and since overflow-x is hidden (for the rounded corners), every column after
    Name silently clips off-screen instead of wrapping or showing a scrollbar. */
 .name { display: flex; flex-wrap: wrap; align-items: baseline; font-weight: 500; }
+/* Same reasoning as .name above: the ready/desired span and any Job/CronJob
+   badges that follow it have no whitespace between them either. */
+.pods { display: flex; flex-wrap: wrap; align-items: baseline; }
 .appver, .chartver { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                     white-space: nowrap; }
 .appver { font-size: .8rem; color: var(--ink); font-weight: 600; }
@@ -1296,13 +1299,6 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{- if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}
     {{- if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}
     {{- if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This service's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}
-    {{- range .Jobs}}
-      {{- if eq .State "Failed"}}<span class="blocked" title="Job {{.Name}} failed{{if .CompletionTime}}, last attempt {{relTime .CompletionTime}}{{end}}. Informational only, does not affect this service's health.">{{icon "warn"}}{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
-      {{- else if eq .State "Active"}}<span class="pod-count" title="Job {{.Name}} is running now, {{.Succeeded}} of {{.Completions}} completions so far.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
-      {{- else if eq .State "Succeeded"}}<span class="pod-count" title="Job {{.Name}} completed{{if .CompletionTime}} {{relTime .CompletionTime}}{{end}}.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
-      {{- else if eq .Kind "CronJob"}}<span class="pod-count" title="CronJob {{.Name}}, schedule {{.Schedule}}{{if .Suspended}}, suspended{{end}}{{if .LastScheduleTime}}. Last scheduled {{relTime .LastScheduleTime}}{{end}}{{if .LastSuccessfulTime}}, last succeeded {{relTime .LastSuccessfulTime}}{{end}}.">{{.Name}}{{if .Suspended}} (suspended){{end}}</span>
-      {{- end}}
-    {{- end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
     {{- /* Three situations a single badge used to hide: holding devices, waiting for
@@ -1323,6 +1319,13 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   <td class="pods hide-sm">
     {{- if .PodsReady.Found}}<span title="{{.PodsReady.Ready}} of {{.PodsReady.Desired}} pods ready, summed across every Deployment/StatefulSet/DaemonSet this service owns">{{.PodsReady.Ready}}/{{.PodsReady.Desired}}</span>
     {{- else if .Zones.Pods}}<span title="{{.Zones.Pods}} running pod{{if ne .Zones.Pods 1}}s{{end}} matched to this service (needs config.unmanaged too, for a ready/desired count instead)">{{.Zones.Pods}}</span>
+    {{- end}}
+    {{- range .Jobs}}
+      {{- if eq .State "Failed"}}<span class="blocked" title="Job {{.Name}} failed{{if .CompletionTime}}, last attempt {{relTime .CompletionTime}}{{end}}. Informational only, does not affect this service's health.">{{icon "warn"}}{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+      {{- else if eq .State "Active"}}<span class="pod-count" title="Job {{.Name}} is running now, {{.Succeeded}} of {{.Completions}} completions so far.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+      {{- else if eq .State "Succeeded"}}<span class="pod-count" title="Job {{.Name}} completed{{if .CompletionTime}} {{relTime .CompletionTime}}{{end}}.">{{.Name}}: {{.Succeeded}}/{{.Completions}}</span>
+      {{- else if eq .Kind "CronJob"}}<span class="pod-count" title="CronJob {{.Name}}, schedule {{.Schedule}}{{if .Suspended}}, suspended{{end}}{{if .LastScheduleTime}}. Last scheduled {{relTime .LastScheduleTime}}{{end}}{{if .LastSuccessfulTime}}, last succeeded {{relTime .LastSuccessfulTime}}{{end}}.">{{.Name}}{{if .Suspended}} (suspended){{end}}</span>
+      {{- end}}
     {{- end}}
   </td>
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
