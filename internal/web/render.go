@@ -38,7 +38,20 @@ func templateFuncs() template.FuncMap {
 		"clip":       clip,
 		"icon":       icon,
 		"brand":      brand,
+		"anchor":     svcAnchor,
 	}
+}
+
+// svcAnchor is the one place a service row's HTML id is built, shared by the services
+// table (so each row is a jump target) and the attention digest (so it can link
+// straight to the row it's summarizing). Source and namespace disambiguate two
+// sources owning a row of the same name; namespace is empty for most ArgoCD rows.
+func svcAnchor(source, namespace, name string) string {
+	id := "svc-" + source
+	if namespace != "" {
+		id += "-" + namespace
+	}
+	return id + "-" + name
 }
 
 func shortSHA(s string) string {
@@ -277,6 +290,45 @@ func (d pageData) Tiles() []Tile {
 	out = append(out, Tile{Class: "t-ok", Count: s.OK, Label: "ok", Href: d.FilterHref("status", "OK"), IsOn: d.FilterActive("status", "OK")})
 	if s.Hidden > 0 {
 		out = append(out, Tile{Count: s.Hidden, Label: "hidden"})
+	}
+	return out
+}
+
+// AttentionItem is one row of the cluster-wide digest: worth a look before scanning
+// the full table.
+type AttentionItem struct {
+	Name   string
+	State  string
+	Reason string
+	// Anchor points at the same row in the services table below, built by the exact
+	// same svcAnchor call the table's own row id uses.
+	Anchor string
+}
+
+// AttentionItems lists every service.NeedsAttention() row, worst-first (the
+// services table is already sorted that way), each with the same one-line reason
+// the table's own Detail column shows -- or the scheduling reason when that is why
+// it needs attention, since Detail alone can otherwise leave a Healthy-looking row
+// with no explanation for why it is here.
+func (d pageData) AttentionItems() []AttentionItem {
+	if d.Snapshot == nil {
+		return nil
+	}
+	var out []AttentionItem
+	for _, svc := range d.Snapshot.Services {
+		if !svc.NeedsAttention() {
+			continue
+		}
+		reason := svc.Detail
+		if svc.Blocked != nil {
+			reason = svc.Blocked.Reason()
+		}
+		out = append(out, AttentionItem{
+			Name:   svc.Name,
+			State:  string(svc.State),
+			Reason: reason,
+			Anchor: svcAnchor(string(svc.Source), svc.Namespace, svc.Name),
+		})
 	}
 	return out
 }

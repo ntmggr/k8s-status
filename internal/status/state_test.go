@@ -219,3 +219,28 @@ func TestDetectRootAppByShape(t *testing.T) {
 		t.Errorf("detectRootApp = %q, want empty when nothing owns Applications", got)
 	}
 }
+
+func TestNeedsAttention(t *testing.T) {
+	cases := []struct {
+		name string
+		svc  Service
+		want bool
+	}{
+		{"ok", Service{State: StateOK}, false},
+		{"degraded", Service{State: StateDegraded}, true},
+		{"warning", Service{State: StateWarning}, true},
+		{"progressing", Service{State: StateProgressing}, false},
+		{"drift", Service{State: StateDrift}, false},
+		{"prune", Service{State: StatePrune}, false},
+		{"suspended", Service{State: StateSuspended}, false},
+		{"ok but blocked from scheduling", Service{State: StateOK, Blocked: &Blocked{Pods: 2}}, true},
+		{"degraded and blocked stays degraded-ranked", Service{State: StateDegraded, Blocked: &Blocked{Pods: 1}}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.svc.NeedsAttention(); got != tc.want {
+				t.Errorf("NeedsAttention() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -390,6 +390,14 @@ func rank(s Service) int {
 	return r
 }
 
+// NeedsAttention reports whether this service belongs in a cluster-wide digest of
+// what to look at first, using the same worst-first ranking sortServices already
+// applies -- degraded, warning, or blocked from scheduling regardless of what
+// ArgoCD/Flux itself reported as this row's health.
+func (s Service) NeedsAttention() bool {
+	return rank(s) <= severity[StateWarning]
+}
+
 // sortServices orders rows worst-first, then alphabetically. Source and namespace are
 // the last tiebreakers: two sources can each own a row of the same name, and the order
 // has to stay stable between refreshes.
