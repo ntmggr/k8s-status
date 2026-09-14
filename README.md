@@ -21,6 +21,8 @@
 - Are your services fully HA? One glance.
 - Do you have strict mTLS enforced, cluster-wide? Same glance.
 - Are your services actually healthy? Done.
+- Something degraded, warning, or stuck unable to schedule? It's called out at the
+  top, before you have to scan the table for it.
 
 ## What is this?
 
@@ -826,14 +828,17 @@ helm template k8s-status charts/k8s-status --set config.meshMTLS=true | grep -c 
 ### Cluster capacity
 
 Shows total nodes, CPU nodes, GPU nodes, total GPUs, GPU services and the CPU architecture
-split.
+split. A "N nodes, one by one" disclosure underneath expands into a per-node table (zone,
+architecture, ready, allocatable CPU/memory, GPU) -- not-ready nodes sort first, so a
+problem node is a name, not a guess worked back from the aggregate counts above. Built
+from the same node read as the counts above it: no extra request, no extra RBAC.
 
 - A node counts as a GPU node when `.status.capacity["nvidia.com/gpu"]` is above zero.
   That key comes from the standard NVIDIA device plugin, so it works on any cluster; a
   node-group label would not.
 - A missing or unreadable value counts as zero rather than failing the read.
-- Only three fields are decoded: `metadata.name`,
-  `status.capacity["nvidia.com/gpu"]` and `status.nodeInfo.architecture`.
+- CPU and memory in the per-node table are `status.allocatable`, not `status.capacity`:
+  what a pod can actually request, after the kubelet/OS's own reserved share.
 
 GPU is reported here rather than as a status tile. The status tiles are mutually exclusive
 and add up to the service total, and a GPU service is already counted in `OK` or
