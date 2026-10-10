@@ -5,7 +5,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.21.2] - Unreleased
+## [0.22.0] - Unreleased
+
+### Added
+
+- "Attention needed" digest: every degraded, warning or scheduling-blocked service in one
+  list, each linking to its row in the services table. No new API reads or RBAC.
+- Per-node table under the Cluster panel: zone, architecture, readiness, allocatable CPU and
+  memory, and accelerators per node, not-ready nodes first. Built from the existing node read.
+- Fleet section: cluster-wide totals for running pods (and how many are Ready), workloads
+  (ready vs desired replicas) and nodes, from reads `AZ_SPREAD`, `UNMANAGED` and `NODE_STATS`
+  already make.
+
+### Changed
+
+- Health, HA, Istio and Fleet now sit in one compact column on the left, with Cluster and
+  Attention side by side beside it; below 1100px the sections form a grid, and on phones a
+  single column. Section explanations moved from subtitles into tooltips.
+- Gauges are flat rings instead of a needle dial. HA and Istio rings show the compliant share
+  in green and the at-risk share in that row's warning colour.
+- The Health ring shows the counted states only, healthy first, so its green arc matches the
+  percentage printed inside it.
+- The Architecture bar shows only arm64 and amd64; GPU nodes are listed as text, since a GPU
+  node is also one of the two architectures.
+
+### Fixed
+
+- HA and Istio rings rendered as one solid colour whenever the value was in the warning or
+  bad band.
+- On phones, the services table hid the Status column, the header pushed the refresh links
+  off-screen, and the node table widened the page past the screen.
+- Fleet rings with nothing to count rendered fully red; they are now neutral.
+- Legend: progressing counts as healthy (it said otherwise), labels match the page, and the
+  removed needle and tiles are no longer mentioned.
+
+## [0.21.2] - 2026-10-10
 
 ### Security
 

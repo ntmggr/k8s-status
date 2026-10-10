@@ -722,7 +722,7 @@ A cluster can have GPUs that Kubernetes cannot schedule. Access to a device come
 the driver and the container runtime; only *allocation* needs a device plugin. Where the
 runtime injects devices by default, workloads use the GPU perfectly well while the node
 advertises no capacity at all. Nodes carrying a `.../gpu.present=true` label with nothing
-allocatable still count as GPU nodes, and the page says `no device plugin` instead of
+allocatable still count as GPU nodes, and the page says `no gpu plugin` instead of
 printing a card count it cannot know. Services pinned to them are marked as GPU-backed,
 because the runtime does hand them the device.
 
