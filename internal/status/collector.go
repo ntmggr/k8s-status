@@ -477,6 +477,10 @@ func (c *Collector) attachUnmanaged(_ context.Context, snap *Snapshot) {
 	FillGPU(snap, c.workloadList, c.nodeList, DiscoverAccelerators(c.nodeList, c.opts.AcceleratorResources))
 	FillArch(snap, c.workloadList, c.nodeList)
 	FillReadiness(snap, c.workloadList)
+	if c.workloadList != nil {
+		ws := BuildWorkloadStats(c.workloadList)
+		snap.Workloads = &ws
+	}
 }
 
 func (c *Collector) attachJobs(_ context.Context, snap *Snapshot) {
@@ -503,4 +507,8 @@ func (c *Collector) attachZones(_ context.Context, snap *Snapshot) {
 	}
 	snap.ZoneRead = c.zoneRead
 	FillZones(snap, c.runningPods, c.nodeList, c.workloadList, c.meshNamespace, c.peerAuths, fluxReleaseKeys(c.fluxList))
+	if c.runningPods != nil {
+		ps := BuildPodStats(c.runningPods)
+		snap.Pods = &ps
+	}
 }

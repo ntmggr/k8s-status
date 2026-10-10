@@ -249,6 +249,10 @@ type Snapshot struct {
 	Services       []Service
 	// Nodes is nil unless NODE_STATS is enabled.
 	Nodes *NodeStats
+	// Pods is nil unless AZ_SPREAD is enabled and its read last succeeded.
+	Pods *PodStats
+	// Workloads is nil unless UNMANAGED is enabled and its read last succeeded.
+	Workloads *WorkloadStats
 	// Unmanaged is nil unless UNMANAGED is enabled.
 	Unmanaged *Unmanaged
 	// Flux is nil unless flux is one of SOURCES.

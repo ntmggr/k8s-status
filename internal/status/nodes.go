@@ -273,6 +273,39 @@ func quantityInt(s string) int {
 	return n
 }
 
+// Ready is Total minus NotReady, for the ring-counter widget's own fill.
+func (s NodeStats) Ready() int { return s.Total - s.NotReady }
+
+// Percent is Ready as a percentage of Total, for the ring's own fill.
+func (s NodeStats) Percent() int { return roundPercent(s.Ready(), s.Total) }
+
+// ArchPercent is what share of all nodes report this architecture, for the
+// architecture ring-counter widget. 0 rather than a divide-by-zero when arch is
+// not found or there are no nodes at all.
+func (s NodeStats) ArchPercent(arch string) int {
+	for _, a := range s.Arch {
+		if a.Arch == arch {
+			return roundPercent(a.Count, s.Total)
+		}
+	}
+	return 0
+}
+
+// GPUPercent is what share of all nodes carry a GPU, same rounding as ArchPercent.
+func (s NodeStats) GPUPercent() int { return roundPercent(s.GPUNodes, s.Total) }
+
+// ArchCountFor is the raw node count for one architecture, for the single-bar
+// composition chart -- widths there are flex-proportional to these counts
+// directly, not to a percent-of-100 that arm64+amd64 already exhausts.
+func (s NodeStats) ArchCountFor(arch string) int {
+	for _, a := range s.Arch {
+		if a.Arch == arch {
+			return a.Count
+		}
+	}
+	return 0
+}
+
 // nodeStatsError builds the degraded form of the section: no counts, one note.
 func nodeStatsError(err error) NodeStats {
 	var stats NodeStats

@@ -293,3 +293,41 @@ func TestBuildNodeStatsRows(t *testing.T) {
 		t.Errorf("Rows[1] should have no GPU, got %+v", got.Rows[1])
 	}
 }
+
+func TestNodeStatsReadyAndPercent(t *testing.T) {
+	s := NodeStats{Total: 10, NotReady: 2}
+	if s.Ready() != 8 {
+		t.Errorf("Ready() = %d, want 8", s.Ready())
+	}
+	if s.Percent() != 80 {
+		t.Errorf("Percent() = %d, want 80", s.Percent())
+	}
+	if (NodeStats{}).Percent() != 0 {
+		t.Error("Percent() on zero total should not divide by zero")
+	}
+}
+
+func TestNodeStatsArchAndGPUPercent(t *testing.T) {
+	s := NodeStats{Total: 10, GPUNodes: 2, Arch: []ArchCount{{Arch: "arm64", Count: 7}, {Arch: "amd64", Count: 3}}}
+	if got := s.ArchPercent("arm64"); got != 70 {
+		t.Errorf("ArchPercent(arm64) = %d, want 70", got)
+	}
+	if got := s.ArchPercent("amd64"); got != 30 {
+		t.Errorf("ArchPercent(amd64) = %d, want 30", got)
+	}
+	if got := s.ArchPercent("riscv"); got != 0 {
+		t.Errorf("ArchPercent(riscv) = %d, want 0 for an arch not present", got)
+	}
+	if got := s.GPUPercent(); got != 20 {
+		t.Errorf("GPUPercent() = %d, want 20", got)
+	}
+	if (NodeStats{}).ArchPercent("arm64") != 0 {
+		t.Error("ArchPercent on zero total should not divide by zero")
+	}
+	if got := s.ArchCountFor("arm64"); got != 7 {
+		t.Errorf("ArchCountFor(arm64) = %d, want 7", got)
+	}
+	if got := s.ArchCountFor("riscv"); got != 0 {
+		t.Errorf("ArchCountFor(riscv) = %d, want 0 for an arch not present", got)
+	}
+}
