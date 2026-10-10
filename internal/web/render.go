@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -38,7 +39,79 @@ func templateFuncs() template.FuncMap {
 		"clip":       clip,
 		"icon":       icon,
 		"brand":      brand,
+		"anchor":     svcAnchor,
+		"ringStops":  ringStops,
 	}
+}
+
+// tileColorVar maps a Tile's Class to the CSS custom property already used for that
+// same status everywhere else on the page (the pill, the chip) -- one color per
+// status, defined once, never restated.
+var tileColorVar = map[string]string{
+	"t-degraded":    "--deg-fg",
+	"t-warning":     "--warn-fg",
+	"t-progressing": "--prog-fg",
+	"t-drift":       "--drift-fg",
+	"t-ok":          "--ok-fg",
+}
+
+// healthRingOrder is the slice order of the Health ring. Only the states
+// Summary.Health() counts appear, healthy ones first, so the arc from 12 o'clock to
+// the end of the progressing slice is exactly the percent printed in the middle.
+// Prune and suspended are excluded from that percent, so they are excluded here too.
+var healthRingOrder = []string{"t-ok", "t-progressing", "t-drift", "t-warning", "t-degraded"}
+
+// ringStops builds the conic-gradient stop list for the Health ring: one arc per
+// counted status actually present, in healthRingOrder, in the same colors the tile
+// chips beside it already use. Callers do `background: conic-gradient(TEMPLATE)`.
+//
+// Returns template.CSS, not string: html/template's CSS sanitizer doesn't recognize
+// var()/conic-gradient() syntax and silently replaces an untyped string with the
+// placeholder "ZgotmplZ", which renders as a plain (uncolored) ring with no error.
+// This is safe to mark trusted -- every token comes from tileColorVar's own fixed
+// map or numbers this function computed itself, never from request input.
+func ringStops(tiles []Tile) template.CSS {
+	counts := map[string]int{}
+	total := 0
+	for _, t := range tiles {
+		if t.State != "" {
+			counts[t.Class] += t.Count
+		}
+	}
+	for _, class := range healthRingOrder {
+		total += counts[class]
+	}
+	if total == 0 {
+		return "var(--track) 0deg 360deg"
+	}
+	var b strings.Builder
+	var from float64
+	for _, class := range healthRingOrder {
+		n := counts[class]
+		if n == 0 {
+			continue
+		}
+		v := tileColorVar[class]
+		to := from + float64(n)*360/float64(total)
+		if b.Len() > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "var(%s) %.4fdeg %.4fdeg", v, from, to)
+		from = to
+	}
+	return template.CSS(b.String())
+}
+
+// svcAnchor is the one place a service row's HTML id is built, shared by the services
+// table (so each row is a jump target) and the attention digest (so it can link
+// straight to the row it's summarizing). Source and namespace disambiguate two
+// sources owning a row of the same name; namespace is empty for most ArgoCD rows.
+func svcAnchor(source, namespace, name string) string {
+	id := "svc-" + source
+	if namespace != "" {
+		id += "-" + namespace
+	}
+	return id + "-" + name
 }
 
 func shortSHA(s string) string {
@@ -242,9 +315,33 @@ func (d pageData) ClearHref() string {
 type Tile struct {
 	Class string
 	Count int
-	Label string
-	Href  string
-	IsOn  bool
+	// Percent is Count as a share of the service total, for the tile's own ring fill.
+	Percent int
+	Label   string
+	// State is the uppercase status name ("DEGRADED", "OK", ...), for looking up its
+	// glyph and color. Empty for the total/hidden tiles, which are not a status.
+	State string
+	// Name is Label, capitalized for display ("Degraded" from "degraded").
+	Name string
+	Href string
+	IsOn bool
+}
+
+// tilePercent matches status.roundPercent's own rounding (unexported there, and not
+// worth exporting for the one caller here): nearest integer, clamped to [0, 100].
+func tilePercent(count, total int) int {
+	if total <= 0 {
+		return 0
+	}
+	pct := int(math.Round(float64(count) * 100 / float64(total)))
+	switch {
+	case pct < 0:
+		return 0
+	case pct > 100:
+		return 100
+	default:
+		return pct
+	}
 }
 
 // Tiles builds the tile list in the same order and the same nonzero-count gating the
@@ -260,13 +357,15 @@ func (d pageData) Tiles() []Tile {
 		return nil
 	}
 	s := d.Snapshot.Summary
-	out := []Tile{{Class: "t-total", Count: s.Total, Label: "services", Href: d.ClearHref(), IsOn: !d.AnyFilter()}}
+	out := []Tile{{Class: "t-total", Count: s.Total, Percent: 100, Label: "services", Href: d.ClearHref(), IsOn: !d.AnyFilter()}}
 	add := func(count int, class, label string) {
 		if count == 0 {
 			return
 		}
-		out = append(out, Tile{Class: class, Count: count, Label: label,
-			Href: d.FilterHref("status", strings.ToUpper(label)), IsOn: d.FilterActive("status", strings.ToUpper(label))})
+		state := strings.ToUpper(label)
+		out = append(out, Tile{Class: class, Count: count, Percent: tilePercent(count, s.Total), Label: label, State: state,
+			Name: strings.ToUpper(label[:1]) + label[1:],
+			Href: d.FilterHref("status", state), IsOn: d.FilterActive("status", state)})
 	}
 	add(s.Degraded, "t-degraded", "degraded")
 	add(s.Warning, "t-warning", "warning")
@@ -274,9 +373,49 @@ func (d pageData) Tiles() []Tile {
 	add(s.Drift, "t-drift", "drift")
 	add(s.Prune, "t-prune", "prune")
 	add(s.Suspended, "t-suspended", "suspended")
-	out = append(out, Tile{Class: "t-ok", Count: s.OK, Label: "ok", Href: d.FilterHref("status", "OK"), IsOn: d.FilterActive("status", "OK")})
+	out = append(out, Tile{Class: "t-ok", Count: s.OK, Percent: tilePercent(s.OK, s.Total), Label: "ok", State: "OK", Name: "OK",
+		Href: d.FilterHref("status", "OK"), IsOn: d.FilterActive("status", "OK")})
 	if s.Hidden > 0 {
 		out = append(out, Tile{Count: s.Hidden, Label: "hidden"})
+	}
+	return out
+}
+
+// AttentionItem is one row of the cluster-wide digest: worth a look before scanning
+// the full table.
+type AttentionItem struct {
+	Name   string
+	State  string
+	Reason string
+	// Anchor points at the same row in the services table below, built by the exact
+	// same svcAnchor call the table's own row id uses.
+	Anchor string
+}
+
+// AttentionItems lists every service.NeedsAttention() row, worst-first (the
+// services table is already sorted that way), each with the same one-line reason
+// the table's own Detail column shows -- or the scheduling reason when that is why
+// it needs attention, since Detail alone can otherwise leave a Healthy-looking row
+// with no explanation for why it is here.
+func (d pageData) AttentionItems() []AttentionItem {
+	if d.Snapshot == nil {
+		return nil
+	}
+	var out []AttentionItem
+	for _, svc := range d.Snapshot.Services {
+		if !svc.NeedsAttention() {
+			continue
+		}
+		reason := svc.Detail
+		if svc.Blocked != nil {
+			reason = svc.Blocked.Reason()
+		}
+		out = append(out, AttentionItem{
+			Name:   svc.Name,
+			State:  string(svc.State),
+			Reason: reason,
+			Anchor: svcAnchor(string(svc.Source), svc.Namespace, svc.Name),
+		})
 	}
 	return out
 }

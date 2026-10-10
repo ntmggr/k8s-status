@@ -114,16 +114,11 @@
     color: var(--muted); font-weight: 600; font-family: var(--mono); margin-bottom: .6rem; }
   .gauge-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .7rem; }
   .gauge {
-    width: 64px; height: 32px; position: relative; overflow: hidden;
-  }
-  .gauge::before {
-    content: ""; position: absolute; inset: 0; border-radius: 64px 64px 0 0;
-    background: conic-gradient(from -90deg at 50% 100%,
-      var(--deg-fg) 0deg, var(--warn-fg) 65deg, var(--ok-fg) 145deg, var(--ok-fg) 180deg);
+    width: 48px; height: 48px; position: relative; border-radius: 50%;
+    background: conic-gradient(var(--warn-fg) 230.4deg, var(--hair) 0);
   }
   .gauge::after {
-    content: ""; position: absolute; left: 8px; right: 8px; top: 8px; bottom: 0;
-    border-radius: 48px 48px 0 0; background: var(--surface);
+    content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--surface);
   }
   .gauge-num { font-family: var(--mono); font-weight: 800; font-size: 1.15rem; }
   .gauge-num small { font-family: var(--sans); font-weight: 600; color: var(--muted); font-size: .68rem;

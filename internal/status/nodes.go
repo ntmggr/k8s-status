@@ -53,8 +53,30 @@ type NodeStats struct {
 	// reliable signal, the managed offering on it (e.g. "AWS EKS"). Empty when
 	// neither gives one -- see detectProvider.
 	Provider string
-	Denied   bool
-	Error    string
+	// Rows is one entry per node, worst-first (not-ready nodes before ready ones,
+	// then by name), for the per-node table. Nil on the same Denied/Error/no-data
+	// paths as everything else here.
+	Rows   []NodeRow
+	Denied bool
+	Error  string
+}
+
+// NodeRow is one row of the per-node table: enough to spot a problem node without
+// needing kubectl, using only fields this project already reads for the aggregate
+// counts above.
+type NodeRow struct {
+	Name  string
+	Zone  string
+	Arch  string
+	Ready bool
+	// CPU and Memory are allocatable, not capacity: what a pod can actually request,
+	// which is what a reader comparing this to a workload's own requests wants.
+	CPU    string
+	Memory string
+	// GPUResource is empty for a node with no accelerator. GPU is that resource's
+	// allocatable count.
+	GPUResource string
+	GPU         int
 }
 
 // AcceleratorCount is one device type and how much of it the cluster has.
@@ -140,6 +162,22 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 			e[1]++
 		}
 		byZone[zone] = e
+
+		row := NodeRow{
+			Name:   n.Metadata.Name,
+			Zone:   n.Zone(),
+			Arch:   n.Status.NodeInfo.Architecture,
+			Ready:  ready,
+			CPU:    formatCPUCores(parseCPUCores(n.Status.Allocatable["cpu"])),
+			Memory: formatMemoryGiB(parseMemoryBytes(n.Status.Allocatable["memory"])),
+		}
+		for _, name := range accel {
+			if c := quantityInt(string(n.Status.Allocatable[name])); c > 0 {
+				row.GPUResource, row.GPU = name, c
+				break
+			}
+		}
+		stats.Rows = append(stats.Rows, row)
 	}
 
 	stats.Accelerators = make([]AcceleratorCount, 0, len(perRes))
@@ -165,6 +203,14 @@ func BuildNodeStats(list *kube.NodeList, accel []string) NodeStats {
 		stats.Zones = append(stats.Zones, ZoneCount{Zone: z, Nodes: e[0], Ready: e[1]})
 	}
 	sort.Slice(stats.Zones, func(i, j int) bool { return stats.Zones[i].Zone < stats.Zones[j].Zone })
+	// Not-ready nodes first -- the ones worth a look -- then alphabetically, same
+	// worst-first convention the services table sorts by.
+	sort.Slice(stats.Rows, func(i, j int) bool {
+		if stats.Rows[i].Ready != stats.Rows[j].Ready {
+			return !stats.Rows[i].Ready
+		}
+		return stats.Rows[i].Name < stats.Rows[j].Name
+	})
 	stats.KubernetesVersion = parseKubernetesVersion(versionSource)
 	stats.Provider = detectProvider(providerID, versionSource)
 	return stats
@@ -225,6 +271,39 @@ func quantityInt(s string) int {
 		return 0
 	}
 	return n
+}
+
+// Ready is Total minus NotReady, for the ring-counter widget's own fill.
+func (s NodeStats) Ready() int { return s.Total - s.NotReady }
+
+// Percent is Ready as a percentage of Total, for the ring's own fill.
+func (s NodeStats) Percent() int { return roundPercent(s.Ready(), s.Total) }
+
+// ArchPercent is what share of all nodes report this architecture, for the
+// architecture ring-counter widget. 0 rather than a divide-by-zero when arch is
+// not found or there are no nodes at all.
+func (s NodeStats) ArchPercent(arch string) int {
+	for _, a := range s.Arch {
+		if a.Arch == arch {
+			return roundPercent(a.Count, s.Total)
+		}
+	}
+	return 0
+}
+
+// GPUPercent is what share of all nodes carry a GPU, same rounding as ArchPercent.
+func (s NodeStats) GPUPercent() int { return roundPercent(s.GPUNodes, s.Total) }
+
+// ArchCountFor is the raw node count for one architecture, for the single-bar
+// composition chart -- widths there are flex-proportional to these counts
+// directly, not to a percent-of-100 that arm64+amd64 already exhausts.
+func (s NodeStats) ArchCountFor(arch string) int {
+	for _, a := range s.Arch {
+		if a.Arch == arch {
+			return a.Count
+		}
+	}
+	return 0
 }
 
 // nodeStatsError builds the degraded form of the section: no counts, one note.
