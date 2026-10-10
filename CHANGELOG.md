@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.2] - Unreleased
+
+### Security
+
+- Build with Go 1.27.2, which fixes standard-library vulnerabilities in HTTP/2, `net/http`,
+  `crypto/tls`, `net/textproto` and `html/template` reported by govulncheck and Trivy
+  (CVE-2026-78669, CVE-2026-97031, GO-2026-6599 and related advisories).
+
 ## [0.5.0] - 2026-08-25
 
 ### Added
