@@ -88,6 +88,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ],
         "containerStatuses": [
@@ -122,6 +126,10 @@
         "conditions": [
           {
             "type": "PodScheduled",
+            "status": "True"
+          },
+          {
+            "type": "Ready",
             "status": "True"
           }
         ],
@@ -158,6 +166,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ],
         "containerStatuses": [
@@ -188,6 +200,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ],
         "containerStatuses": [
@@ -214,6 +230,10 @@
         "conditions": [
           {
             "type": "PodScheduled",
+            "status": "True"
+          },
+          {
+            "type": "Ready",
             "status": "True"
           }
         ],
@@ -245,6 +265,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ]
       }
@@ -266,6 +290,10 @@
         "conditions": [
           {
             "type": "PodScheduled",
+            "status": "True"
+          },
+          {
+            "type": "Ready",
             "status": "True"
           }
         ]
@@ -289,6 +317,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ]
       }
@@ -310,6 +342,10 @@
         "conditions": [
           {
             "type": "PodScheduled",
+            "status": "True"
+          },
+          {
+            "type": "Ready",
             "status": "True"
           }
         ]
@@ -333,6 +369,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ]
       }
@@ -355,6 +395,10 @@
           {
             "type": "PodScheduled",
             "status": "True"
+          },
+          {
+            "type": "Ready",
+            "status": "True"
           }
         ]
       }
@@ -376,6 +420,10 @@
         "conditions": [
           {
             "type": "PodScheduled",
+            "status": "True"
+          },
+          {
+            "type": "Ready",
             "status": "True"
           }
         ],
@@ -403,6 +451,10 @@
         "conditions": [
           {
             "type": "PodScheduled",
+            "status": "True"
+          },
+          {
+            "type": "Ready",
             "status": "True"
           }
         ],

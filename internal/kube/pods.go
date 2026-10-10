@@ -111,6 +111,19 @@ func (p Pod) IsIstioInjected() bool {
 	return false
 }
 
+// Ready reports the pod's own Ready condition, same shape and same reasoning as
+// Node.Ready(): this list only ever contains Running pods (see runningPodsPath), but
+// Running does not mean healthy -- a crash-looping container or a stuck readiness
+// probe still reports Running while Ready is False, and phase alone would call it fine.
+func (p Pod) Ready() bool {
+	for _, c := range p.Status.Conditions {
+		if c.Type == "Ready" {
+			return c.Status == "True"
+		}
+	}
+	return false
+}
+
 type PodCondition struct {
 	Type    string `json:"type"`
 	Status  string `json:"status"`

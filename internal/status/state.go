@@ -249,6 +249,10 @@ type Snapshot struct {
 	Services       []Service
 	// Nodes is nil unless NODE_STATS is enabled.
 	Nodes *NodeStats
+	// Pods is nil unless AZ_SPREAD is enabled and its read last succeeded.
+	Pods *PodStats
+	// Workloads is nil unless UNMANAGED is enabled and its read last succeeded.
+	Workloads *WorkloadStats
 	// Unmanaged is nil unless UNMANAGED is enabled.
 	Unmanaged *Unmanaged
 	// Flux is nil unless flux is one of SOURCES.
@@ -388,6 +392,14 @@ func rank(s Service) int {
 		return severity[StateWarning]
 	}
 	return r
+}
+
+// NeedsAttention reports whether this service belongs in a cluster-wide digest of
+// what to look at first, using the same worst-first ranking sortServices already
+// applies -- degraded, warning, or blocked from scheduling regardless of what
+// ArgoCD/Flux itself reported as this row's health.
+func (s Service) NeedsAttention() bool {
+	return rank(s) <= severity[StateWarning]
 }
 
 // sortServices orders rows worst-first, then alphabetically. Source and namespace are

@@ -547,7 +547,7 @@ func TestUnmanagedIsNotAStatusTile(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, unmanagedProvider(t, &stubWorkloadLister{list: sampleWorkloads()}))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	start := strings.Index(body, `<div class="tiles">`)
+	start := strings.Index(body, `<div class="tile-chips">`)
 	// Bound this to the status tile row itself. The separate "views" row below it
 	// deliberately does carry unmanaged, because those are cross-cutting selections
 	// rather than states that sum to the service total.
@@ -676,7 +676,7 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	for _, want := range []string{"Cluster", "nodes", "cpu", "gpu", "cards", "2 arm64", "1 amd64"} {
+	for _, want := range []string{"Cluster", "nodes", "cpu", "gpu", "cards", "67% arm64", "33% amd64"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("capacity section missing %q", want)
 		}
@@ -832,9 +832,10 @@ func TestPageFiltersRows(t *testing.T) {
 	if !strings.Contains(body, "showing 2 of 14") {
 		t.Error("want a showing-N-of-M count")
 	}
-	// Counts stay whole-cluster while a filter is applied.
-	if !strings.Contains(body, `<div class="n">14</div><div class="k">services</div>`) {
-		t.Error("the total tile must keep counting the whole cluster")
+	// Counts stay whole-cluster while a filter is applied: the DEGRADED chip itself
+	// must still read 2, not 2-of-2-shown collapsing to some other number.
+	if !strings.Contains(body, `tile-chip t-degraded is-on" href="/k8s-status/" title="Degraded: 2`) {
+		t.Error("the DEGRADED chip must keep counting the whole cluster")
 	}
 	if !strings.Contains(body, `class="chip">status DEGRADED<`) {
 		t.Error("want a removable chip for the active filter")
@@ -889,7 +890,7 @@ func TestTileLinkTogglesActiveFilter(t *testing.T) {
 	}
 
 	on := get(t, h, "/k8s-status/?status=DEGRADED").Body.String()
-	if !strings.Contains(on, `class="tile t-degraded is-on" href="/k8s-status/"`) {
+	if !strings.Contains(on, `class="tile-chip t-degraded is-on" href="/k8s-status/"`) {
 		t.Error("active DEGRADED tile should link back to the cleared view and be marked selected")
 	}
 }

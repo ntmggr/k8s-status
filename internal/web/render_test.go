@@ -50,3 +50,104 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestAttentionItemsFiltersAndOrders(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Services: []status.Service{
+		{Name: "accounts-api", Source: status.SourceArgoCD, State: status.StateOK, Detail: "all good"},
+		{Name: "orders-api", Source: status.SourceArgoCD, State: status.StateDegraded, Detail: "0/2 replicas available"},
+		{Name: "search-api", Source: status.SourceArgoCD, State: status.StateWarning, Detail: "health unknown"},
+		{Name: "cache-shim", Namespace: "cache", Source: status.SourceFlux, State: status.StateOK,
+			Blocked: &status.Blocked{Resources: []string{"cpu"}, Pods: 1}},
+		{Name: "edge-proxy", Source: status.SourceArgoCD, State: status.StateProgressing, Detail: "rolling out"},
+	}}}
+
+	items := d.AttentionItems()
+	if len(items) != 3 {
+		t.Fatalf("len(items) = %d, want 3 (OK and PROGRESSING excluded)", len(items))
+	}
+
+	got := map[string]AttentionItem{}
+	for _, it := range items {
+		got[it.Name] = it
+	}
+	if _, ok := got["accounts-api"]; ok {
+		t.Error("OK service must not appear in the digest")
+	}
+	if _, ok := got["edge-proxy"]; ok {
+		t.Error("PROGRESSING service must not appear in the digest")
+	}
+	if it := got["orders-api"]; it.Reason != "0/2 replicas available" {
+		t.Errorf("orders-api reason = %q, want the Detail text", it.Reason)
+	}
+	if it := got["cache-shim"]; it.Reason == "" || it.Anchor != "svc-flux-cache-cache-shim" {
+		t.Errorf("cache-shim = %+v, want a Blocked.Reason() and a namespaced anchor", it)
+	}
+}
+
+func TestAttentionItemsNilSnapshotIsNoop(t *testing.T) {
+	d := pageData{}
+	if got := d.AttentionItems(); got != nil {
+		t.Errorf("AttentionItems() = %v, want nil", got)
+	}
+}
+
+func TestTilesComputePercent(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{
+		Total: 20, OK: 15, Degraded: 5,
+	}}}
+	tiles := d.Tiles()
+	byLabel := map[string]Tile{}
+	for _, ti := range tiles {
+		byLabel[ti.Label] = ti
+	}
+	if got := byLabel["services"].Percent; got != 100 {
+		t.Errorf("services Percent = %d, want 100", got)
+	}
+	if got := byLabel["degraded"].Percent; got != 25 {
+		t.Errorf("degraded Percent = %d, want 25", got)
+	}
+	if got := byLabel["ok"].Percent; got != 75 {
+		t.Errorf("ok Percent = %d, want 75", got)
+	}
+}
+
+func TestRingStopsSplitsByStateInOrder(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{
+		Total: 20, OK: 15, Degraded: 5,
+	}}}
+	got := string(ringStops(d.Tiles()))
+	want := "var(--ok-fg) 0.0000deg 270.0000deg, var(--deg-fg) 270.0000deg 360.0000deg"
+	if got != want {
+		t.Errorf("ringStops() = %q, want %q", got, want)
+	}
+}
+
+func TestRingStopsMatchesHealthPercent(t *testing.T) {
+	s := status.Summary{Total: 14, OK: 6, Progressing: 1, Drift: 1, Warning: 1, Degraded: 2, Prune: 2, Suspended: 1}
+	d := pageData{Snapshot: &status.Snapshot{Summary: s}}
+	got := string(ringStops(d.Tiles()))
+	want := "var(--ok-fg) 0.0000deg 196.3636deg, " +
+		"var(--prog-fg) 196.3636deg 229.0909deg, " +
+		"var(--drift-fg) 229.0909deg 261.8182deg, " +
+		"var(--warn-fg) 261.8182deg 294.5455deg, " +
+		"var(--deg-fg) 294.5455deg 360.0000deg"
+	if got != want {
+		t.Errorf("ringStops() = %q, want %q", got, want)
+	}
+	if h := s.Health(); h.Percent != 64 {
+		t.Fatalf("Health().Percent = %d, want 64", h.Percent)
+	}
+}
+
+func TestRingStopsOnlyExcludedStatesIsFlatTrack(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 3, Prune: 2, Suspended: 1}}}
+	if got := string(ringStops(d.Tiles())); got != "var(--track) 0deg 360deg" {
+		t.Errorf("ringStops() = %q, want the flat-track fallback", got)
+	}
+}
+
+func TestRingStopsEmptyIsFlatTrack(t *testing.T) {
+	if got := string(ringStops(nil)); got != "var(--track) 0deg 360deg" {
+		t.Errorf("ringStops(nil) = %q, want the flat-track fallback", got)
+	}
+}

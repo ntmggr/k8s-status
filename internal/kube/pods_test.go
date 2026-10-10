@@ -230,3 +230,23 @@ func TestIsIstioInjected(t *testing.T) {
 		})
 	}
 }
+
+func TestPodReady(t *testing.T) {
+	cases := []struct {
+		name string
+		pod  Pod
+		want bool
+	}{
+		{"no conditions", Pod{}, false},
+		{"ready true", Pod{Status: PodStatus{Conditions: []PodCondition{{Type: "Ready", Status: "True"}}}}, true},
+		{"ready false", Pod{Status: PodStatus{Conditions: []PodCondition{{Type: "Ready", Status: "False"}}}}, false},
+		{"other conditions only", Pod{Status: PodStatus{Conditions: []PodCondition{{Type: "PodScheduled", Status: "True"}}}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.pod.Ready(); got != tc.want {
+				t.Errorf("Ready() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
