@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Releases failed at the signing step since 0.21.2, so 0.21.2 and 0.22.0 have images and
+  charts but no GitHub release or binaries. cosign v3 ignores the separate signature and
+  certificate flags; `checksums.txt` is now signed into a single
+  `checksums.txt.sigstore.json` bundle, and the verify command in the README uses it.
 - Fixture mode served every pod to both the Running and Pending pod lists, so Fleet counted
   16 pods instead of the fixture's 13 running ones. The fixture server now honours
   `fieldSelector=status.phase`.

@@ -49,17 +49,15 @@ checksum:
 # Rekor transparency log. Verification needs no key either, only the identity that signed:
 #
 #   cosign verify-blob checksums.txt \
-#     --signature checksums.txt.sig --certificate checksums.txt.pem \
+#     --bundle checksums.txt.sigstore.json \
 #     --certificate-identity-regexp 'https://github.com/ntmggr/k8s-status/.*' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 signs:
   - cmd: cosign
-    signature: "${artifact}.sig"
-    certificate: "${artifact}.pem"
+    signature: "${artifact}.sigstore.json"
     args:
       - sign-blob
-      - "--output-signature=${signature}"
-      - "--output-certificate=${certificate}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - "--yes"
     artifacts: checksum

@@ -1131,8 +1131,7 @@ public Rekor transparency log.
 
 ```sh
 cosign verify-blob checksums.txt \
-  --signature checksums.txt.sig \
-  --certificate checksums.txt.pem \
+  --bundle checksums.txt.sigstore.json \
   --certificate-identity-regexp 'https://github.com/ntmggr/k8s-status/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 
@@ -1141,6 +1140,10 @@ sha256sum -c checksums.txt --ignore-missing
 
 The first command proves the checksum file came from this project's release workflow.
 The second proves the archive you downloaded matches it.
+
+Releases up to 0.21.1 ship a separate `checksums.txt.sig` and `checksums.txt.pem` instead
+of the bundle; verify those with `--signature checksums.txt.sig --certificate
+checksums.txt.pem` in place of `--bundle`.
 
 ## Security
 
