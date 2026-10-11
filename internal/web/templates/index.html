@@ -1190,8 +1190,8 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   </div>
   {{- if .Rows}}
   <div class="node-table">
-    <div class="node-table-head">{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one</div>
-    <div class="node-table-scroll">
+    <div class="node-table-head" id="node-table-head">{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one</div>
+    <div class="node-table-scroll" tabindex="0" role="region" aria-labelledby="node-table-head">
     <table>
       <tr><th>Name</th><th>Zone</th><th>Arch</th><th>Ready</th><th>CPU</th><th>Memory</th><th>{{$.Snapshot.AcceleratorLabel}}</th></tr>
       {{- range .Rows}}

@@ -686,6 +686,24 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	}
 }
 
+// The node table scrolls inside its own box, so keyboard users need to be able to
+// focus that box to scroll it (WCAG 2.1.1, axe's scrollable-region-focusable).
+func TestNodeTableScrollAreaIsKeyboardReachable(t *testing.T) {
+	nodes := &stubNodeLister{list: &kube.NodeList{Items: []kube.Node{
+		{Status: kube.NodeStatus{NodeInfo: kube.NodeInfo{Architecture: "arm64"}}},
+	}}}
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
+
+	body := get(t, h, "/k8s-status/").Body.String()
+	want := `<div class="node-table-scroll" tabindex="0" role="region" aria-labelledby="node-table-head">`
+	if !strings.Contains(body, want) {
+		t.Errorf("node table scroll area is not focusable; want %s", want)
+	}
+	if !strings.Contains(body, `id="node-table-head"`) {
+		t.Error("the region's label element node-table-head is missing")
+	}
+}
+
 // A MIG-partitioned cluster advertises slices and no nvidia.com/gpu at all, so the
 // page has to name what it found rather than saying "gpu" and "cards" regardless.
 func TestPageNamesNonNvidiaAccelerators(t *testing.T) {
