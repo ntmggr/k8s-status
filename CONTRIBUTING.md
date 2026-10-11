@@ -81,6 +81,30 @@ that reaches a device without requesting one, a cancelled request. Several of th
 written after a real bug and are commented with what went wrong, which is a good pattern
 to follow.
 
+### Browser tests
+
+`e2e/` holds [Playwright](https://playwright.dev/) tests that open the real page, served
+from the fixtures by `hack/fixture-server`, at desktop, tablet and phone widths in light
+and dark. They check that nothing scrolls sideways or escapes its section, that the
+sections are arranged for each width, that an [axe](https://github.com/dequelabs/axe-core)
+scan finds no serious WCAG 2.1 AA problems, and that the page still looks like `main`.
+
+They need Node 20 or later. They are optional locally, since CI runs them:
+
+```sh
+cd e2e && npm ci && npx playwright install chromium
+npm test
+```
+
+This is a separate, test-only package. Nothing in it ships: the binary still has no
+dependencies and the page still has no JavaScript.
+
+Screenshot baselines are not committed. Each push to `main` records the page as a CI
+artifact, and pull requests are compared against the latest one, so a deliberate visual
+change shows as a diff on its pull request and becomes the new baseline once merged. A
+local run compares against your own previous run, which is useful for checking that a
+refactor changed nothing. The check is advisory for now and does not block a merge.
+
 ## Review
 
 Pull requests are reviewed by a maintainer who did not write the change. Nobody approves
@@ -122,6 +146,8 @@ What the project does depend on is tracked and updated automatically:
 - **Go toolchain** and any future modules, through Dependabot on the `gomod` ecosystem.
 - **Container base images**, pinned by digest, through Dependabot on `docker`.
 - **GitHub Actions**, pinned by commit SHA, through Dependabot on `github-actions`.
+- **Playwright and axe** for the browser tests, pinned exactly in `e2e/package-lock.json`,
+  through Dependabot on `npm`. Test-only, so their bumps release nothing.
 
 Dependabot runs weekly. Minor and patch updates are grouped and merge themselves once
 CI passes; a major version waits for a human, because a major is where behaviour changes.

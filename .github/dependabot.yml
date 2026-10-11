@@ -32,6 +32,19 @@ updates:
     commit-message:
       prefix: ci
 
+  # Playwright and axe for the e2e tests. Never shipped, so bumps do not release.
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies]
+    groups:
+      e2e:
+        patterns: ["*"]
+    commit-message:
+      prefix: test
+
   - package-ecosystem: gomod
     directory: /
     schedule:

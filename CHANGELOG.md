@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Browser tests in `e2e/` (Playwright and axe): layout at desktop, tablet and phone widths,
+  an accessibility scan, and full-page screenshots in light and dark compared against
+  `main`'s rendering. Run in CI as an advisory check; screenshot baselines live as a CI
+  artifact rather than in the repository.
+
+### Fixed
+
+- The node table's scroll area can now be focused and scrolled from the keyboard.
+
+## [0.22.1] - 2026-10-11
+
 ### Changed
 
 - `./scripts/local-test.sh fixture` serves the fixtures with a small Go server

@@ -1,0 +1,16 @@
+{
+  "name": "k8s-status-e2e",
+  "private": true,
+  "description": "Browser tests for the k8s-status page, run against hack/fixture-server.",
+  "scripts": {
+    "test": "playwright test",
+    "test:update": "playwright test --update-snapshots=all"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.64.0"
+  }
+}
