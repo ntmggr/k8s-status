@@ -16,6 +16,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 )
 
 const (
@@ -166,7 +167,7 @@ func (h *podsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if selector := r.URL.Query().Get("fieldSelector"); selector != "" {
 		phase, ok := parsePhaseSelector(selector)
 		if !ok {
-			log.Printf("fixture-server: unsupported fieldSelector %q on %s", selector, r.URL.Path)
+			log.Printf("fixture-server: unsupported fieldSelector %q on %s", sanitizeForLog(selector), sanitizeForLog(r.URL.Path))
 			writeStatus(w, http.StatusBadRequest, "BadRequest", "only status.phase field selectors are supported")
 			return
 		}
@@ -201,8 +202,22 @@ func parsePhaseSelector(selector string) (string, bool) {
 }
 
 func notFound(w http.ResponseWriter, r *http.Request) {
-	log.Printf("fixture-server: no fixture for %s %s", r.Method, r.URL.Path)
+	log.Printf("fixture-server: no fixture for %s %s", sanitizeForLog(r.Method), sanitizeForLog(r.URL.Path))
 	writeStatus(w, http.StatusNotFound, "NotFound", "no fixture for this path")
+}
+
+// sanitizeForLog drops control characters, so a request cannot forge extra log
+// lines with an encoded newline in its path (CodeQL go/log-injection). The explicit
+// newline removal is what CodeQL recognises as a sanitizer; the Map covers the rest.
+func sanitizeForLog(value string) string {
+	value = strings.ReplaceAll(value, "\n", "")
+	value = strings.ReplaceAll(value, "\r", "")
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, value)
 }
 
 func writeStatus(w http.ResponseWriter, code int, reason, message string) {

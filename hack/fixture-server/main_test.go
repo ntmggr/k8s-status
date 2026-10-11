@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -131,6 +132,34 @@ func TestUnknownPathIsKubernetesNotFound(t *testing.T) {
 	}
 	if status.Kind != "Status" || status.Reason != "NotFound" || status.Code != http.StatusNotFound {
 		t.Errorf("status body = %+v", status)
+	}
+}
+
+func TestSanitizeForLogDropsControlCharacters(t *testing.T) {
+	cases := map[string]string{
+		"/api/v1/nodes":                   "/api/v1/nodes",
+		"/x\nfixture-server: forged line": "/xfixture-server: forged line",
+		"/x\r\n\t\x00\x1b[31m":            "/x[31m",
+		"/ünïcode/ok":                     "/ünïcode/ok",
+	}
+	for in, want := range cases {
+		if got := sanitizeForLog(in); got != want {
+			t.Errorf("sanitizeForLog(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestUnknownPathWithEncodedNewlineLogsOneLine(t *testing.T) {
+	var buf strings.Builder
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	rec := get(t, newTestHandler(t), "/nope%0Afixture-server:%20forged")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status %d, want 404", rec.Code)
+	}
+	if lines := strings.Count(strings.TrimRight(buf.String(), "\n"), "\n") + 1; lines != 1 {
+		t.Errorf("logged %d lines, want 1: %q", lines, buf.String())
 	}
 }
 
