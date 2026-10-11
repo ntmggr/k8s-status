@@ -5,7 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.22.0] - Unreleased
+## [Unreleased]
+
+### Changed
+
+- `./scripts/local-test.sh fixture` serves the fixtures with a small Go server
+  (`hack/fixture-server`) instead of Python's `http.server`, which dropped connections and
+  left the page with partial data. Unknown paths answer a Kubernetes-style 404, and a
+  missing or malformed fixture fails at startup.
+
+### Fixed
+
+- Fixture mode served every pod to both the Running and Pending pod lists, so Fleet counted
+  16 pods instead of the fixture's 13 running ones. The fixture server now honours
+  `fieldSelector=status.phase`.
+
+## [0.22.0] - 2026-10-10
 
 ### Added
 

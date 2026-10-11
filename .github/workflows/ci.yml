@@ -100,9 +100,10 @@ jobs:
           fi
           changed="$(git diff --name-only "$BASE" HEAD)"
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
-          # Anything that can alter compiled behavior or the built image. Docs, charts
-          # and manifests cannot.
-          if echo "$changed" | grep -qE '^(cmd/|internal/|go\.(mod|sum)$|Dockerfile$|\.github/workflows/ci\.yml$)'; then
+          # Anything that can alter compiled behavior, test results or the built image.
+          # hack/ is compiled by `go build ./...` and testdata/ is read by the tests.
+          # Docs, charts and manifests cannot.
+          if echo "$changed" | grep -qE '^(cmd/|internal/|hack/|testdata/|go\.(mod|sum)$|Dockerfile$|\.github/workflows/ci\.yml$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"

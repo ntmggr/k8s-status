@@ -23,7 +23,7 @@ PIDS=()
 
 usage() { echo "usage: $0 fixture | $0 cluster <kube-context>" >&2; exit 2; }
 
-cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; rm -rf "${FAKE_DIR:-}"; }
+cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT INT TERM
 
 port_busy() { lsof -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
@@ -47,47 +47,11 @@ go build -o /tmp/k8s-status-local ./cmd/k8s-status
 
 case "$MODE" in
   fixture)
-    FAKE_DIR="$(mktemp -d)"
-    mkdir -p "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd"
-    mkdir -p "$FAKE_DIR/apis/apps/v1" "$FAKE_DIR/api/v1" "$FAKE_DIR/apis/batch/v1"
-    mkdir -p "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications"
-    mkdir -p "$FAKE_DIR/apis/helm.toolkit.fluxcd.io/v2" "$FAKE_DIR/apis/kustomize.toolkit.fluxcd.io/v1"
-    cp testdata/applications.json "$FAKE_DIR/apis/argoproj.io/v1alpha1/namespaces/argocd/applications"
-    cp testdata/nodes.json        "$FAKE_DIR/api/v1/nodes"
-    cp testdata/pods.json         "$FAKE_DIR/api/v1/pods"
-    cp testdata/deployments.json  "$FAKE_DIR/apis/apps/v1/deployments"
-    cp testdata/statefulsets.json "$FAKE_DIR/apis/apps/v1/statefulsets"
-    cp testdata/daemonsets.json   "$FAKE_DIR/apis/apps/v1/daemonsets"
-    # accounts-api owns both, in applications.json's own resources list: proves a
-    # Job/CronJob shows up per service instead of being silently dropped.
-    cp testdata/jobs.json      "$FAKE_DIR/apis/batch/v1/jobs"
-    cp testdata/cronjobs.json  "$FAKE_DIR/apis/batch/v1/cronjobs"
-    # Cluster-wide, same as the real Flux API: one collection per kind, no per-namespace
-    # split. Served regardless of SOURCES; the app just never asks for them unless
-    # SOURCES includes flux. podinfo (helmreleases.json) and network-policy-controller
-    # (in deployments.json, via a kustomize.toolkit.fluxcd.io/name label) exist to prove
-    # a Flux-managed workload lands in the service table, not "not managed by ArgoCD".
-    cp testdata/helmreleases.json   "$FAKE_DIR/apis/helm.toolkit.fluxcd.io/v2/helmreleases"
-    cp testdata/kustomizations.json "$FAKE_DIR/apis/kustomize.toolkit.fluxcd.io/v1/kustomizations"
-    # The discovery document and the object collection both live under
-    # .../security.istio.io/v1, so the discovery doc is served as index.html: a GET
-    # with no trailing slash 301s to the directory, which python's http.server then
-    # answers from index.html. Go's http.Client follows that redirect transparently.
-    cp testdata/istio-discovery.json "$FAKE_DIR/apis/security.istio.io/v1/index.html"
-    cp testdata/peerauthentication.json "$FAKE_DIR/apis/security.istio.io/v1/namespaces/istio-system/peerauthentications/default"
-    # Cluster-wide collection endpoint (list), a plain file alongside index.html and
-    # the by-name object above, same trick deployments/statefulsets/daemonsets below
-    # already use: MeshPolicy's single-object-by-name read is unaffected either way.
-    # Exercises all three PeerAuthentication precedence levels: mesh-wide STRICT
-    # (istio-system), namespace-wide PERMISSIVE (search-api), and a workload-scoped
-    # DISABLE (admin-ui, matched on the "app: admin-ui" pod label added below).
-    cp testdata/peerauthentications.json "$FAKE_DIR/apis/security.istio.io/v1/peerauthentications"
-    # --directory instead of a `cd X && python3 ...` subshell: a subshell's PID is
-    # what $! captures, not python's own -- cleanup()'s kill on Ctrl-C then only
-    # signals the subshell wrapper, and python survives as an orphaned grandchild
-    # still holding the port. --directory (Python 3.7+) needs no subshell at all, so
-    # $! is python's real PID and cleanup's kill actually reaches it.
-    python3 -m http.server "$PROXY_PORT" --directory "$FAKE_DIR" >/dev/null 2>&1 &
+    # hack/fixture-server maps each API path to its testdata file; see its routes
+    # table. Built, not `go run`, so $! is the server's own PID and cleanup's kill
+    # reaches it instead of an intermediate go process.
+    go build -o /tmp/k8s-status-fixture ./hack/fixture-server
+    /tmp/k8s-status-fixture -addr "127.0.0.1:$PROXY_PORT" -dir "$ROOT/testdata" &
     PIDS+=($!)
     API="http://127.0.0.1:$PROXY_PORT"
     ROOT_APP="${ROOT_APP_NAME:-root-app}"   # the fixture's root app is named root-app
