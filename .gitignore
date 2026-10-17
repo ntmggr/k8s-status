@@ -7,5 +7,12 @@ coverage.*
 .DS_Store
 .idea/
 .vscode/
+# Playwright: dependencies, build output, reports, and screenshot baselines (never
+# committed; CI keeps main's as an artifact, see .github/workflows/e2e.yml).
+/e2e/node_modules/
+/e2e/.bin/
+/e2e/test-results/
+/e2e/playwright-report/
+/e2e/tests/__screenshots__/
 # Claude Code session state and agent worktrees -- local to whoever's machine ran it.
 .claude/

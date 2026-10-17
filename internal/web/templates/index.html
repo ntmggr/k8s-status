@@ -1272,8 +1272,8 @@ tbody.svc.is-warning td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); 
   </div>
   {{- if .Rows}}
   <div class="node-table">
-    <div class="node-table-head">{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one<span class="scroll-hint">Scroll for all nodes and columns</span></div>
-    <div class="node-table-scroll" tabindex="0" role="region" aria-label="Node details, scroll to see all columns and rows">
+    <div class="node-table-head" id="node-table-head">{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one<span class="scroll-hint">Scroll for all nodes and columns</span></div>
+    <div class="node-table-scroll" tabindex="0" role="region" aria-labelledby="node-table-head">
     <table>
       <tr><th>Name</th><th>Zone</th><th>Arch</th><th>Ready</th><th>CPU</th><th>Memory</th><th>{{$.Snapshot.AcceleratorLabel}}</th></tr>
       {{- range .Rows}}

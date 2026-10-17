@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Browser tests in `e2e/` (Playwright and axe): layout at desktop, tablet and phone widths,
+  an accessibility scan, and full-page screenshots in light and dark compared against
+  `main`'s rendering. Run in CI as an advisory check; screenshot baselines live as a CI
+  artifact rather than in the repository.
+
+### Changed
+
+- The node table's scroll region takes its accessible name from the visible "N nodes"
+  heading instead of a separate `aria-label`.
+
+## [0.23.0] - 2026-10-17
+
 ### Changed
 
 - The overview is reorganised into a summary row of cards (services, running pods,
@@ -21,10 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPU badges describe what the API actually knows: `GPU unready`, `GPU target 0` and
   `GPU ?` replace `GPU waiting` and `GPU 0 pods`, and the capacity line says "ready-replica
   requests" instead of "allocated". None of these is a measurement of device use.
-- `./scripts/local-test.sh fixture` serves the fixtures with a small Go server
-  (`hack/fixture-server`) instead of Python's `http.server`, which dropped connections and
-  left the page with partial data. Unknown paths answer a Kubernetes-style 404, and a
-  missing or malformed fixture fails at startup.
 
 ### Fixed
 
@@ -39,6 +49,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returns 0, and the gauges still show `—` when nothing is counted.
 - GPU allocation is reported as unknown, not zero, when no owned workload supplied replica
   data.
+
+## [0.22.1] - 2026-10-11
+
+### Changed
+
+- `./scripts/local-test.sh fixture` serves the fixtures with a small Go server
+  (`hack/fixture-server`) instead of Python's `http.server`, which dropped connections and
+  left the page with partial data. Unknown paths answer a Kubernetes-style 404, and a
+  missing or malformed fixture fails at startup.
+
+### Fixed
+
 - Releases failed at the signing step since 0.21.2, so 0.21.2 and 0.22.0 have images and
   charts but no GitHub release or binaries. cosign v3 ignores the separate signature and
   certificate flags; `checksums.txt` is now signed into a single
