@@ -613,27 +613,28 @@ func TestMeshHANilMeshIsUnknown(t *testing.T) {
 }
 
 // TestMeshPolicyHA mirrors TestMeshHA for the per-service policy question: what
-// share of policy-eligible services are NOT permissive. This operates purely on the
+// share of policy-eligible services enforce STRICT mTLS. This operates purely on the
 // already-aggregated Summary counts; the "Istio not installed" case is covered
 // upstream of this, in resolvePolicy (see TestFillZonesPolicyUnknownWhenMeshNotInstalled)
 // -- MeshPolicyEligible never becomes nonzero in the first place, so zero-eligible
 // here is sufficient.
 func TestMeshPolicyHA(t *testing.T) {
 	cases := []struct {
-		name                 string
-		eligible, permissive int
-		wantKnown            bool
-		wantPercent          int
+		name                           string
+		eligible, permissive, disabled int
+		wantKnown                      bool
+		wantPercent                    int
 	}{
-		{"none permissive", 4, 0, true, 100},
-		{"mixed", 4, 1, true, 75},
-		{"zero eligible", 0, 0, false, 0},
-		{"all permissive", 3, 3, true, 0},
+		{"all strict", 4, 0, 0, true, 100},
+		{"mixed", 4, 1, 1, true, 50},
+		{"zero eligible", 0, 0, 0, false, 0},
+		{"all permissive", 3, 3, 0, true, 0},
+		{"all disabled", 3, 0, 3, true, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			snap := &Snapshot{
-				Summary: Summary{MeshPolicyEligible: tc.eligible, MeshPolicyPermissive: tc.permissive},
+				Summary: Summary{MeshPolicyEligible: tc.eligible, MeshPolicyPermissive: tc.permissive, MeshPolicyDisabled: tc.disabled},
 			}
 			m := snap.MeshPolicyHA()
 			if m.Known != tc.wantKnown {
@@ -645,7 +646,7 @@ func TestMeshPolicyHA(t *testing.T) {
 			if m.Eligible != tc.eligible || m.Permissive != tc.permissive {
 				t.Errorf("MeshPolicyHA=%+v, want eligible=%d permissive=%d", m, tc.eligible, tc.permissive)
 			}
-			if want := tc.eligible - tc.permissive; m.Compliant() != want {
+			if want := tc.eligible - tc.permissive - tc.disabled; m.Compliant() != want {
 				t.Errorf("Compliant()=%d, want %d", m.Compliant(), want)
 			}
 		})
@@ -678,6 +679,35 @@ func TestFillZonesResolvesPerServicePolicyFromRunningPod(t *testing.T) {
 	}
 	if snap.Summary.MeshPolicyPermissive != 0 {
 		t.Errorf("MeshPolicyPermissive = %d, want 0", snap.Summary.MeshPolicyPermissive)
+	}
+	if snap.Summary.MeshPolicyDisabled != 1 || snap.MeshPolicyHA().Percent != 0 {
+		t.Errorf("disabled policy must not count as strict: %+v", snap.MeshPolicyHA())
+	}
+}
+
+func TestFillZonesPolicyUnknownWhenReadsFail(t *testing.T) {
+	for _, failedDefault := range []bool{false, true} {
+		snap := &Snapshot{Mesh: &MeshSection{Installed: true, Effective: MeshStrict}}
+		snap.addService(zoneSvc("billing", "payments", "billing"))
+		pods := &kube.PodList{Items: []kube.Pod{zoneRunningPod("payments", "billing-abc", "billing", "10.0.0.1")}}
+		nodes := &kube.NodeList{Items: []kube.Node{zoneNode("n1", "zone-a", "10.0.0.1")}}
+		var policies *kube.PeerAuthenticationList
+		if failedDefault {
+			snap.Mesh.Error = "read denied"
+			policies = &kube.PeerAuthenticationList{}
+		}
+		FillZones(snap, pods, nodes, nil, "istio-system", policies, nil)
+		if snap.Services[0].Policy.Known() || snap.MeshPolicyHA().Known {
+			t.Fatal("failed policy reads must not imply strict coverage")
+		}
+	}
+}
+
+func TestRoundPercentHandlesEmptyAndInvalidDenominators(t *testing.T) {
+	for _, den := range []int{0, -1} {
+		if got := roundPercent(1, den); got != 0 {
+			t.Errorf("roundPercent(1, %d) = %d, want 0", den, got)
+		}
 	}
 }
 

@@ -79,6 +79,7 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 				continue
 			}
 			svc.GPU = true
+			svc.GPUAlloc.Known = true
 			svc.GPUAlloc.PerReplica += d.perReplica
 			svc.GPUAlloc.Desired += d.desired
 			svc.GPUAlloc.Ready += d.ready
@@ -94,19 +95,22 @@ func FillGPU(snap *Snapshot, list *kube.WorkloadList, nodes *kube.NodeList, acce
 			continue
 		}
 		snap.Summary.GPU++
+		state := svc.GPUAlloc.State()
+		switch state {
+		case gpuStateUnknown:
+			continue
+		}
 		allocated += svc.GPUAlloc.Allocated
-		// Only a running one is actually using a device we cannot count. A service
-		// with no replicas consumes nothing, and counting those read as though most
-		// of the cluster's usage were invisible.
-		if svc.GPUAlloc.Unmeasured() && !svc.GPUAlloc.ScaledToZero() && !svc.GPUAlloc.Waiting() {
+		// This is an undeclared device request, not evidence a device is in use.
+		if svc.GPUAlloc.Unmeasured() {
 			unmeasured++
 		}
-		switch {
-		case svc.GPUAlloc.Waiting():
+		switch state {
+		case gpuStateWaiting:
 			waiting++
-		case svc.GPUAlloc.ScaledToZero():
+		case gpuStateScaledToZero:
 			stopped++
-		default:
+		case gpuStateRunning:
 			running++
 		}
 	}

@@ -146,7 +146,9 @@ type ServicePolicy struct {
 }
 
 // Known reports whether this workload has a usable policy answer at all.
-func (p ServicePolicy) Known() bool { return p.Scope != "" }
+func (p ServicePolicy) Known() bool {
+	return p.Scope != "" && (p.Effective == MeshStrict || p.Effective == MeshPermissive || p.Effective == MeshDisabled)
+}
 
 // mtlsMode maps Istio's own spec.mtls.mode spelling onto this page's effective words.
 // ok is false for UNSET or an absent field, which is not a mode this scope sets: the

@@ -26,33 +26,47 @@ func parseTemplates() (*template.Template, error) {
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"short":      shortSHA,
-		"lower":      strings.ToLower,
-		"trunc":      truncate,
-		"relTime":    relTime,
-		"appURL":     func(base, name string) string { return strings.TrimRight(base, "/") + "/applications/" + name },
-		"repoTree":   repoTreeURL,
-		"repoCommit": repoCommitURL,
-		"release":    releaseURL,
-		"project":    func() string { return projectURL },
-		"glyph":      stateGlyph,
-		"clip":       clip,
-		"icon":       icon,
-		"brand":      brand,
-		"anchor":     svcAnchor,
-		"ringStops":  ringStops,
+		"short":        shortSHA,
+		"lower":        strings.ToLower,
+		"trunc":        truncate,
+		"relTime":      relTime,
+		"appURL":       func(base, name string) string { return strings.TrimRight(base, "/") + "/applications/" + name },
+		"repoTree":     repoTreeURL,
+		"repoCommit":   repoCommitURL,
+		"release":      releaseURL,
+		"project":      func() string { return projectURL },
+		"glyph":        stateGlyph,
+		"clip":         clip,
+		"icon":         icon,
+		"brand":        brand,
+		"anchor":       svcAnchor,
+		"ringSegments": ringSegments,
+		"gaugeClass":   gaugeClass,
+		"archClass":    archClass,
 	}
 }
 
-// tileColorVar maps a Tile's Class to the CSS custom property already used for that
-// same status everywhere else on the page (the pill, the chip) -- one color per
-// status, defined once, never restated.
-var tileColorVar = map[string]string{
-	"t-degraded":    "--deg-fg",
-	"t-warning":     "--warn-fg",
-	"t-progressing": "--prog-fg",
-	"t-drift":       "--drift-fg",
-	"t-ok":          "--ok-fg",
+func gaugeClass(known bool, percent int) string {
+	if !known {
+		return "is-unknown"
+	}
+	switch (status.Health{Percent: percent}).State() {
+	case status.StateOK:
+		return "is-ok"
+	case status.StateWarning:
+		return "is-warn"
+	default:
+		return "is-bad"
+	}
+}
+
+func archClass(arch string) string {
+	switch arch {
+	case "arm64", "amd64":
+		return arch
+	default:
+		return "other"
+	}
 }
 
 // healthRingOrder is the slice order of the Health ring. Only the states
@@ -61,45 +75,54 @@ var tileColorVar = map[string]string{
 // Prune and suspended are excluded from that percent, so they are excluded here too.
 var healthRingOrder = []string{"t-ok", "t-progressing", "t-drift", "t-warning", "t-degraded"}
 
-// ringStops builds the conic-gradient stop list for the Health ring: one arc per
-// counted status actually present, in healthRingOrder, in the same colors the tile
-// chips beside it already use. Callers do `background: conic-gradient(TEMPLATE)`.
-//
-// Returns template.CSS, not string: html/template's CSS sanitizer doesn't recognize
-// var()/conic-gradient() syntax and silently replaces an untyped string with the
-// placeholder "ZgotmplZ", which renders as a plain (uncolored) ring with no error.
-// This is safe to mark trusted -- every token comes from tileColorVar's own fixed
-// map or numbers this function computed itself, never from request input.
-func ringStops(tiles []Tile) template.CSS {
+// RingSegment is one arc of the Health donut, in units of an SVG circle drawn
+// with pathLength="100": Dash is the stroke-dasharray, Offset the dashoffset.
+type RingSegment struct{ Class, Dash, Offset string }
+
+// ringSegments splits the Health donut into one arc per counted status actually
+// present, in healthRingOrder, so the arcs from 12 o'clock through progressing are
+// exactly the percent printed in the middle. Prune and suspended are excluded from
+// that percent, so they are excluded here too. A small gap separates adjacent arcs.
+func ringSegments(tiles []Tile) []RingSegment {
 	counts := map[string]int{}
-	total := 0
 	for _, t := range tiles {
 		if t.State != "" {
 			counts[t.Class] += t.Count
 		}
 	}
+	total, present := 0, 0
 	for _, class := range healthRingOrder {
 		total += counts[class]
+		if counts[class] > 0 {
+			present++
+		}
 	}
 	if total == 0 {
-		return "var(--track) 0deg 360deg"
+		return nil
 	}
-	var b strings.Builder
+	gap := 0.0
+	if present > 1 {
+		gap = 0.8
+	}
+	segs := make([]RingSegment, 0, present)
 	var from float64
 	for _, class := range healthRingOrder {
 		n := counts[class]
 		if n == 0 {
 			continue
 		}
-		v := tileColorVar[class]
-		to := from + float64(n)*360/float64(total)
-		if b.Len() > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(&b, "var(%s) %.4fdeg %.4fdeg", v, from, to)
-		from = to
+		share := float64(n) * 100 / float64(total)
+		length := math.Max(share-gap, 0.4)
+		segs = append(segs, RingSegment{
+			Class: class,
+			Dash:  fmt.Sprintf("%.2f %.2f", length, 100-length),
+			// 100-from, not -from: the dash pattern repeats every 100 units, and this
+			// keeps the first arc's offset from printing as "-0.00".
+			Offset: fmt.Sprintf("%.2f", 100-from),
+		})
+		from += share
 	}
-	return template.CSS(b.String())
+	return segs
 }
 
 // svcAnchor is the one place a service row's HTML id is built, shared by the services
@@ -606,19 +629,24 @@ func brand() template.HTML {
 	return template.HTML(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="19" height="19" class="brand" role="img" aria-label="k8s-status"><title>k8s-status</title> <rect x="6" y="12" width="52" height="12" rx="6" fill="#e6f4ea"/> <rect x="6" y="28" width="46" height="12" rx="6" fill="#feefc3"/> <rect x="6" y="44" width="40" height="12" rx="6" fill="#fce8e6"/> <circle cx="16" cy="18" r="4" fill="#137333"/> <circle cx="16" cy="34" r="4" fill="#a15c00"/> <circle cx="16" cy="50" r="4" fill="#c5221f"/> </svg>`)
 }
 
-// sortRunningFirst orders accelerator rows by what they are doing: holding devices,
-// then waiting for one, then stopped. Ties keep the worst-first order underneath.
+// sortRunningFirst orders GPU rows by desired replica state: all ready, unready, or
+// no desired replicas. Ties keep the worst-first order underneath.
 func sortRunningFirst(services []status.Service) {
 	rank := func(s status.Service) int {
-		switch {
-		case !s.GPU:
-			return 3
-		case s.GPUAlloc.Waiting():
-			return 1
-		case s.GPUAlloc.ScaledToZero():
-			return 2
-		default:
+		if !s.GPU {
+			return 4
+		}
+		switch s.GPUAlloc.State() {
+		case "running":
 			return 0
+		case "waiting":
+			return 1
+		case "scaled-to-zero":
+			return 2
+		case "unknown":
+			return 3
+		default:
+			return 4
 		}
 	}
 	sort.SliceStable(services, func(i, j int) bool {

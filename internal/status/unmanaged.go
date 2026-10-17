@@ -211,10 +211,8 @@ func fluxReleaseKeys(fl *kube.FluxList) map[string]struct{} {
 
 // readiness picks the counters the kind actually populates.
 func readiness(w kube.Workload) (ready, desired int) {
-	if w.Kind == kube.KindDaemonSet {
-		return w.Status.NumberReady, w.Status.DesiredNumberScheduled
-	}
-	return w.Status.ReadyReplicas, w.Status.Replicas
+	desired, ready = workloadReplicas(w)
+	return ready, desired
 }
 
 // workloadState maps the counters onto the page's existing states. desired == 0 is
