@@ -46,6 +46,17 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Publishing $version"
 
+      - name: Resolve previous release tag
+        id: prev
+        env:
+          CURRENT_TAG: v${{ steps.v.outputs.version }}
+        run: |
+          previous="$(git tag --list 'v*.*.*' --sort=-v:refname \
+            | grep -Ev -- '-' \
+            | awk -v current="$CURRENT_TAG" 'found { print; exit } $0 == current { found = 1 }')"
+          echo "tag=$previous" >> "$GITHUB_OUTPUT"
+          echo "Release notes cover ${previous:-the full history}..${CURRENT_TAG}"
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -136,3 +147,4 @@ jobs:
           # devices it uses `git describe`, which can pick a different tag and
           # publish a release whose number disagrees with the image just pushed.
           GORELEASER_CURRENT_TAG: v${{ steps.v.outputs.version }}
+          GORELEASER_PREVIOUS_TAG: ${{ steps.prev.outputs.tag }}

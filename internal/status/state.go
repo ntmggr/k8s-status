@@ -64,35 +64,55 @@ type Options struct {
 // Component is an individual Kubernetes resource inside a service that is not
 // matching git. ArgoCD does not populate per-resource health in the Application
 // CR, so only sync state is available here.
-// GPUAllocation separates three states that look identical in a boolean GPU marker:
-// a service holding devices, one deliberately scaled to zero, and one that wants
-// devices and cannot get them. The last is the interesting one and the only one that
-// needs attention.
+// GPUAllocation tracks declared requests and workload replica state for GPU-backed
+// services. Kubernetes replica readiness is not hardware allocation or utilization.
 type GPUAllocation struct {
+	// Known means an owned GPU workload supplied the replica counters. A name-only
+	// fallback cannot distinguish scaled-to-zero from missing workload data.
+	Known bool
 	// PerReplica is what one replica requests. Zero means the service never names the
 	// resource and reaches its device through the runtime, so how much it uses is not
 	// knowable from the API.
 	PerReplica int
 	Desired    int
 	Ready      int
-	// Allocated is PerReplica * Ready: devices the scheduler has actually handed over.
+	// Allocated is the sum of device requests represented by ready replicas. It is
+	// not measured device allocation: unready pods may already hold a device.
 	Allocated int
 }
 
-// Waiting reports a service that asked for devices and did not get them. Distinct from
-// scaled to zero, which is deliberate, and from holding fewer than it wants only
-// because it is mid-rollout, which still shows here and is worth seeing.
+const (
+	gpuStateUnknown      = "unknown"
+	gpuStateRunning      = "running"
+	gpuStateWaiting      = "waiting"
+	gpuStateScaledToZero = "scaled-to-zero"
+)
+
+// State classifies the replica data once for the summary, API and renderer.
+// "waiting" means unready replicas, not a confirmed accelerator shortage.
+func (g GPUAllocation) State() string {
+	if !g.Known {
+		return gpuStateUnknown
+	}
+	if g.Waiting() {
+		return gpuStateWaiting
+	}
+	if g.ScaledToZero() {
+		return gpuStateScaledToZero
+	}
+	return gpuStateRunning
+}
+
+// Waiting reports fewer ready replicas than desired. This does not by itself mean a
+// replica was blocked from scheduling or could not obtain a device.
 func (g GPUAllocation) Waiting() bool { return g.Desired > 0 && g.Ready < g.Desired }
 
-// ScaledToZero reports a service asking for no replicas. Deliberately not called
-// "idle": that word describes a device that is allocated and doing no work, which is a
-// utilisation fact this project cannot see. What is known here is only that nothing is
-// running, and whether that is a deliberate stop or an autoscaler at rest is not
-// visible from the workload alone.
+// ScaledToZero reports a service asking for no replicas. Existing pods may still be
+// terminating during scale-down.
 func (g GPUAllocation) ScaledToZero() bool { return g.Desired == 0 }
 
-// Unmeasured reports a service that reaches a device without requesting it, so the
-// API cannot say how much it holds.
+// Unmeasured reports a workload whose container resources declare no device request.
+// If it reaches a device through the runtime, that access is not measurable here.
 func (g GPUAllocation) Unmeasured() bool { return g.PerReplica == 0 }
 
 type Component struct {
@@ -169,13 +189,12 @@ type Summary struct {
 	Suspended   int
 	Hidden      int
 	GPU         int
-	// GPURunning holds devices right now. GPUWaiting asked and has not got one.
-	// GPUStopped is asking for no replicas at all. Split out because a single GPU
-	// count hides all three, and the one worth leading with is what is running.
+	// GPURunning counts services with desired > 0 and every replica ready.
+	// GPUWaiting counts services with fewer ready than desired, regardless of cause.
+	// GPUStopped counts services with no desired replicas; old pods may still drain.
 	GPURunning int
-	// GPUUnmeasured reach a device through the runtime without requesting one, so they
-	// contribute nothing to the allocated total. Counted so the page can say that the
-	// total is a floor rather than letting it read as the whole story.
+	// GPUUnmeasured have unknown device requests because they reach a device through
+	// the runtime without declaring it; this does not prove a device is in use.
 	GPUUnmeasured int
 	GPUWaiting    int
 	GPUStopped    int
@@ -207,21 +226,31 @@ type Summary struct {
 	// MeshPolicyEligible counts services (GitOps-tracked only) with a resolved
 	// effective policy at all. MeshPolicyPermissive is the subset whose effective mode
 	// is PERMISSIVE -- whether inherited from a PERMISSIVE mesh-wide default or from
-	// their own namespace/workload override. Both zero unless MESH_MTLS and AZ_SPREAD
+	// their own namespace/workload override. MeshPolicyDisabled tracks DISABLE
+	// separately so it cannot count as strict. All zero unless MESH_MTLS and AZ_SPREAD
 	// are both on, since per-service policy reuses the same running-pods read
 	// AZ_SPREAD already fetches.
 	MeshPolicyEligible   int
 	MeshPolicyPermissive int
+	MeshPolicyDisabled   int
 	// UnmanagedMesh{Eligible,Injected} and UnmanagedMeshPolicy{Eligible,Permissive}
 	// are the not-in-gitops counterpart of the four fields above, kept separate
 	// rather than folded in: the Istio gauges describe GitOps-tracked services
 	// specifically, so a not-in-gitops workload gaining or losing its sidecar must
-	// not move a percentage that claims to be about services. The Istio panel
+	// not move a percentage that claims to be about services. The Resilience panel
 	// mentions these totals alongside the gauges instead.
 	UnmanagedMeshEligible         int
 	UnmanagedMeshInjected         int
 	UnmanagedMeshPolicyEligible   int
 	UnmanagedMeshPolicyPermissive int
+}
+
+func (s Summary) GPUUnknown() int {
+	n := s.GPU - s.GPURunning - s.GPUWaiting - s.GPUStopped
+	if n < 0 {
+		return 0
+	}
+	return n
 }
 
 type Snapshot struct {

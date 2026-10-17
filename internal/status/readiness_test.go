@@ -83,3 +83,31 @@ func TestFillReadinessResetsOnRepeatedCalls(t *testing.T) {
 		t.Errorf("PodsReady after 3 calls = %+v, want Ready=1 Desired=1 (must not accumulate)", got)
 	}
 }
+
+func TestFillReadinessDistinguishesWorkloadKinds(t *testing.T) {
+	snap := &Snapshot{Services: []Service{{Owned: []Component{
+		{Kind: "Deployment", Namespace: "apps", Name: "api"},
+		{Kind: "StatefulSet", Namespace: "apps", Name: "api"},
+	}}}}
+	list := &kube.WorkloadList{Items: []kube.Workload{
+		{Kind: kube.KindDeployment, Metadata: kube.WorkloadMetadata{Namespace: "apps", Name: "api"},
+			Status: kube.WorkloadStatus{ReadyReplicas: 1, Replicas: 2}},
+		{Kind: kube.KindStatefulSet, Metadata: kube.WorkloadMetadata{Namespace: "apps", Name: "api"},
+			Status: kube.WorkloadStatus{ReadyReplicas: 3, Replicas: 4}},
+	}}
+	FillReadiness(snap, list)
+	if got := snap.Services[0].PodsReady; got.Ready != 4 || got.Desired != 6 {
+		t.Fatalf("PodsReady = %+v, want 4/6 across distinct kinds", got)
+	}
+}
+
+func TestReadinessUsesDesiredSpecDuringScaling(t *testing.T) {
+	for _, desired := range []int{0, 4} {
+		w := kube.Workload{Kind: kube.KindDeployment, Status: kube.WorkloadStatus{Replicas: 2, ReadyReplicas: 2}}
+		w.Spec.Replicas = &desired
+		ready, got := readiness(w)
+		if ready != 2 || got != desired {
+			t.Errorf("readiness = %d/%d, want 2/%d from spec.replicas", ready, got, desired)
+		}
+	}
+}

@@ -129,6 +129,9 @@ func (snap *Snapshot) NodeHA() NodeHA {
 // roundPercent rounds num*100/den to the nearest integer and clamps to [0,100].
 // Shared by HA and NodeHA so the two percentages behave identically.
 func roundPercent(num, den int) int {
+	if den <= 0 {
+		return 0
+	}
 	pct := int(math.Round(float64(num) * 100 / float64(den)))
 	switch {
 	case pct < 0:
@@ -206,10 +209,8 @@ func (m MeshHA) NotInMesh() int { return m.Eligible - m.Injected }
 
 // MeshPolicyHA mirrors MeshHA's shape for the per-service policy question instead of
 // the sidecar-injection one: what share of services with a known effective mTLS mode
-// are NOT permissive. A service counts as compliant here if it enforces the
-// mesh-wide default or a stricter override; DISABLE is not tracked per-service
-// (ResolveServicePolicy's own scope), so this is a two-way permissive/not split, not
-// a three-way STRICT/PERMISSIVE/DISABLE severity ranking.
+// enforce STRICT mTLS. Disabled policies must not count as strict merely because
+// they are not permissive.
 type MeshPolicyHA struct {
 	// Percent is Compliant as a share of Eligible, rounded to the nearest integer.
 	// Meaningless when Known is false.
@@ -221,6 +222,7 @@ type MeshPolicyHA struct {
 	Eligible int
 	// Permissive is Summary.MeshPolicyPermissive.
 	Permissive int
+	Disabled   int
 }
 
 // MeshPolicyHA folds the per-service policy summary into one percentage, the same
@@ -229,6 +231,7 @@ func (snap *Snapshot) MeshPolicyHA() MeshPolicyHA {
 	m := MeshPolicyHA{
 		Eligible:   snap.Summary.MeshPolicyEligible,
 		Permissive: snap.Summary.MeshPolicyPermissive,
+		Disabled:   snap.Summary.MeshPolicyDisabled,
 	}
 	if m.Eligible <= 0 {
 		return m
@@ -238,8 +241,8 @@ func (snap *Snapshot) MeshPolicyHA() MeshPolicyHA {
 	return m
 }
 
-// Compliant is how many policy-eligible services are NOT permissive.
-func (m MeshPolicyHA) Compliant() int { return m.Eligible - m.Permissive }
+// Compliant is how many policy-eligible services enforce STRICT mTLS.
+func (m MeshPolicyHA) Compliant() int { return m.Eligible - m.Permissive - m.Disabled }
 
 // ZoneError is the degraded form of the AZ-spread section: no per-service zone data,
 // one note explaining why. Denied and TooLarge each get their own inline hint in the
@@ -305,7 +308,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 
 	// Idempotent against a cached snapshot being decorated more than once: everything
 	// this function owns is reset before it accumulates anything, the same reason
-	// FillGPU resets GPUAlloc instead of +=.
+	// FillGPU recomputes GPUAlloc from the current workload list.
 	for i := range snap.Services {
 		snap.Services[i].Zones = ZoneSpread{}
 		snap.Services[i].Nodes = NodeSpread{}
@@ -324,6 +327,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	snap.Summary.SingleNode, snap.Summary.MultiNode = 0, 0
 	snap.Summary.MeshEligible, snap.Summary.MeshInjected = 0, 0
 	snap.Summary.MeshPolicyEligible, snap.Summary.MeshPolicyPermissive = 0, 0
+	snap.Summary.MeshPolicyDisabled = 0
 	snap.Summary.UnmanagedMeshEligible, snap.Summary.UnmanagedMeshInjected = 0, 0
 	snap.Summary.UnmanagedMeshPolicyEligible, snap.Summary.UnmanagedMeshPolicyPermissive = 0, 0
 
@@ -490,7 +494,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	// a PeerAuthentication fallback policy per service, showing e.g. "100% strict" for
 	// a mesh question that doesn't apply here.
 	resolvePolicy := func(seen bool, namespace string, labels map[string]string) ServicePolicy {
-		if !seen || snap.Mesh == nil || !snap.Mesh.Installed {
+		if !seen || snap.Mesh == nil || !snap.Mesh.Installed || snap.Mesh.Error != "" || peerAuths == nil {
 			return ServicePolicy{}
 		}
 		return ResolveServicePolicy(peerAuths, meshNamespace, namespace, labels, snap.Mesh.Effective)
@@ -542,6 +546,8 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 			snap.Summary.MeshPolicyEligible++
 			if svc.Policy.Effective == MeshPermissive {
 				snap.Summary.MeshPolicyPermissive++
+			} else if svc.Policy.Effective == MeshDisabled {
+				snap.Summary.MeshPolicyDisabled++
 			}
 		}
 	}
@@ -554,7 +560,7 @@ func FillZones(snap *Snapshot, pods *kube.PodList, nodes *kube.NodeList, workloa
 	// Mesh/Policy are kept apart in their own Unmanaged* counters instead: the Istio
 	// gauges are specifically about GitOps-tracked services, and blending in
 	// not-in-gitops workloads there would move those percentages for reasons that
-	// have nothing to do with the services they claim to describe. The Istio panel
+	// have nothing to do with the services they claim to describe. The Resilience panel
 	// mentions the Unmanaged* totals alongside the gauges rather than inside them.
 	//
 	// All four are also recorded per group key (not just tallied) so the badge below

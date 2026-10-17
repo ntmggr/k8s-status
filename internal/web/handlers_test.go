@@ -676,7 +676,7 @@ func TestPageWithNodeStatsRendersCapacitySection(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, nodeStatsProvider(t, nodes))
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	for _, want := range []string{"Cluster", "nodes", "cpu", "gpu", "cards", "67% arm64", "33% amd64"} {
+	for _, want := range []string{"Cluster", "nodes", "cpu", "gpu", "cards", "2 arm64", "(67%)", "1 amd64", "(33%)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("capacity section missing %q", want)
 		}
@@ -1054,17 +1054,17 @@ func TestVersionColumnsAreSeparate(t *testing.T) {
 	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
 
 	body := get(t, h, "/k8s-status/").Body.String()
-	if !strings.Contains(body, "<th>App version</th>") || !strings.Contains(body, `<th class="hide-sm">Chart version</th>`) {
+	if !strings.Contains(body, `<th class="version-col" scope="col">App version</th>`) || !strings.Contains(body, `<th class="hide-sm">Chart version</th>`) {
 		t.Error("want two separate version headers, the chart one droppable on narrow screens")
 	}
 	if strings.Contains(body, "app / chart") {
 		t.Error("the combined sub-label should be gone")
 	}
-	if !strings.Contains(body, `<td class="appver">`) || !strings.Contains(body, `<td class="chartver hide-sm"`) {
+	if !strings.Contains(body, `<td class="appver version-col">`) || !strings.Contains(body, `<td class="chartver version-col hide-sm"`) {
 		t.Error("want one cell per version column")
 	}
 	// A service with no reported image renders an empty cell, not a broken row.
-	if !strings.Contains(body, `<td class="appver"></td>`) {
+	if !strings.Contains(body, `<td class="appver version-col"></td>`) {
 		t.Error("want an empty App version cell for a service with no image")
 	}
 	if !strings.Contains(body, "no-image-app") {

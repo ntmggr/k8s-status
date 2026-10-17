@@ -53,9 +53,7 @@
 }
 * { box-sizing: border-box; }
 body {
-  /* Bottom padding clears the now-fixed footer (see below) so the last bit of
-     real content never sits behind it. */
-  margin: 0; padding: var(--pad-top) var(--pad-x) 3.5rem;
+  margin: 0; padding: var(--pad-top) var(--pad-x) 1rem;
   background: var(--plane); color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; line-height: 1.45;
@@ -134,33 +132,9 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
    can join as sibling .panel elements later without restructuring this row). */
 .panel-row { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .75rem;
              margin: .9rem 0 .35rem; }
-/* flex-grow: 1 -- today there is exactly one panel in this row, and it should fill it:
-   its own .areas (Health/HA/Istio) needs the full row's width to lay three areas out
-   side by side instead of wrapping the third one onto its own line. Revisit this once
-   a second sibling panel actually exists -- growing both evenly would then need its
-   own call, not this one. min-width is the mobile floor; flex-shrink still lets a
-   panel narrow (then wrap) on a small viewport. */
-.panel { flex: 1 1 auto; min-width: 380px; box-sizing: border-box; background: var(--surface);
-         border: 1px solid var(--ring); border-radius: 8px; padding: .55rem .8rem; }
-/* Health and HA are both about services, so they live inside one Services panel as
-   two sub-areas. Each gets its own inset box rather than a divider line between them:
-   a border-left reads fine side by side but dangles disconnected once a narrow
-   viewport wraps them onto separate rows, where a box still reads correctly either
-   way. --plane (the page background, not --surface's card tone) is the same
-   "recessed within this card" look used elsewhere on the page. */
-.areas { display: flex; flex-wrap: wrap; gap: .9rem; margin-top: .5rem; }
-.area {
-  display: flex; flex-direction: column;
-  background: var(--plane); border: 1px solid var(--ring); border-radius: 8px;
-  padding: .55rem .8rem;
-}
-.tiles-row { display: flex; align-items: stretch; justify-content: flex-start; gap: .9rem;
-             margin-top: .45rem; }
-/* Health's gauge is now taller (gauge-lg) than the tile stack beside it -- stretch
-   would just pad blank space under the tiles instead of aligning them to its top. */
-.tiles-row.is-top { align-items: flex-start; }
+
 .tiles-stack { display: flex; flex-direction: column; gap: .5rem; margin: 1.1rem 0 .35rem; }
-.tiles { display: flex; flex-wrap: wrap; gap: .5rem; }
+
 .tile {
   background: var(--surface); border: 1px solid var(--ring); border-radius: 8px;
   padding: .5rem .8rem; width: 7.4rem; box-sizing: border-box;
@@ -232,48 +206,23 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 .cap-item.is-gpu .cv { color: var(--gpu-fg); }
 .cap-note { margin-top: .4rem; font-size: .74rem; color: var(--muted); }
 
-/* The signal rail (Health/HA/Istio/Fleet) is a fixed-width column on the left; the
-   detail panels (Cluster, Attention) share the rest side by side, wrapping under
-   each other once there is no room for two. Below 1100px everything stacks. */
-.split-row { display: grid; grid-template-columns: minmax(22rem, 27rem) minmax(0, 1fr);
-             gap: .9rem; align-items: start; margin: .8rem 0; }
-.split-main { min-width: 0; }
+/* Metric signals and cluster details get distinct, full-width rows. */
+.split-row { margin: .8rem 0; }
+
 .split-side { min-width: 0; display: grid; gap: .9rem; align-items: start;
-              grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
+              grid-template-columns: minmax(0, 1.35fr) minmax(18rem, .85fr); }
 .split-side .attn, .split-side .capacity { margin: 0; box-sizing: border-box; }
-@media (max-width: 1100px) {
-  .split-row { grid-template-columns: minmax(0, 1fr); }
+.split-side > :only-child { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .split-side { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Ring counters: a plain count (not a percent-with-threshold like .gauge), the arc
-   itself split ready/not-ready by proportion -- closer to how a fleet dashboard's
-   own headline numbers read than a dial. */
-.ringstat-row { display: flex; gap: 1.1rem; flex-wrap: wrap; height: 100%;
-                align-items: center; justify-content: space-around; padding: .8rem; }
-.ringstat { display: flex; flex-direction: column; align-items: center; gap: .35rem; }
-.ringstat-ring {
-  position: relative; width: 84px; height: 84px; border-radius: 50%;
-  background: conic-gradient(var(--ok-fg) calc(var(--pct) * 3.6deg), var(--deg-fg) 0);
-}
-.ringstat-ring.is-empty { background: var(--track); }
-.ringstat-ring::after {
-  content: ""; position: absolute; inset: 10px; border-radius: 50%; background: var(--surface);
-}
-.ringstat-num {
-  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center;
-  justify-content: center; font-size: 1.4rem; font-weight: 800; color: var(--ink);
-}
 .ringstat-lab { font-size: .78rem; font-weight: 600; color: var(--ink-2); }
 .ringstat-sub { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center;
                 font-family: var(--mono); font-size: .68rem; }
 .ringstat-sub .is-ok { color: var(--ok-fg); }
 .ringstat-sub .is-bad { color: var(--deg-fg); font-weight: 700; }
-/* Fleet's own rings (Pods/Workloads/Nodes), not the Cluster panel's -- everything
-   outside Cluster reads at the smaller, denser scale; the Cluster panel is the one
-   place a reader comes to actually study the machines, so its ring stays full size. */
-.area .ringstat-ring { width: 60px; height: 60px; }
-.area .ringstat-ring::after { inset: 7px; }
-.area .ringstat-num { font-size: 1rem; }
+
 /* Architecture as a bar, not a ring: a ring reads fine for a single proportion
    (ready/not-ready) but two arcs back to back is harder to compare at a glance --
    a segmented bar puts arm64/amd64 side by side on the same baseline, each segment's
@@ -322,66 +271,6 @@ h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -.01em;
 }
 
 .hdr-right { display: flex; align-items: center; gap: .75rem; flex: 0 1 auto; min-width: 0; }
-/* Gauge: a plain ring, not a dial -- closer to a fleet-status page's own instrument
-   than a speedometer's. A colored arc up to --pct, flat red/yellow/green by threshold
-   rather than a needle's smooth gradient, a plain track for the rest, and the number
-   in the middle. No needle, no pivot, no 25/50/75 scale to read against. */
-.gauge {
-  --pct: 0; flex: none; width: 62px;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  gap: .25rem; box-sizing: border-box;
-}
-.gauge .hd-face {
-  /* --gauge-track: the "rest" of the ring is the true at-risk/not-in-mesh/permissive
-     color for this row, not a neutral gray -- set inline per gauge instance below,
-     falling back to the plain track when a row has no single "everything else"
-     meaning of its own. Those rows also set --arc to the OK color: a threshold-colored
-     arc on a warn/deg track is one solid ring at exactly the values worth reading.
-     Health instead overrides this whole rule with its own
-     inline background (one arc per status actually present), since "the rest" of
-     Health isn't one category. */
-  position: relative; width: 46px; height: 46px; border-radius: 50%; margin-top: 2px;
-  background: conic-gradient(var(--arc, var(--ring, var(--muted))) calc(var(--pct) * 3.6deg), var(--gauge-track, var(--track)) 0);
-}
-.gauge .hd-face::after {
-  /* The donut hole: a plain inset circle in the page's own surface color, cut into
-     the conic-gradient ring above it rather than a second stacked element. */
-  content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--surface);
-}
-.gauge .hd-num {
-  /* z-index, not just a later rule: .hd-face::after is also position:absolute for the
-     donut-hole cutout, and a pseudo-element stacks as though it were the box's last
-     child, so without this it painted over the number instead of under it. */
-  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
-  font-size: .74rem; font-weight: 800; letter-spacing: -.02em; color: var(--ring, var(--muted));
-}
-.gauge .hd-num small { font-size: .5em; font-weight: 700; color: var(--muted); margin-left: .1em; }
-.gauge .hd-cap {
-  text-align: center; font-size: .56rem; color: var(--muted); white-space: nowrap;
-}
-.gauge.is-ok   { --ring: var(--ok-fg); }
-.gauge.is-warn { --ring: var(--warn-fg); }
-.gauge.is-bad  { --ring: var(--deg-fg); }
-.gauge.is-unknown .hd-face { background: var(--track); }
-.gauge.is-unknown .hd-num { color: var(--muted); }
-
-/* The gauge's own percentage only says how many are at risk, not which -- the at-risk
-   tile is what actually answers that, by filtering the table to those exact rows.
-   It is a plain .tile (t-warning/t-ok), the same size as the Services ones, not a
-   bespoke wide box: consistent sizing beats a second, differently-shaped component
-   for what is still just "a number with a filter behind it". */
-.ha-rows { display: flex; flex-direction: column; gap: .6rem; margin-top: .45rem; }
-/* center, not stretch: the at-risk tile keeps its natural Services-tile height
-   instead of being pulled edge-to-edge to match the gauge's taller face. */
-.ha-rows .tiles-row { margin-top: 0; align-items: center; }
-.spread-lab {
-  /* Top-aligned, not centered: lines up with the gauge card's own top padding (.55rem)
-     so the label reads as its header even when a taller sibling (Services' two-row
-     tile stack) stretches the row -- centered, it floated alone in empty space. */
-  flex: none; width: 3.6rem; align-self: flex-start; margin-top: .55rem;
-  font-size: .68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
-  color: var(--muted);
-}
 
 a.tile { display: block; text-decoration: none; color: inherit; }
 a.tile:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--ring); }
@@ -541,15 +430,13 @@ table.components td.k { color: var(--muted); }
            color: var(--muted); font-size: .62rem; font-weight: 600; white-space: nowrap; }
 .by.is-unknown { color: var(--muted); }
 
-/* Fixed like header, not part of the scrolling page: the build-version/cluster
-   line is the one thing worth being able to check without scrolling all the way
-   down, especially now that the Services/not-in-gitops tables scroll internally
-   (below) and no longer force the page itself to grow past a screenful. */
+/* Keep the footer in document flow: a fixed footer covered table rows, especially
+   when a table's own scroll container crossed the bottom of the viewport. */
 footer {
   display: flex; justify-content: space-between; align-items: center; gap: .75rem;
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  position: static;
   background: var(--plane); border-top: 1px solid var(--hair);
-  padding: .5rem var(--pad-x); margin: 0;
+  padding: 1rem 0; margin: 1.5rem auto 0; max-width: 1680px;
   color: var(--muted); font-size: .72rem;
 }
 @media (max-width: 720px) {
@@ -557,79 +444,151 @@ footer {
   header { flex-wrap: wrap; height: auto; min-height: var(--hdr-h); row-gap: .2rem; }
   .meta { white-space: normal; }
   .hide-sm { display: none; }
-  body { padding: var(--pad-top) var(--pad-x) 3rem; }
+  body { padding: var(--pad-top) var(--pad-x) 1rem; }
 }
-/* >>> instrument refresh (generated) >>> */
-/* ── instrument v2 — one coherent sheet over the stock one ───────────────
-   Three moves: (1) flatten the panel → area → gauge-card nesting to a single
-   card divided by hairlines, (2) colour lives only on numerals, arcs and a 3px
-   row rule, (3) all data is mono, all labels are 10px/.16em, all prose is
-   system-ui. Nothing below adds a class or touches the template. */
+/* Dashboard visual system: inline CSS, system fonts, and shared status colors.
+   Values use tabular numerals; labels and prose remain readable at small widths. */
 :root {
-  --plane:#f7f7f5; --surface:#ffffff; --sunken:#fbfaf8;
-  --hair:#e6e5df;  --hair-2:#f0efe9;  --ring:#e6e5df; --track:#e9e8e1;
-  --ink:#101112;   --ink-2:#4a4b4d;   --muted:#8d8c86;
-  --warn-arc:#c27e0a;
+  --plane:#f0f1f8; --surface:#ffffff; --sunken:#f7f8fc;
+  --hair:#e0e3ee; --hair-2:#eceef5; --ring:#e0e3ee; --track:#e7eaf2;
+  --ink:#14243b; --ink-2:#44556b; --muted:#596b80;
+  --ok-bg:#e7f5ed; --ok-fg:#087443;
+  --deg-bg:#fff0f1; --deg-fg:#c0213b;
+  --warn-bg:#fff6df; --warn-fg:#885700;
+  --prog-bg:#e9f4ff; --prog-fg:#086aab;
+  --drift-bg:#f3edff; --drift-fg:#7036b5;
+  --prune-bg:#edf1f6; --prune-fg:#536276;
+  --susp-bg:#edf1f6; --susp-fg:#536276;
+  --gpu-bg:#e4f5f2; --gpu-fg:#06756c;
+  --accent:#175cd3; --warn-arc:var(--warn-fg);
+  --shadow:0 5px 20px rgba(28,51,84,.045);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --pad-x:1.5rem;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --plane:#08090a; --surface:#0e1012; --sunken:#0a0b0c;
-    --hair:#1e2123;  --hair-2:#17191b; --ring:#1e2123; --track:#1c1f21;
-    --ink:#f2f2ef;   --ink-2:#b9b8b2;  --muted:#7d7c76;
-    --warn-arc:#ffa200;
+    --plane:#0b111b; --surface:#121c2a; --sunken:#162234;
+    --hair:#2b3c52; --hair-2:#233246; --ring:#2b3c52; --track:#2a3a4e;
+    --ink:#eef4fc; --ink-2:#c0cddd; --muted:#a0b1c6;
+    --ok-bg:#133c2d; --ok-fg:#58e0a0;
+    --deg-bg:#421d2b; --deg-fg:#ff879b;
+    --warn-bg:#3c3019; --warn-fg:#ffd17c;
+    --prog-bg:#15344d; --prog-fg:#7dccff;
+    --drift-bg:#302341; --drift-fg:#c9a1ff;
+    --prune-bg:#243144; --prune-fg:#b5c2d4;
+    --susp-bg:#243144; --susp-fg:#b5c2d4;
+    --gpu-bg:#123c39; --gpu-fg:#69dfd0;
+    --accent:#8ac2ff; --warn-arc:var(--warn-fg);
+    --shadow:0 5px 24px rgba(0,0,0,.12);
   }
 }
 
-body { background: var(--plane); font-size: 13px; line-height: 1.5; }
-header { background: var(--plane); border-bottom: 1px solid var(--hair); }
-h1 { font-size: 1.05rem; letter-spacing: -.015em; }
+body { background: var(--plane); font-size: 14px; line-height: 1.5; }
+main { min-width: 0; }
+.dashboard-top { max-width: 1680px; margin: 0 auto .9rem; }
+.dashboard-top > :last-child { margin-bottom: 0; }
+.dashboard-content { min-width: 0; }
+.dashboard-content > :first-child { margin-top: 0; }
+.dashboard-shell {
+  display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: start;
+  gap: 1.2rem; max-width: 1680px; margin: 0 auto;
+}
+.dashboard-sidebar {
+  position: sticky; top: calc(var(--hdr-h) + .9rem); align-self: start;
+  display: flex; flex-direction: column; gap: 1.15rem; min-width: 0;
+  padding: 1rem .75rem; background: var(--surface); border: 1px solid var(--hair);
+  border-radius: 16px; box-shadow: var(--shadow);
+}
+.sidebar-project {
+  display: flex; flex-direction: column; gap: .15rem; padding: .7rem .65rem;
+  background: var(--sunken); border: 1px solid var(--hair-2); border-radius: 10px;
+}
+.sidebar-project span { color: var(--muted); font-size: .62rem; font-weight: 700;
+  letter-spacing: .09em; text-transform: uppercase; }
+.sidebar-project strong { overflow: hidden; color: var(--ink); font-size: .85rem;
+  text-overflow: ellipsis; white-space: nowrap; }
+.side-nav { display: flex; flex-direction: column; gap: .2rem; }
+.side-nav-label ~ .side-nav-label { margin-top: .75rem; }
+.side-nav-label { margin: .1rem .55rem .3rem; color: var(--muted);
+  font-size: .63rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.side-nav a {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  min-height: 2.35rem; padding: .45rem .6rem; border-radius: 8px;
+  color: var(--ink-2); font-size: .8rem; font-weight: 550; text-decoration: none;
+}
+.side-nav a:hover {
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: var(--accent); text-decoration: none;
+}
+.side-nav .nav-count {
+  min-width: 1.35rem; padding: .05rem .35rem; border-radius: 999px;
+  background: var(--deg-bg); color: var(--deg-fg); font-size: .68rem;
+  font-variant-numeric: tabular-nums; text-align: center;
+}
+.sidebar-note {
+  margin-top: auto; padding: .7rem .6rem 0; border-top: 1px solid var(--hair);
+  color: var(--muted); font-size: .7rem; line-height: 1.45;
+}
+#overview, #cluster, #attention, #services, #unmanaged {
+  scroll-margin-top: calc(var(--hdr-h) + 1rem);
+}
+@media (max-width: 900px) {
+  .dashboard-shell { grid-template-columns: minmax(0, 1fr); gap: .7rem; }
+  .dashboard-sidebar {
+    position: static; min-height: 0; padding: .45rem .55rem; gap: .35rem;
+    overflow: hidden;
+  }
+  .sidebar-project, .sidebar-note, .side-nav-label { display: none; }
+  .side-nav { flex-direction: row; gap: .2rem; overflow-x: auto; }
+  .side-nav a { flex: none; white-space: nowrap; }
+}
+header { background: var(--surface); border-bottom: 1px solid var(--hair); box-shadow: var(--shadow); }
+h1 { font-size: 1.1rem; letter-spacing: -.025em; }
 .meta, .badge, .runmode, .src-tag { font-family: var(--mono); }
-.meta { font-size: .72rem; letter-spacing: .02em; }
+.meta { font-size: .76rem; letter-spacing: 0; }
 .badge, .runmode, .src-tag {
-  border-radius: 3px; font-size: .6rem; letter-spacing: .12em; padding: .2rem .4rem;
+  border-radius: 5px; font-size: .65rem; letter-spacing: .06em; padding: .2rem .4rem;
   background: transparent; border: 1px solid var(--hair); color: var(--muted);
 }
 .runmode { border-style: solid; }
+.badge.is-envtype, .hdr-sub { opacity: 1; }
+.page-intro { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 1.8rem 0 1.2rem; }
+.eyebrow { color: var(--accent); font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.page-intro h2 { margin: .25rem 0 0; font-size: clamp(1.5rem, 2.4vw, 2rem); line-height: 1.2; letter-spacing: -.04em; font-weight: 700; }
+.read-only { color: var(--muted); border: 1px solid var(--hair); border-radius: 999px; padding: .35rem .7rem; background: var(--surface); font-size: .74rem; white-space: nowrap; }
+.read-only span { margin: 0 .3rem; }
+.skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 100; transform: translateY(-200%); padding: .65rem 1rem; border-radius: 8px; background: var(--ink); color: var(--surface); }
+.skip-link:focus { transform: none; }
+:where(a, summary, [tabindex]):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 5px; }
+html { scroll-padding-top: 5rem; }
 
 /* Every micro-label, one voice. Not .legend > summary: "What these states mean" is a
    sentence to read, not a field label, and shrunk to .6rem/mono/uppercase/.16em
    tracking it turned into a cramped, hard-to-read pill instead of plain text. */
-.tile .k, .cap-head, .views-lab, .spread-lab, .cap-lead .ck, .cap-of .ck, thead th,
+.tile .k, .cap-head, .views-lab, .cap-lead .ck, .cap-of .ck, thead th,
 .kind, .sec-head {
-  font-family: var(--mono); font-size: .6rem; font-weight: 700;
-  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+  font-family: inherit; font-size: .7rem; font-weight: 700;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
 }
 .cap-head .cap-sub, .sec-head .sec-sub, .hdr-sub {
-  font-family: system-ui, sans-serif; font-size: .72rem; font-weight: 400;
+  font-family: system-ui, sans-serif; font-size: .78rem; font-weight: 400;
   letter-spacing: 0; text-transform: none; color: var(--muted);
 }
 /* Every number, mono and tabular. */
-.tile .n, .cap-item .cv, .cap-lead .cv, .gauge .hd-num, .appver, .chartver, .ready,
+.tile .n, .cap-item .cv, .cap-lead .cv, .appver, .chartver, .ready,
 .sync, .meta, .members { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* One console sheet, not five floating cards. Views / Cluster / legend were each a
    rounded box wrapping a single thin row — five competing containers for four facts.
    They become bands of one continuous sheet, separated by hairlines. */
-.panel, .views, .capacity, .legend {
+.views, .capacity, .legend {
   background: var(--surface); border: 0; border-radius: 0;
   border-top: 1px solid var(--hair); margin: 0 calc(-1 * var(--pad-x));
   padding: .7rem var(--pad-x);
 }
 .panel-row { margin: 0 0 0 0; gap: 0; }
-/* Unlike .views/.capacity/.legend below, .panel keeps the full-bleed treatment --
-   but its background stays --surface (near-white) from the shared rule above,
-   which shows as a plain white band behind the --plane-toned .area cards. */
-.panel { padding: 0; flex: 1 1 100%; min-width: 0; border-top: 0; background: var(--plane); }
-/* var(--pad-x) horizontally, matching .areas' own left edge below (and .sub/.views/
-   .capacity above and below this panel) -- .9rem here put "Services" to the left of
-   where the Health/HA/Istio boxes actually start. No border-bottom: that hairline
-   read as a stray line under the heading now that .panel has no other framing. */
-.panel > .cap-head, .panel > div:first-child.cap-head {
-  padding: .6rem var(--pad-x);
-}
-.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; }
+
+.card { background: var(--surface); border: 1px solid var(--hair); border-radius: 12px; box-shadow: var(--shadow); }
 /* A fixed label rail down the left, so every band starts on the same column. */
 .views, .capacity { display: flex; align-items: baseline; gap: .8rem; flex-wrap: nowrap; }
 .views-lab { flex: none; width: 5rem; margin: 0; padding-top: .12rem; }
@@ -649,95 +608,26 @@ h1 { font-size: 1.05rem; letter-spacing: -.015em; }
    flat hairline-band treatment above for these: they read as distinct panels, not
    more rows of the same running sheet. */
 .views, .capacity, .legend {
-  background: var(--surface); border: 1px solid var(--hair); border-radius: 8px;
-  margin: .9rem 0 0; padding: .6rem .9rem;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 12px;
+  margin: 1rem 0 0; padding: .8rem 1rem; box-shadow: var(--shadow);
 }
 .capacity > .cap-row, .capacity > .cap-note { flex: 1 1 24rem; margin-top: 0; }
 .views { flex-wrap: wrap; }
 
-/* Signal rail: Health, HA, Istio and Fleet are the same kind of thing (a headline
-   signal), so they stack as compact bands of one card, divided by hairlines, and
-   read top to bottom at a glance. */
-.areas { display: flex; flex-direction: column; margin: 0; padding: 0;
-         box-sizing: border-box; background: var(--surface); border: 1px solid var(--hair);
-         border-radius: 8px; overflow: hidden; }
-.area {
-  background: none; border: 0; border-top: 1px solid var(--hair);
-  padding: .6rem .85rem .65rem 1rem; min-width: 0;
-  position: relative; overflow: hidden;
-}
-.areas > .area:first-child { border-top: 0; }
-@media (min-width: 721px) and (max-width: 1100px) {
-  .areas { display: grid; grid-template-columns: 1fr 1fr; }
-  .areas > .area:nth-child(2) { border-top: 0; }
-}
-/* A colored left-edge accent per area, not a border: a *-colored border-left next
-   to the box's own --hair-colored top/bottom borders blends across the rounded
-   corner into a small diagonal wedge of the wrong color right where the curve
-   starts. A ::before rectangle clipped by the parent's own overflow: hidden (its
-   only job) sits flush inside the radius instead, the same technique the
-   reference layout uses for this exact accent -- and, now that the three areas
-   share one card, doubles as the only divider between them. */
-.area::before {
-  content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
-}
-.areas > .area:first-child::before { background: var(--ok-fg); }
-.areas > .area:nth-child(2)::before { background: var(--warn-fg); }
-.areas > .area:nth-child(3)::before { background: var(--drift-fg); }
-.areas > .area:nth-child(4)::before { background: var(--prog-fg); }
-/* Area heads: one short title line; the longer explanation is the title tooltip. */
-.area > .cap-head { display: block; margin: 0 0 .45rem; font-size: .66rem; cursor: help; }
-.tiles-row { align-items: center; margin-top: 0; }
-.tiles { gap: .45rem; }
 /* .cap-part.is-warn ("not ready", "no cpu", ...) only had colour inside .cap-of's
    own context (the Cluster band) -- outside it, "is-warn" was a no-op. */
 .cap-part { font-size: .68rem; }
 .cap-part.is-warn { color: var(--warn-fg); }
 a.cap-part { text-decoration: none; }
 a.cap-part:hover { text-decoration: underline; }
-.spread-lab { flex: none; align-self: center; margin-top: 0; width: 3.8rem; }
 
-/* Health: the ring on the left, its counted line and status chips beside it. */
-.health-row { display: flex; align-items: center; gap: .9rem; }
 .health-side { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
-.health-side .hd-cap { font-size: .7rem; color: var(--muted); }
-.health-row .gauge { width: auto; }
-.health-row .gauge .hd-face { width: 58px; height: 58px; margin-top: 0; }
-.health-row .gauge .hd-face::after { inset: 6px; }
-.health-row .gauge .hd-num { font-size: .95rem; }
-.health-row .tile-chips { gap: .3rem; }
-.health-row .tile-chip { padding: .12rem .45rem; font-size: .72rem; }
+.health-side .hd-cap { font-size: .82rem; color: var(--ink-2); white-space: normal; }
+.health-side .excluded { color: var(--muted); }
 
-/* HA and Istio: one line per signal -- label, ring, counted, and the at-risk count
-   pushed to the right edge as a compact chip instead of a full tile. */
-.ha-rows { display: flex; flex-direction: column; gap: .4rem; margin: 0; }
-.ha-rows .tiles-row { flex-direction: row; flex-wrap: nowrap; align-items: center;
-                      gap: .6rem; margin: 0; }
-.ha-rows .gauge { flex-direction: row; align-items: center; width: auto; gap: .5rem; }
-.ha-rows .gauge .hd-face { width: 36px; height: 36px; margin-top: 0; }
-.ha-rows .gauge .hd-face::after { inset: 4px; }
-.ha-rows .gauge .hd-num { font-size: .62rem; }
-.ha-rows .gauge .hd-num small { font-size: .8em; }
-.ha-rows .gauge .hd-cap { font-size: .68rem; }
-.ha-rows .tile {
-  display: inline-flex; flex-direction: row; align-items: baseline; gap: .35rem;
-  margin-left: auto; width: auto; min-height: 0; padding: .2rem .5rem;
-  border-top-width: 1px;
-}
-.ha-rows .tile .n { font-size: .85rem; }
-.ha-rows .tile .k { margin-top: 0; white-space: nowrap; }
-.area .cap-note { margin-top: .45rem; font-size: .68rem; line-height: 1.4; }
+.tile-chip b { margin-left: .15rem; font-variant-numeric: tabular-nums; }
 
-/* Fleet: three small rings in a row, each with its label and ready count beside it. */
-.area .ringstat-row { height: auto; padding: 0; gap: .5rem 1rem; flex-wrap: wrap;
-                      justify-content: space-between; }
-.area .ringstat { display: grid; grid-template-columns: auto auto; column-gap: .5rem;
-                  align-items: center; justify-items: start; }
-.area .ringstat-ring { grid-row: span 2; width: 46px; height: 46px; }
-.area .ringstat-ring::after { inset: 5px; }
-.area .ringstat-num { font-size: .8rem; }
-.area .ringstat-lab { align-self: end; }
-.area .ringstat-sub { align-self: start; justify-content: flex-start; }
+.policy-disabled { color: var(--deg-fg); }
 
 /* Tiles: fixed cell, hairline box, 2px state rule. The stock .t-* rules set
    border-color: transparent, so each one has to restate it. */
@@ -756,9 +646,7 @@ a.cap-part:hover { text-decoration: underline; }
   display: flex; flex-direction: column; justify-content: center;
   align-items: center; text-align: center;
 }
-/* Status chips: one glyph badge per status present, below the Health ring that
-   already carries the headline percent -- the same glyph the services table's own
-   pill uses for that state, so the vocabulary is shared rather than invented twice. */
+/* Visible state names accompany every count; color and glyphs are supplementary. */
 .tile-chips { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .tile-chip {
   display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .55rem;
@@ -781,7 +669,7 @@ a.cap-part:hover { text-decoration: underline; }
 .tile-chip.t-prune       { --tile-color: var(--prune-fg); }
 .tile-chip.t-suspended   { --tile-color: var(--susp-fg); }
 .tile .n { font-size: 1.05rem; font-weight: 700; letter-spacing: -.02em; }
-.tile .k { margin-top: .15rem; font-size: .62rem; }
+.tile .k { margin-top: .15rem; font-size: .66rem; letter-spacing: .04em; }
 .tile.t-total       { border-color: var(--hair); border-top-color: var(--ink); --tile-color: var(--ink); }
 /* A full colour ring, not just the top rule: reads as "this box is about that
    state" at a glance, the same way the .pill capsule beside it does now. */
@@ -795,18 +683,17 @@ a.cap-part:hover { text-decoration: underline; }
 .tile.t-ok .k, .tile.t-degraded .k, .tile.t-warning .k, .tile.t-progressing .k,
 .tile.t-drift .k, .tile.t-prune .k, .tile.t-suspended .k { color: var(--muted); }
 
-
 /* Views + cluster: hairline chips, no fills. */
 .views, .capacity { padding: .6rem .9rem; }
 .vchip, .chip {
   background: transparent; border: 1px solid var(--hair); border-radius: 4px;
-  font-family: var(--mono); font-size: .68rem; letter-spacing: .04em;
+  font-family: inherit; font-size: .78rem; letter-spacing: 0;
   padding: .28rem .5rem; color: var(--ink-2);
 }
 .vchip:hover { border-color: var(--ink-2); }
 .cap-item .cv, .cap-lead .cv { font-size: .95rem; font-weight: 700; }
-.cap-item .ck, .cap-split { font-family: var(--mono); font-size: .68rem; }
-.ic { opacity: .45; }
+.cap-item .ck, .cap-split { font-family: inherit; font-size: .75rem; }
+.ic { opacity: .8; }
 
 /* Selection: a tight ring on the element. The stock outline + 2px offset reads as a
    detached halo once everything is a flat bordered card. */
@@ -820,12 +707,12 @@ a.cap-part:hover { text-decoration: underline; }
   margin-left: .4em; opacity: .55;
 }
 
-/* Table: 10px mono headers, hairline rows, a 3px state rule, no wash. */
+/* Bounded tables with readable headers and a severity rule on each service row. */
 /* Bounded and internally scrollable -- a cluster with hundreds of services or a
    long not-in-gitops list used to just grow the whole page instead. Both axes
    scroll: any overflow other than visible already clips to the rounded corners,
    and hidden on x cut the Status column off entirely on a phone. */
-.card { overflow: auto; max-height: 28rem; margin-top: 1rem; position: relative; }
+.card { overflow: auto; max-height: 36rem; margin-top: 1rem; position: relative; }
 /* Sticky here is safe, unlike the page-level attempt this project tried once
    before (see the base thead th rule above): that collapsed rows because the
    table scrolled with the whole page while sticking to an offset borrowed from
@@ -842,11 +729,11 @@ thead th {
 thead th:first-child, thead th:last-child,
 tbody:last-of-type tr:last-child td:first-child,
 tbody:last-of-type tr:last-child td:last-child { border-radius: 0; }
-tbody td { padding: .45rem .8rem; border-top: 1px solid var(--hair-2); }
+tbody td { padding: .65rem .8rem; border-top: 1px solid var(--hair-2); }
 tbody.svc:hover td { background: var(--sunken); }
-.name { font-weight: 500; font-size: .84rem; letter-spacing: -.005em; }
-.appver { font-size: .76rem; font-weight: 700; }
-.chartver, .sync, .detail { font-size: .72rem; }
+.name { font-weight: 600; font-size: .88rem; letter-spacing: -.005em; }
+.appver { font-size: .8rem; font-weight: 700; }
+.chartver, .sync, .detail { font-size: .78rem; }
 .detail { font-family: system-ui, sans-serif; color: var(--ink-2); }
 .svc.is-degraded td:first-child { box-shadow: inset 3px 0 0 var(--deg-fg); }
 .svc.is-warning  td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
@@ -858,7 +745,7 @@ tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
    all seven states instead of restating each border/background pair. */
 .pill {
   padding: .12rem .55rem; border-radius: 4px; border: 1px solid currentColor;
-  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+  font-family: inherit; font-size: .68rem; letter-spacing: .04em;
 }
 .pill.s-ok, .pill.s-degraded, .pill.s-warning, .pill.s-progressing,
 .pill.s-drift, .pill.s-prune, .pill.s-suspended {
@@ -869,8 +756,8 @@ tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
 /* Inline badges: outline in their own colour, never a fill. */
 .blocked, .arch, .az, .gpu, .src, .members {
   background: transparent; border: 1px solid currentColor; border-radius: 2px;
-  padding: .04rem .26rem; font-family: var(--mono); font-size: .58rem;
-  letter-spacing: .06em; opacity: .9;
+  padding: .08rem .3rem; font-family: inherit; font-size: .65rem;
+  letter-spacing: .015em; opacity: 1;
 }
 .arch.is-arm64 { color: var(--prog-fg); }
 .arch.is-amd64 { color: var(--drift-fg); }
@@ -883,25 +770,210 @@ tbody.svc.is-gpu td:first-child { box-shadow: inset 3px 0 0 var(--gpu-fg); }
 .blocked.is-accelerator { color: var(--gpu-fg); }
 .members, .src { color: var(--muted); }
 
-/* Gauges are cells too — same height, so a row reads as one band. */
-.tiles-row > .gauge { flex: none; }
 /* Istio's Policy pill sits on the title line now, right-aligned, not its own row
    below -- the wrapper is a span, not the .cap-head div itself, so .cap-sub still
    sits on its own line underneath exactly like every other area's header. */
 .cap-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .cap-head-badge { flex: none; }
+.metric-meta { font-size: .72rem; font-weight: 500; text-transform: none; letter-spacing: 0; }
 
 /* Legend + sections. */
 .legend { margin-bottom: 0; }
 .legend > summary { color: var(--muted); }
-.legend-row, .legend-note, .sub { font-size: .76rem; color: var(--ink-2); }
+.legend-row, .legend-note, .sub { font-size: .8rem; color: var(--ink-2); }
 .legend-kw { font-family: var(--mono); }
 .sec-head { margin: 1.6rem 0 -.1rem; }
-footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
-/* <<< instrument refresh (generated) <<< */
+footer { font-family: inherit; font-size: .75rem; letter-spacing: 0; }
+.attn { border-color: var(--hair); border-top: 3px solid var(--deg-fg); border-radius: 12px; box-shadow: var(--shadow); }
+.attn-head { font-size: .72rem; padding: .8rem 1rem; }
+.attn-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .25rem .55rem; padding: .7rem 1rem; }
+.attn-name { min-width: 0; overflow-wrap: anywhere; font-size: .86rem; }
+.attn-reason { grid-column: 2; white-space: normal; overflow-wrap: anywhere; font-size: .78rem; }
+.attn.is-clear { border-top-color: var(--ok-fg); padding: 1rem; }
+.archbar { width: 190px; max-width: 100%; }
+.archbar-track { height: 12px; }
+.archbar-seg { flex-basis: 0; background: var(--muted); }
+.ringstat-sub .is-other { color: var(--ink-2); }
+.arch-percent { font-weight: 400; }
+.cap-note { font-size: .78rem; }
+.cap-of { font-size: .85rem; }
+.cap-part { font-size: .78rem; }
+.node-table-scroll { scrollbar-width: thin; scrollbar-color: var(--muted) var(--sunken); }
+.card { scrollbar-width: thin; scrollbar-color: var(--muted) var(--sunken); }
+.name { display: table-cell; }
+.name-content { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem; min-width: 0; }
+.name-content > span { margin-left: 0; }
+.service-name { overflow-wrap: anywhere; min-width: 0; }
+tbody.svc.is-degraded td:first-child { box-shadow: inset 3px 0 0 var(--deg-fg); }
+tbody.svc.is-warning td:first-child { box-shadow: inset 3px 0 0 var(--warn-fg); }
+.scroll-hint { display: block; color: var(--muted); font-size: .72rem; margin-top: .15rem; }
+.tile:focus-visible, .tile-chip:focus-visible, .vchip:focus-visible, a.cap-item:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 3px;
+}
+@media (max-width: 720px) {
+  :root { --pad-x: 1rem; }
+  .page-intro { margin-top: 1.25rem; align-items: flex-start; }
+  .read-only { font-size: .68rem; padding: .3rem .5rem; white-space: normal; text-align: right; }
+  .split-row { margin-inline: 0; }
+  .split-side { grid-template-columns: minmax(0, 1fr); }
+  .capacity { min-width: 0; }
+
+  .health-side { flex: 1 1 12rem; }
+  .cap-rings { gap: 1rem; }
+  .legend-grid { grid-template-columns: minmax(0, 1fr); }
+  .views-lab { width: 100%; }
+  .vchip { min-height: 2rem; }
+  .card { max-height: none; }
+  .attn-list { max-height: none; }
+  .services-table, .unmanaged-table { table-layout: fixed; }
+  .services-table .service-col { width: 42%; }
+  .services-table .version-col { width: 23%; }
+  .services-table .status-col { width: 35%; }
+  .unmanaged-table .service-col { width: 34%; }
+  .unmanaged-table .version-col { width: 20%; }
+  .unmanaged-table .ready-col { width: 14%; }
+  .unmanaged-table .status-col { width: 32%; }
+  .services-table td, .services-table th, .unmanaged-table td, .unmanaged-table th { padding: .6rem .45rem; }
+  .name-content .service-name { flex-basis: 100%; }
+  .appver { white-space: normal; overflow-wrap: anywhere; font-size: .72rem; }
+  .services-table .pill, .unmanaged-table .pill { font-size: .6rem; letter-spacing: 0; padding: .15rem .3rem; gap: .2rem; }
+  .ready { font-size: .72rem; }
+  footer { flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+  .health-side { flex: none; width: 100%; }
+
+  .cap-head-row { flex-wrap: wrap; }
+  .attn-item { grid-template-columns: minmax(0, 1fr); }
+  .attn-item .pill { justify-self: start; }
+  .attn-reason { grid-column: 1; }
+}
+/* Overview layout: KPI strip, two equal detail panels, then cluster and attention.
+   Every card shares one radius, border, padding and title style so edges line up. */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .9rem; margin: .9rem 0; }
+.kpi, .insight, .split-side .capacity, .split-side .attn {
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 14px;
+  box-shadow: var(--shadow); box-sizing: border-box; min-width: 0;
+}
+.kpi { display: flex; flex-direction: column; gap: .35rem; padding: 1rem 1.15rem; }
+.kpi-lab { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.kpi-val { color: var(--ink); font-size: 1.75rem; font-weight: 750; line-height: 1.1;
+  letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.kpi-bar { display: block; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.kpi-bar i { display: block; height: 100%; border-radius: inherit; background: var(--muted); }
+.kpi-bar.is-ok i { background: var(--ok-fg); }
+.kpi-bar.is-warn i { background: var(--warn-fg); }
+.kpi-bar.is-bad i { background: var(--deg-fg); }
+.kpi-sub { margin-top: auto; color: var(--ink-2); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.kpi-sub .is-ok { color: var(--ok-fg); font-weight: 600; }
+.kpi-sub .is-bad { color: var(--deg-fg); font-weight: 600; }
+
+.insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; align-items: stretch; }
+.insight { display: flex; flex-direction: column; gap: 1rem; padding: 1.1rem 1.25rem; }
+.insight-head, .split-side .capacity > .cap-head, .split-side .attn-head {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 1.6rem;
+}
+.insight-title, .split-side .capacity > .cap-head {
+  margin: 0; color: var(--ink); font-size: .95rem; font-weight: 700;
+  letter-spacing: -.01em; text-transform: none;
+}
+.insight-head .pill { flex: none; }
+
+/* Health donut: SVG arcs with a hairline gap between states, number in the hole. */
+.health-body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1.4rem; flex: 1; }
+.donut { position: relative; width: 172px; height: 172px; }
+.donut svg { display: block; width: 100%; height: 100%; }
+.donut circle { fill: none; stroke-width: 14; }
+.donut-track { stroke: var(--track); }
+.donut-seg.t-ok { stroke: var(--ok-fg); }
+.donut-seg.t-progressing { stroke: var(--prog-fg); }
+.donut-seg.t-drift { stroke: var(--drift-fg); }
+.donut-seg.t-warning { stroke: var(--warn-fg); }
+.donut-seg.t-degraded { stroke: var(--deg-fg); }
+.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; }
+.donut-val { color: var(--ink); font-size: 2rem; font-weight: 800; line-height: 1;
+  letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.donut-val small { margin-left: .05em; color: var(--muted); font-size: .5em; font-weight: 700; }
+.donut-lab { margin-top: .2rem; color: var(--muted); font-size: .72rem; font-weight: 600; }
+.insight-health .health-side { display: flex; flex-direction: column; gap: .65rem; min-width: 0; }
+.insight-health .hd-cap { color: var(--ink-2); font-size: .85rem; }
+.insight-health .tile-chips { display: grid; grid-template-columns: minmax(0, 1fr); gap: .4rem; }
+.insight-health .tile-chip {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .5rem;
+  padding: .4rem .55rem; border: 1px solid var(--hair-2); border-radius: 9px;
+  background: var(--sunken); color: var(--ink); font-family: inherit; font-size: .8rem;
+  letter-spacing: 0; text-transform: none; text-decoration: none;
+}
+.insight-health a.tile-chip:hover { border-color: var(--tile-color); background: var(--surface); }
+.insight-health .tile-chip .g {
+  display: inline-flex; align-items: center; justify-content: center; width: 1.3rem; height: 1.3rem;
+  border-radius: 6px; background: color-mix(in srgb, var(--tile-color) 16%, var(--surface));
+  color: var(--tile-color); font-size: .7rem; font-weight: 700;
+}
+.insight-health .tile-chip b { margin: 0; color: var(--ink); font-weight: 700; }
+
+/* Resilience: four identical half-circle gauges, one per signal, on one baseline. */
+.insight-resilience { container-type: inline-size; }
+.meters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }
+@container (max-width: 36rem) {
+  .meters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.meter {
+  display: flex; flex-direction: column; align-items: center; gap: .35rem; min-width: 0;
+  padding: .75rem .6rem .7rem; border: 1px solid var(--hair-2); border-radius: 11px;
+  background: var(--sunken); text-align: center;
+}
+.meter-lab { color: var(--ink-2); font-size: .78rem; font-weight: 650; cursor: help; }
+.meter-dial { position: relative; width: min(100%, 108px); color: var(--muted); }
+.meter-dial.is-ok { color: var(--ok-fg); }
+.meter-dial.is-warn { color: var(--warn-fg); }
+.meter-dial.is-bad { color: var(--deg-fg); }
+.semi { display: block; width: 100%; height: auto; }
+.semi path { fill: none; stroke-width: 11; stroke-linecap: round; }
+.semi-track { stroke: var(--track); }
+.semi-fill { stroke: currentColor; }
+.meter-val { position: absolute; left: 0; right: 0; bottom: 0; color: var(--ink);
+  font-size: 1.35rem; font-weight: 800; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.meter-val small { color: var(--muted); font-size: .55em; font-weight: 700; margin-left: .05em; }
+.meter-cap { color: var(--muted); font-size: .72rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.meter .tile {
+  display: inline-flex; flex-direction: row; align-items: baseline; gap: .3rem; width: auto; min-height: 0;
+  margin-top: auto; padding: .15rem .55rem; border: 1px solid transparent; border-radius: 999px;
+}
+.meter .tile .n { font-size: .78rem; font-weight: 750; }
+.meter .tile .k { margin: 0; font-size: .66rem; white-space: nowrap; }
+.insight .cap-note { margin: 0; font-size: .75rem; line-height: 1.5; }
+
+/* Cluster and attention on the row below use the same card shell. */
+.split-row-details { margin: .9rem 0; }
+.split-side .capacity { padding: 1.1rem 1.25rem; gap: .9rem; }
+.split-side .capacity .cap-rings { justify-content: flex-start; }
+.split-side .capacity .archbar { width: 100%; align-items: stretch; }
+.split-side .capacity .archbar .ringstat-lab, .split-side .capacity .archbar .ringstat-sub { justify-content: flex-start; text-align: left; }
+.split-side .attn { border-top: 3px solid var(--deg-fg); }
+.split-side .attn.is-clear { border-top-color: var(--ok-fg); padding: 1.1rem 1.25rem; color: var(--ok-fg); }
+.split-side .attn-head { justify-content: flex-start; padding: 1rem 1.25rem .6rem; font-size: .95rem; letter-spacing: -.01em; text-transform: none; }
+.split-side .attn-item { padding: .55rem 1.25rem; }
+.split-side .attn-count { margin-left: auto; }
+
+@media (max-width: 1100px) {
+  .insights { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  .kpi { padding: .8rem .9rem; }
+  .kpi-val { font-size: 1.4rem; }
+  .insight, .split-side .capacity { padding: .95rem 1rem; }
+  .health-body { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .insight-health .health-side { width: 100%; }
+  .insight-health .tile-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .donut { width: 148px; height: 148px; }
+}
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to dashboard</a>
 <header>
   <h1>{{brand}}<span title="{{if .LocalMode}}Running outside the cluster against a proxied API.{{else}}Running in-cluster.{{end}}">{{if .LocalMode}}{{icon "laptop"}}{{else}}{{icon "cluster"}}{{end}}</span>{{.EnvName}}{{if .LocalMode}}<span class="runmode" title="Running outside the cluster against a proxied API. Permissions here are your kubeconfig's, not the ServiceAccount a deployed instance is limited to.">local run</span>{{end}}
     {{- if and .ClusterName (ne .ClusterName .EnvName)}}<span class="badge" title="Cluster{{if .EnvType}}, a {{.EnvType}} environment{{end}}">{{.ClusterName}}</span>
@@ -915,6 +987,12 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   </div>
   </div>
 </header>
+<main id="main">
+<div class="dashboard-top">
+<div class="page-intro" id="overview">
+  <div><span class="eyebrow">Kubernetes / live status</span><h2>Cluster overview</h2></div>
+  <span class="read-only">Read-only <span aria-hidden="true">&middot;</span> GitOps-aware</span>
+</div>
 
 {{if .ShowRootLine}}{{with .Snapshot}}
 <div class="sub" title="root health {{.RootHealth}} &middot; root sync {{.RootSync}}">
@@ -970,54 +1048,111 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 </div>
 {{end}}
 {{if .Stale}}<div class="banner stale">data is {{.AgeSeconds}}s stale</div>{{end}}
+</div>
+<div class="dashboard-shell">
+<div class="dashboard-sidebar">
+  <div class="sidebar-project"><span>Current environment</span><strong>{{.EnvName}}</strong></div>
+  <nav class="side-nav" aria-label="Dashboard sections">
+    <span class="side-nav-label">Monitor</span>
+    <a href="#overview">Overview</a>
+    {{if and .HasData .Snapshot.Nodes}}<a href="#cluster">Cluster</a>{{end}}
+    {{if .HasData}}<a href="#attention">Attention{{if .AttentionItems}}<span class="nav-count">{{len .AttentionItems}}</span>{{end}}</a>{{end}}
+    <span class="side-nav-label">Inventory</span>
+    {{if and .HasData .Filter.ShowServices}}<a href="#services">Services</a>{{end}}
+    {{if and .HasData .Filter.ShowUnmanaged .Snapshot.Unmanaged}}<a href="#unmanaged">Workloads</a>{{end}}
+  </nav>
+  <div class="sidebar-note">Read-only cluster view<br>Live GitOps status</div>
+</div>
+<div class="dashboard-content">
 
 {{if .HasData}}
 {{with .Snapshot.Summary}}
 {{/* The tiles keep counting the whole cluster while a filter is on. Do not "fix" this
      to count only the filtered rows: every other tile would read 0 as soon as one filter
      is applied and the reader would lose their bearings. Filtering picks rows, not counts. */}}
-<div class="cap-head">Services<span class="cap-sub">what's deployed, and whether it's healthy</span></div>
-
-
-{{/* The signal rail on the left, the Cluster and Attention detail panels beside it. */}}
-<div class="split-row">
-<div class="split-main">
-<div class="areas">
-<div class="area">
-<div class="cap-head" title="Share of counted services that are OK or progressing right now. Prune and suspended rows are not counted.">Health</div>
-<div class="health-row">
-{{with .Health}}
-<div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}" title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
-  {{/* Composition ring over the counted states only (see ringStops): the healthy
-       slices come first, so their arc is the same share as the number inside. */}}
-  <div class="hd-face"{{if .Known}} style="background: conic-gradient({{ringStops $.Tiles}})"{{end}}>
-    <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
+{{/* Headline counts first, then the two detail panels, then cluster and attention. */}}
+<div class="kpis">
+  <div class="kpi" title="GitOps-tracked services: ArgoCD Applications and Flux releases.">
+    <span class="kpi-lab">Services</span>
+    <span class="kpi-val">{{.Total}}</span>
+    {{with .Health}}<span class="kpi-bar {{gaugeClass .Known .Percent}}" title="{{if .Known}}{{.Percent}}% of counted services healthy{{else}}no services counted{{end}}"><i style="width: {{.Percent}}%"></i></span>{{end}}
+    <span class="kpi-sub">{{with $.AttentionItems}}<span class="is-bad">{{len .}} need attention</span>{{else}}<span class="is-ok">nothing needs attention</span>{{end}}</span>
   </div>
+  {{with $.Snapshot.Pods}}
+  <div class="kpi" title="Running pods across the whole cluster. Ready is each pod's own Ready condition -- a Running pod can still fail this.">
+    <span class="kpi-lab">Running pods</span>
+    <span class="kpi-val">{{.Total}}</span>
+    <span class="kpi-bar {{gaugeClass (gt .Total 0) .Percent}}"><i style="width: {{.Percent}}%"></i></span>
+    <span class="kpi-sub">{{.Ready}} ready{{if .NotReady}} <span class="is-bad">&middot; {{.NotReady}} not ready</span>{{end}}</span>
+  </div>
+  {{end}}
+  {{with $.Snapshot.Workloads}}
+  <div class="kpi" title="Every Deployment/StatefulSet/DaemonSet in the cluster, GitOps-managed or not. Ready/Desired are summed replica counts.">
+    <span class="kpi-lab">Workloads</span>
+    <span class="kpi-val">{{.Total}}</span>
+    <span class="kpi-bar {{gaugeClass (gt .Desired 0) .Percent}}"><i style="width: {{.Percent}}%"></i></span>
+    <span class="kpi-sub" title="{{.Ready}} of {{.Desired}} desired replicas are ready, summed across every workload">{{.Ready}}/{{.Desired}} replicas ready</span>
+  </div>
+  {{end}}
+  {{with $.Snapshot.Nodes}}{{if not .Error}}
+  <div class="kpi" title="Every node in the cluster.">
+    <span class="kpi-lab">Nodes</span>
+    <span class="kpi-val">{{.Total}}</span>
+    <span class="kpi-bar {{gaugeClass (gt .Total 0) .Percent}}"><i style="width: {{.Percent}}%"></i></span>
+    <span class="kpi-sub">{{.Ready}} ready{{if .NotReady}} <span class="is-bad" title="Not reporting Ready. A node the cloud provider has shut down stays in the list like this until something removes it, and it is not usable capacity.">&middot; {{.NotReady}} not ready</span>{{end}}</span>
+  </div>
+  {{end}}{{end}}
 </div>
-{{end}}
-{{/* One ring for the whole, then one small badge per status actually present --
-     the glyph is the same one the services table's own pill already uses for that
-     state. Hovering names it in full plus its share of the total. */}}
-<div class="health-side">
-{{with .Health}}<span class="hd-cap">{{if .Known}}{{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}</span>{{end}}
+
+<div class="insights">
+<section class="insight insight-health" aria-labelledby="health-title">
+  <div class="insight-head">
+    <h3 class="insight-title" id="health-title" title="Share of counted services that are OK or progressing right now. Prune and suspended rows are not counted.">Service health</h3>
+    <span class="metric-meta">{{.Total}} tracked</span>
+  </div>
+  <div class="health-body">
+    {{with .Health}}
+    {{/* One arc per counted state, healthy ones first, so the healthy arc is the
+         same share as the number in the middle (see ringSegments). */}}
+    <div class="donut {{gaugeClass .Known .Percent}}" role="img" aria-label="{{if .Known}}{{.Percent}}% healthy, {{.OK}} of {{.Counted}} counted services{{else}}No services counted{{end}}" title="{{if .Known}}{{.Percent}}% healthy &middot; {{.OK}} of {{.Counted}} counted{{if .Excluded}} &middot; {{.Excluded}} excluded{{end}}{{else}}no services counted{{end}}">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-90 60 60)">
+        <circle class="donut-track" cx="60" cy="60" r="50" pathLength="100"/>
+        {{- if .Known}}{{range ringSegments $.Tiles}}
+        <circle class="donut-seg {{.Class}}" cx="60" cy="60" r="50" pathLength="100" stroke-dasharray="{{.Dash}}" stroke-dashoffset="{{.Offset}}"/>
+        {{- end}}{{end}}
+      </g></svg>
+      <div class="donut-center"><span class="donut-val">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span><span class="donut-lab">healthy</span></div>
+    </div>
+    {{end}}
+    {{/* State names and counts remain visible without hover; tooltips add their share
+         of all services, which differs from the Health ring's counted population. */}}
+    <div class="health-side">
+      {{with .Health}}<span class="hd-cap">{{if .Known}}<strong>{{.OK}} of {{.Counted}}</strong> healthy{{if .Excluded}} <span class="excluded">&middot; {{.Excluded}} excluded</span>{{end}}{{else}}No services counted{{end}}</span>{{end}}
 <div class="tile-chips">
-  {{range $.Tiles}}{{if .State}}{{if .Href}}<a class="tile-chip {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}" title="{{.Name}}: {{.Count}} &middot; {{.Percent}}% of services"><span class="g">{{glyph .State}}</span>{{.Count}}</a>{{else}}<span class="tile-chip {{.Class}}" title="{{.Name}}: {{.Count}} &middot; {{.Percent}}% of services"><span class="g">{{glyph .State}}</span>{{.Count}}</span>{{end}}{{end}}{{end}}
+  {{range $.Tiles}}{{if .State}}{{if .Href}}<a class="tile-chip {{.Class}}{{if .IsOn}} is-on{{end}}" href="{{.Href}}" title="{{.Name}}: {{.Count}} &middot; {{.Percent}}% of services"{{if .IsOn}} aria-current="true"{{end}}><span class="g" aria-hidden="true">{{glyph .State}}</span><span>{{.Name}}</span><b>{{.Count}}</b></a>{{else}}<span class="tile-chip {{.Class}}" title="{{.Name}}: {{.Count}} &middot; {{.Percent}}% of services"><span class="g" aria-hidden="true">{{glyph .State}}</span><span>{{.Name}}</span><b>{{.Count}}</b></span>{{end}}{{end}}{{end}}
 </div>
-</div>
-</div>
-</div>
-{{with $.Snapshot.HA}}
-<div class="area">
-  <div class="cap-head" title="How well services survive losing one zone or one node.">HA</div>
-  <div class="ha-rows">
-    <div class="tiles-row">
-      <span class="spread-lab">Zones</span>
-      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}; --arc: var(--ok-fg); --gauge-track: var(--warn-fg)"{{end}} title="{{if .Known}}{{.Percent}}% of zone-eligible services spread across 2+ zones &middot; {{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
-        <div class="hd-face">
-          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
-        </div>
-        <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+    </div>
+  </div>
+</section>
+
+<section class="insight insight-resilience" aria-labelledby="resilience-title">
+  <div class="insight-head">
+    <h3 class="insight-title" id="resilience-title" title="How well services survive losing one zone or one node, and how much of the fleet is in the Istio mesh.">Resilience</h3>
+    {{with $.Snapshot.Mesh}}{{if not .Error}}<span class="pill s-{{lower (printf "%s" .State)}}" title="The cluster-wide default. Namespace and workload PeerAuthentications can override this for individual services -- when AZ_SPREAD is also on, the &quot;permissive&quot; count below and each row's own badge show where they do.{{if .Scoped}} The default PeerAuthentication object itself also carries a selector, so it applies to one workload, not the whole mesh.{{end}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
+      {{- if eq .Effective "strict"}}STRICT mTLS
+      {{- else if eq .Effective "permissive"}}PERMISSIVE mTLS
+      {{- else if eq .Effective "disabled"}}mTLS disabled
+      {{- else}}No service mesh detected{{end -}}
+    </span>{{end}}{{end}}
+  </div>
+  <div class="meters">
+    {{with $.Snapshot.HA}}
+    <div class="meter">
+      <span class="meter-lab" title="Services and not-in-gitops workloads with running pods in two or more availability zones.">Zone spread</span>
+      <div class="meter-dial {{gaugeClass .Known .Percent}}" role="img" aria-label="{{if .Known}}{{.Percent}}% spread across 2+ zones{{else}}no services counted{{end}}" title="{{if .Known}}{{.Percent}}% spread across 2+ zones &middot; {{.Compliant}} of {{.Eligible}} eligible services and unmanaged workloads{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
+        {{template "semi" .}}<span class="meter-val">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
       </div>
+      <span class="meter-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} in 2+ zones{{else}}no services counted{{end}}</span>
       {{if .AtRisk}}
       <a class="tile t-warning{{if $.FilterActive "spread" "zone"}} is-on{{end}}" href="{{$.FilterHref "spread" "zone"}}" title="{{.AtRisk}} at risk: every running pod, across both services and not-in-gitops workloads, sits in one availability zone -- that zone going down takes them out completely. Click to show which."><div class="n">{{.AtRisk}}</div><div class="k">at risk</div></a>
       {{else if .Known}}
@@ -1026,14 +1161,12 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     </div>
     {{end}}
     {{with $.Snapshot.NodeHA}}
-    <div class="tiles-row">
-      <span class="spread-lab">Nodes</span>
-      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}; --arc: var(--ok-fg); --gauge-track: var(--warn-fg)"{{end}} title="{{if .Known}}{{.Percent}}% of node-eligible services spread across 2+ nodes &middot; {{.Compliant}} of {{.Eligible}} counted{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
-        <div class="hd-face">
-          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
-        </div>
-        <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+    <div class="meter">
+      <span class="meter-lab" title="Services and not-in-gitops workloads with running pods on two or more nodes.">Node spread</span>
+      <div class="meter-dial {{gaugeClass .Known .Percent}}" role="img" aria-label="{{if .Known}}{{.Percent}}% spread across 2+ nodes{{else}}no services counted{{end}}" title="{{if .Known}}{{.Percent}}% spread across 2+ nodes &middot; {{.Compliant}} of {{.Eligible}} eligible services and unmanaged workloads{{if .AtRisk}} &middot; {{.AtRisk}} at risk{{end}}{{else}}no services counted{{end}}">
+        {{template "semi" .}}<span class="meter-val">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
       </div>
+      <span class="meter-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} on 2+ nodes{{else}}no services counted{{end}}</span>
       {{if .AtRisk}}
       <a class="tile t-warning{{if $.FilterActive "spread" "node"}} is-on{{end}}" href="{{$.FilterHref "spread" "node"}}" title="{{.AtRisk}} at risk: every running pod, across both services and not-in-gitops workloads, sits on one node -- that node failing or draining takes them out completely. Click to show which."><div class="n">{{.AtRisk}}</div><div class="k">at risk</div></a>
       {{else if .Known}}
@@ -1041,37 +1174,14 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
       {{end}}
     </div>
     {{end}}
-  </div>
-</div>
-{{if $.Snapshot.Mesh}}
-<div class="area">
-  {{/* The Policy pill lives on the title line now, right-aligned, not as its own
-       row below: a cluster-wide fact reads as a header-level annotation, and it
-       keeps the rows underneath exactly HA's shape -- label, gauge, one tile. */}}
-  <div class="cap-head" title="Cluster-wide mTLS policy, plus per-service sidecar injection.">
-    <span class="cap-head-row">Istio{{with $.Snapshot.Mesh}}{{if not .Error}}<span class="pill s-{{lower (printf "%s" .State)}} cap-head-badge" title="The cluster-wide default. Namespace and workload PeerAuthentications can override this for individual services -- when AZ_SPREAD is also on, the &quot;permissive&quot; tile below and each row's own badge show where they do.{{if .Scoped}} The default PeerAuthentication object itself also carries a selector, so it applies to one workload, not the whole mesh.{{end}}"><span class="g">{{glyph (printf "%s" .State)}}</span>
-      {{- if eq .Effective "strict"}}STRICT mTLS
-      {{- else if eq .Effective "permissive"}}PERMISSIVE mTLS
-      {{- else if eq .Effective "disabled"}}mTLS disabled
-      {{- else}}No service mesh detected{{end -}}
-    </span>{{end}}{{end}}</span>
-  </div>
-  {{with $.Snapshot.Mesh}}{{if .Error}}
-  <div class="cap-note">
-    {{- if .Denied}}mesh mTLS needs a Role granting <span class="mono">get</span> on the <span class="mono">default</span> <span class="mono">peerauthentications.security.istio.io</span> object in the Istio namespace; the default install grants nothing there.
-    {{- else}}the mesh mTLS read did not complete, so this may be out of date.{{end}} ({{.Error}})
-  </div>
-  {{end}}{{end}}
-  <div class="ha-rows">
+    {{if $.Snapshot.Mesh}}
     {{with $.Snapshot.MeshHA}}
-    <div class="tiles-row is-top">
-      <span class="spread-lab" title="Sidecar injection only: a service having the sidecar on every running pod is not the same as mTLS being enforced for it. An Istio ingress gateway reads as 'in mesh' too, but that's its own Envoy engine, not an injected sidecar -- gateways are never sidecar-injected by design.">In mesh</span>
-      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}; --arc: var(--ok-fg); --gauge-track: var(--deg-fg)"{{end}} title="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar on every running pod &middot; {{.Injected}} of {{.Eligible}} counted{{if .NotInMesh}} &middot; {{.NotInMesh}} not in mesh{{end}}{{else}}no services counted{{end}}">
-        <div class="hd-face">
-          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
-        </div>
-        <span class="hd-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+    <div class="meter">
+      <span class="meter-lab" title="Sidecar injection only: a service having the sidecar on every running pod is not the same as mTLS being enforced for it. An Istio ingress gateway reads as 'in mesh' too, but that's its own Envoy engine, not an injected sidecar -- gateways are never sidecar-injected by design.">In mesh</span>
+      <div class="meter-dial {{gaugeClass .Known .Percent}}" role="img" aria-label="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar{{else}}no services counted{{end}}" title="{{if .Known}}{{.Percent}}% of mesh-eligible services carry the Istio sidecar on every running pod &middot; {{.Injected}} of {{.Eligible}} counted{{if .NotInMesh}} &middot; {{.NotInMesh}} not in mesh{{end}}{{else}}no services counted{{end}}">
+        {{template "semi" .}}<span class="meter-val">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
       </div>
+      <span class="meter-cap">{{if .Known}}{{.Injected}} of {{.Eligible}} with sidecar{{else}}no services counted{{end}}</span>
       {{if and .Known .NotInMesh}}
       <a class="tile t-degraded{{if $.FilterActive "mesh" "not-injected"}} is-on{{end}}" href="{{$.FilterHref "mesh" "not-injected"}}" title="{{.NotInMesh}} not in mesh: at least one running pod lacks the Istio sidecar. Sidecar injection only, not a per-service mTLS enforcement guarantee. Click to show which."><div class="n">{{.NotInMesh}}</div><div class="k">not in mesh</div></a>
       {{else if .Known}}
@@ -1080,14 +1190,12 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     </div>
     {{end}}
     {{with $.Snapshot.MeshPolicyHA}}
-    <div class="tiles-row">
-      <span class="spread-lab" title="Effective policy only -- not sidecar injection. A service counts here if AZ_SPREAD and mesh mTLS are both on and it resolved to an effective mode; DISABLE is not tracked per-service, so this is permissive vs. everything else, not a three-way severity ranking.">Strict</span>
-      <div class="gauge{{if not .Known}} is-unknown{{else if ge .Percent 67}} is-ok{{else if ge .Percent 34}} is-warn{{else}} is-bad{{end}}"{{if .Known}} style="--pct: {{.Percent}}; --arc: var(--ok-fg); --gauge-track: var(--warn-fg)"{{end}} title="{{if .Known}}{{.Percent}}% of policy-eligible services are NOT permissive &middot; {{.Compliant}} of {{.Eligible}} counted{{if .Permissive}} &middot; {{.Permissive}} permissive{{end}}{{else}}no services counted{{end}}">
-        <div class="hd-face">
-          <span class="hd-num">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
-        </div>
-        <span class="hd-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} counted{{else}}no services counted{{end}}</span>
+    <div class="meter">
+      <span class="meter-lab" title="Services whose resolved effective mTLS policy is STRICT. Neither PERMISSIVE nor DISABLE counts as strict.">Strict mTLS</span>
+      <div class="meter-dial {{gaugeClass .Known .Percent}}" role="img" aria-label="{{if .Known}}{{.Percent}}% enforce STRICT mTLS{{else}}policy data unavailable or no services counted{{end}}" title="{{if .Known}}{{.Percent}}% enforce STRICT mTLS &middot; {{.Compliant}} of {{.Eligible}} counted &middot; {{.Permissive}} permissive &middot; {{.Disabled}} disabled{{else}}policy data unavailable or no services counted{{end}}">
+        {{template "semi" .}}<span class="meter-val">{{if .Known}}{{.Percent}}<small>%</small>{{else}}&mdash;{{end}}</span>
       </div>
+      <span class="meter-cap">{{if .Known}}{{.Compliant}} of {{.Eligible}} enforce STRICT{{else}}no services counted{{end}}</span>
       {{if .Permissive}}
       <a class="tile t-warning{{if $.FilterActive "mesh" "permissive"}} is-on{{end}}" href="{{$.FilterHref "mesh" "permissive"}}" title="{{.Permissive}} service{{if ne .Permissive 1}}s{{end}} whose own effective mTLS mode is PERMISSIVE -- from a namespace- or workload-level override, or because the mesh-wide default itself is PERMISSIVE. Click to show which."><div class="n">{{.Permissive}}</div><div class="k">permissive</div></a>
       {{else if .Known}}
@@ -1095,45 +1203,24 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
       {{end}}
     </div>
     {{end}}
+    {{end}}
   </div>
-  {{if $.Snapshot.MeshHA.Known}}{{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
-  <div class="cap-note">+{{.UnmanagedMeshEligible}} not-in-gitops workload{{if ne .UnmanagedMeshEligible 1}}s{{end}} also checked here, not counted in the percentages above: {{.UnmanagedMeshInjected}} of {{.UnmanagedMeshEligible}} in mesh{{if .UnmanagedMeshPolicyEligible}}, {{.UnmanagedMeshPolicyPermissive}} of {{.UnmanagedMeshPolicyEligible}} permissive{{end}}.</div>
+  {{with $.Snapshot.Mesh}}{{if .Error}}
+  <div class="cap-note">
+    {{- if .Denied}}mesh mTLS needs a Role granting <span class="mono">get</span> on the <span class="mono">default</span> <span class="mono">peerauthentications.security.istio.io</span> object in the Istio namespace; the default install grants nothing there.
+    {{- else}}the mesh mTLS read did not complete, so this may be out of date.{{end}} ({{.Error}})
+  </div>
+  {{end}}{{end}}
+  {{if $.Snapshot.Mesh}}{{with $.Snapshot.MeshPolicyHA}}{{if .Disabled}}<div class="cap-note policy-disabled">{{icon "warn"}}{{.Disabled}} service{{if ne .Disabled 1}}s{{end}} with mTLS disabled, not counted as strict.</div>{{end}}{{end}}{{end}}
+  {{if and $.Snapshot.Mesh $.Snapshot.MeshHA.Known}}{{with $.Snapshot.Summary}}{{if .UnmanagedMeshEligible}}
+  <div class="cap-note">+{{.UnmanagedMeshEligible}} not-in-gitops workload{{if ne .UnmanagedMeshEligible 1}}s{{end}} also checked, not counted above: {{.UnmanagedMeshInjected}} of {{.UnmanagedMeshEligible}} in mesh{{if .UnmanagedMeshPolicyEligible}}, {{.UnmanagedMeshPolicyPermissive}} of {{.UnmanagedMeshPolicyEligible}} permissive{{end}}.</div>
   {{end}}{{end}}{{end}}
+</section>
 </div>
-{{end}}
-{{if or $.Snapshot.Pods $.Snapshot.Workloads $.Snapshot.Nodes}}
-<div class="area">
-  <div class="cap-head" title="Cluster-wide totals: running pods, workloads and nodes, and how many of each are ready.">Fleet</div>
-  <div class="ringstat-row">
-    {{with $.Snapshot.Pods}}
-    <div class="ringstat" title="Running pods across the whole cluster, from the same read AZ_SPREAD's zone/mesh join already uses. Ready is each pod's own Ready condition -- a Running pod can still fail this.">
-      <div class="ringstat-ring{{if not .Total}} is-empty{{end}}" style="--pct: {{.Percent}}"><span class="ringstat-num">{{.Total}}</span></div>
-      <div class="ringstat-lab">Pods</div>
-      <div class="ringstat-sub"><span class="is-ok" title="Ready: {{.Ready}} of {{.Total}} pods">{{glyph "OK"}} {{.Ready}}</span>{{if .NotReady}}<span class="is-bad" title="Running but not Ready: {{.NotReady}} of {{.Total}} pods">{{icon "warn"}}{{.NotReady}}</span>{{end}}</div>
-    </div>
-    {{end}}
-    {{with $.Snapshot.Workloads}}
-    <div class="ringstat" title="Every Deployment/StatefulSet/DaemonSet in the cluster, GitOps-managed or not -- the same list the not-managed-by-GitOps table below already reads. Ready/Desired are summed replica counts.">
-      <div class="ringstat-ring{{if not .Desired}} is-empty{{end}}" style="--pct: {{.Percent}}"><span class="ringstat-num">{{.Total}}</span></div>
-      <div class="ringstat-lab">Workloads</div>
-      <div class="ringstat-sub"><span class="is-ok" title="{{.Ready}} of {{.Desired}} desired replicas are ready, summed across every workload">{{.Ready}}/{{.Desired}} ready</span></div>
-    </div>
-    {{end}}
-    {{with $.Snapshot.Nodes}}{{if not .Error}}
-    <div class="ringstat" title="Every node in the cluster, from the same read the Cluster panel beside this already uses.">
-      <div class="ringstat-ring{{if not .Total}} is-empty{{end}}" style="--pct: {{.Percent}}"><span class="ringstat-num">{{.Total}}</span></div>
-      <div class="ringstat-lab">Nodes</div>
-      <div class="ringstat-sub"><span class="is-ok" title="Ready: {{.Ready}} of {{.Total}} nodes">{{glyph "OK"}} {{.Ready}}</span>{{if .NotReady}}<span class="is-bad" title="Not reporting Ready: {{.NotReady}} of {{.Total}} nodes">{{icon "warn"}}{{.NotReady}}</span>{{end}}</div>
-    </div>
-    {{end}}{{end}}
-  </div>
-</div>
-{{end}}
-</div>
-</div>
+<div class="split-row split-row-details">
 <div class="split-side">
   {{if and $.HasData $.Snapshot.Nodes}}
-<section class="capacity">
+<section class="capacity" id="cluster">
   <div class="cap-head">
     <span class="cap-head-row"><span>Cluster</span>{{with $.Snapshot.Nodes}}{{if not .Error}}{{if or .Provider .KubernetesVersion}}<span class="badge cap-head-badge" title="From a Ready node's own reported kubelet version.">{{if .Provider}}{{.Provider}} {{end}}{{.KubernetesVersion}}</span>{{end}}{{end}}{{end}}</span>
   </div>
@@ -1143,20 +1230,15 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
        counters row above uses -- this panel is that Nodes ring's own detail view. */}}
   <div class="cap-group">
   <div class="cap-rings">
-    <div class="ringstat" title="Every node in the cluster.">
-      <div class="ringstat-ring" style="--pct: {{.Percent}}"><span class="ringstat-num">{{.Total}}</span></div>
-      <div class="ringstat-lab">Nodes</div>
-      <div class="ringstat-sub"><span class="is-ok" title="Ready: {{.Ready}} of {{.Total}} nodes">{{glyph "OK"}} {{.Ready}}</span>{{if .NotReady}}<span class="is-bad" title="Not reporting Ready. A node the cloud provider has shut down stays in the list like this until something removes it, and it is not usable capacity.">{{icon "warn"}}{{.NotReady}}</span>{{end}}</div>
-    </div>
-    <div class="archbar" title="Node composition: architecture and accelerator, {{.Total}} nodes total.">
+    {{$nodes := .}}
+    <div class="archbar" title="Architecture composition of all {{.Total}} nodes, including unknown architectures. GPU nodes overlap these groups.">
       <div class="ringstat-lab">Architecture</div>
       <div class="archbar-track">
-        <span class="archbar-seg is-arm64" style="flex-grow: {{.ArchCountFor "arm64"}}" title="{{.ArchCountFor "arm64"}} of {{.Total}} nodes are arm64"></span>
-        <span class="archbar-seg is-amd64" style="flex-grow: {{.ArchCountFor "amd64"}}" title="{{.ArchCountFor "amd64"}} of {{.Total}} nodes are amd64"></span>
+        {{range .Arch}}<span class="archbar-seg is-{{archClass .Arch}}" style="flex-grow: {{.Count}}" title="{{.Count}} of {{$nodes.Total}} nodes are {{.Arch}}"></span>{{end}}
       </div>
       <div class="ringstat-sub">
-        <span class="is-arm64" title="{{.ArchPercent "arm64"}}% of nodes are arm64">{{.ArchPercent "arm64"}}% arm64</span>
-        <span class="is-amd64" title="{{.ArchPercent "amd64"}}% of nodes are amd64">{{.ArchPercent "amd64"}}% amd64</span>
+        {{range .Arch}}<span class="is-{{archClass .Arch}}" title="{{.Count}} of {{$nodes.Total}} nodes">{{.Count}} {{.Arch}} <span class="arch-percent">({{$nodes.ArchPercent .Arch}}%)</span></span>{{end}}
+        {{if not .Total}}<span>No nodes reported</span>{{end}}
         {{if .GPUNodes}}<span class="is-gpu" title="{{.GPUPercent}}% of nodes carry a {{$.Snapshot.AcceleratorLabel}}">{{.GPUPercent}}% gpu</span>{{end}}
       </div>
     </div>
@@ -1167,7 +1249,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
         {{- /* Without a device plugin the card count is not discoverable, so say that
                instead of printing a bare "0 cards" beside nodes that are busy. */}}
         {{- if .GPUs}}
-        <span class="cap-split" title="Counts devices, not services: how many the nodes have in total and how many the scheduler has handed to a workload. The gap is hardware nothing has claimed.{{if $.Snapshot.Summary.GPUUnmeasured}} A floor, not a total: {{$.Snapshot.Summary.GPUUnmeasured}} service{{if ne $.Snapshot.Summary.GPUUnmeasured 1}}s{{end}} reach a device through the runtime without requesting one, so their use cannot be counted.{{end}}{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}} total<i>·</i>{{.GPUsAllocated}} handed out</span>
+        <span class="cap-split" title="Advertised device capacity and device requests multiplied by ready replicas of GitOps-tracked services. Not actual utilization or a cluster-wide allocation measurement: unready pods and unmanaged workloads may also hold devices.{{if $.Snapshot.Summary.GPUUnmeasured}} {{$.Snapshot.Summary.GPUUnmeasured}} service{{if ne $.Snapshot.Summary.GPUUnmeasured 1}}s{{end}} have undeclared device access through the runtime; current use is unknown.{{end}}{{with $.Snapshot.AcceleratorDetail}} {{.}}{{end}}">{{.GPUs}} {{$.Snapshot.AcceleratorUnit}} capacity<i>·</i>{{.GPUsAllocated}} ready-replica requests</span>
         {{- end}}
         {{- if .UnschedulableGPUNodes}}
         <span class="cap-split is-warn" title="These nodes have a device but advertise none, so no gpu plugin is running. Workloads still reach the hardware through the container runtime and can be serving traffic, but the scheduler cannot allocate or limit it: any number of pods can land on one card, and the card count is not discoverable.">{{if eq .UnschedulableGPUNodes .GPUNodes}}no gpu plugin{{else}}{{.UnschedulableGPUNodes}} without a gpu plugin{{end}}</span>
@@ -1190,7 +1272,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   </div>
   {{- if .Rows}}
   <div class="node-table">
-    <div class="node-table-head" id="node-table-head">{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one</div>
+    <div class="node-table-head" id="node-table-head">{{len .Rows}} node{{if ne (len .Rows) 1}}s{{end}}, one by one<span class="scroll-hint">Scroll for all nodes and columns</span></div>
     <div class="node-table-scroll" tabindex="0" role="region" aria-labelledby="node-table-head">
     <table>
       <tr><th>Name</th><th>Zone</th><th>Arch</th><th>Ready</th><th>CPU</th><th>Memory</th><th>{{$.Snapshot.AcceleratorLabel}}</th></tr>
@@ -1227,11 +1309,11 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
   {{$attn := $.AttentionItems}}
   {{if $attn}}
-  <div class="attn">
+  <div class="attn" id="attention">
     <div class="attn-head">{{icon "warn"}}Attention needed<span class="attn-count">{{len $attn}}</span></div>
     <ul class="attn-list">
       {{range $attn}}
-      <li><a class="attn-item" href="#{{.Anchor}}">
+      <li><a class="attn-item" href="{{$.ClearHref}}#{{.Anchor}}">
         <span class="pill s-{{lower .State}}"><span class="g">{{glyph .State}}</span>{{.State}}</span>
         <span class="attn-name">{{.Name}}</span>
         {{- if .Reason}}<span class="attn-reason">{{.Reason}}</span>{{end}}
@@ -1243,7 +1325,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
   {{/* The page's own mood, not a fixed banner: this is the same slot the digest
        above occupies when there IS something to flag, so the page reads as
        genuinely calm rather than as a template with an empty section removed. */}}
-  <div class="attn is-clear">{{glyph "OK"}}Nothing needs attention</div>
+  <div class="attn is-clear" id="attention">{{glyph "OK"}}Nothing needs attention</div>
   {{end}}
 </div>
 </div>
@@ -1260,10 +1342,10 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     <div class="legend-row"><span class="pill s-suspended"><span class="g">&#9208;</span>SUSPENDED</span><span>Deliberately paused.</span></div>
     <div class="legend-row"><span class="arch is-arm64">arm64</span><span>Can only run on arm64 nodes, which on AWS are Graviton.</span></div>
     <div class="legend-row"><span class="arch is-amd64">amd64</span><span>Can only run on amd64 nodes. No badge means it can run on either.</span></div>
-    <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} 2</span><span>Holding that many {{$.Snapshot.AcceleratorLabel}} devices right now.</span></div>
-    <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} ?</span><span>Holding one, but how many is unknown: it never requests a device, so the API cannot count it.</span></div>
-    <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} waiting</span><span>Wants {{$.Snapshot.AcceleratorLabel}} and has not got any: none free, or no node to run on.</span></div>
-    <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} 0 pods</span><span>No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held.</span></div>
+    <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} 2</span><span>Device requests represented by ready replicas. Not measured device allocation or utilization.</span></div>
+    <div class="legend-row"><span class="gpu is-running">{{$.Snapshot.AcceleratorBadge}} ?</span><span>Device requests are unknown because it reaches an accelerator through the runtime without declaring it.</span></div>
+    <div class="legend-row"><span class="gpu is-waiting">{{$.Snapshot.AcceleratorBadge}} unready</span><span>Fewer replicas are ready than requested. The scheduling badge, when present, explains a confirmed resource shortage.</span></div>
+    <div class="legend-row"><span class="gpu is-stopped">{{$.Snapshot.AcceleratorBadge}} target 0</span><span>No replicas requested. Old pods may still be terminating during a scale-down.</span></div>
     <div class="legend-row"><span class="blocked">{{icon "warn"}}no cpu</span><span>The scheduler cannot place its pods. The chip names what ran out, and an accelerator shortage is coloured apart from cpu or memory.</span></div>
     <div class="legend-row">{{icon "mesh"}}<span>The Policy pill is the cluster-wide default. When AZ_SPREAD is also on, namespace and workload PeerAuthentication overrides are read too: the "permissive" tile and each row's own badge (e.g. "workload override: disabled") show where a service's own effective mode differs from it.</span></div>
     <div class="legend-row"><span class="pill s-ok"><span class="g">&#10003;</span>STRICT mTLS</span><span>Every connection in the mesh must be mTLS-encrypted; plaintext is rejected.</span></div>
@@ -1301,7 +1383,7 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
      floating between Cluster and the rows it has no visible connection to. */}}
 <div class="views">
   <span class="views-lab">views</span>
-  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Counts services, not devices. {{$.Snapshot.Summary.GPU}} are backed by {{$.Snapshot.AcceleratorLabel}}: {{$.Snapshot.Summary.GPURunning}} holding one now, {{$.Snapshot.Summary.GPUWaiting}} waiting for one, {{$.Snapshot.Summary.GPUStopped}} with no replicas. The cluster line below counts the devices themselves.">{{icon "gpu"}}<b>{{$.Snapshot.Summary.GPURunning}} running on {{$.Snapshot.AcceleratorLabel}}</b>{{if $.Snapshot.Summary.GPUWaiting}} · {{$.Snapshot.Summary.GPUWaiting}} waiting{{end}}{{if $.Snapshot.Summary.GPUStopped}} · <i>{{$.Snapshot.Summary.GPUStopped}} stopped</i>{{end}}</a>
+  <a class="vchip{{if $.FilterActive "gpu" "true"}} is-on{{end}}" href="{{$.FilterHref "gpu" "true"}}" title="Counts GPU-backed services by workload readiness, not device utilization.">{{icon "gpu"}}<b>{{$.Snapshot.Summary.GPURunning}} {{$.Snapshot.AcceleratorLabel}} services ready</b>{{if $.Snapshot.Summary.GPUWaiting}} · {{$.Snapshot.Summary.GPUWaiting}} unready{{end}}{{if $.Snapshot.Summary.GPUStopped}} · {{$.Snapshot.Summary.GPUStopped}} target 0{{end}}{{if $.Snapshot.Summary.GPUUnknown}} · {{$.Snapshot.Summary.GPUUnknown}} unknown{{end}}</a>
     {{- range $.Snapshot.ArchCounts}}
     <a class="vchip{{if $.FilterActive "arch" .Arch}} is-on{{end}}" href="{{$.FilterHref "arch" .Arch}}" title="Services that can only run on {{.Arch}} nodes">{{.Count}} {{.Arch}} only</a>
     {{- end}}
@@ -1333,16 +1415,16 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 
 {{$cols := 7}}{{if .MultiSource}}{{$cols = 8}}{{end}}
 {{if .Filter.ShowServices}}
-<div class="card">
-<table>
+<div class="card" id="services" tabindex="0" role="region" aria-label="Services table">
+<table class="services-table">
 <thead>
 <tr>
-  <th>Service</th>
+  <th class="service-col" scope="col">Service</th>
   {{if .MultiSource}}<th class="hide-sm">Source</th>{{end}}
-  <th>App version</th>
+  <th class="version-col" scope="col">App version</th>
   <th class="hide-sm">Chart version</th>
   <th class="hide-sm">Pods</th>
-  <th>Status</th>
+  <th class="status-col" scope="col">Status</th>
   <th class="hide-sm">Sync<span class="hdr-sub"> vs git</span></th>
   <th class="hide-sm">Detail</th>
 </tr>
@@ -1350,10 +1432,10 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{$ui := .ArgoCDUIBase}}
 {{$multi := .MultiSource}}
 {{range .Services}}
-<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.ScaledToZero}} is-dim{{end}} is-{{lower (printf "%s" .State)}}" id="{{anchor (printf "%s" .Source) .Namespace .Name}}">
+<tbody class="svc{{if .GPU}} is-gpu{{end}}{{if .Blocked}} is-blocked{{end}}{{if and .GPU .GPUAlloc.Known .GPUAlloc.ScaledToZero}} is-dim{{end}} is-{{lower (printf "%s" .State)}}" id="{{anchor (printf "%s" .Source) .Namespace .Name}}">
 <tr>
   <td class="name"{{if .Namespace}} title="{{.Kind}} {{.Namespace}}/{{.Name}}"{{end}}>
-    {{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}
+    <span class="name-content"><span class="service-name">{{- if and $ui (eq (printf "%s" .Source) "argocd")}}<a href="{{appURL $ui .Name}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</span>
     {{- with .Blocked}}<span class="blocked is-{{.Kind}}" title="The scheduler could not place {{.Pods}} pod{{if ne .Pods 1}}s{{end}} of this service. {{if .Resources}}The cluster is out of {{range $i, $r := .Resources}}{{if $i}}, {{end}}{{$r}}{{end}}.{{else if .NoNodeMatched}}Every node was excluded by affinity or a taint, so the nodegroup it is pinned to is empty.{{end}}">{{icon "warn"}}{{.Reason}}</span>{{end}}
     {{- with .Arch}}<span class="arch is-{{.}}" title="Every node this service may run on is {{.}}{{if eq . "arm64"}}, which on AWS means Graviton{{end}}. Services free to run on either architecture carry no badge.">{{.}}</span>{{end}}
     {{- if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}
@@ -1361,14 +1443,14 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
     {{- if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This service's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}
     {{- if .GPU}}
     {{- $g := .GPUAlloc}}
-    {{- /* Three situations a single badge used to hide: holding devices, waiting for
-           one, and parked at zero. Each gets its own colour and its own word. */}}
-    <span class="gpu{{if $g.Waiting}} is-waiting{{else if $g.ScaledToZero}} is-stopped{{else}} is-running{{end}}"
-      title="{{if $g.Unmeasured}}Holding a device, but how many is unknown: it reaches one through the runtime without ever requesting it, so the API cannot say. That is what the question mark means. {{else}}{{$g.PerReplica}} per replica, {{$g.Ready}} of {{$g.Desired}} replicas ready, {{$g.Allocated}} allocated. {{end}}{{if $g.Waiting}}Asked for {{$.Snapshot.AcceleratorLabel}} and has not got {{if eq $g.Desired 1}}it{{else}}them{{end}}.{{else if $g.ScaledToZero}}No replicas requested, so nothing is running and no {{$.Snapshot.AcceleratorLabel}} is held. Whether that is a deliberate stop or an autoscaler at rest is not visible from the workload.{{else}}Running.{{end}}"
-      >{{$.Snapshot.AcceleratorBadge}}{{if $g.Waiting}} waiting{{else if $g.ScaledToZero}} 0 pods{{else if $g.Unmeasured}} ?{{else}} {{$g.Allocated}}{{end}}</span>{{end}}</td>
+    {{- $gpuState := $g.State}}
+    {{- /* State comes from GPUAllocation so the API, summary, sort and badge agree. */}}
+    <span class="gpu{{if or (eq $gpuState "unknown") (eq $gpuState "scaled-to-zero")}} is-stopped{{else if eq $gpuState "waiting"}} is-waiting{{else}} is-running{{end}}"
+      title="{{if eq $gpuState "unknown"}}GPU-backed by name only; workload readiness is unavailable, not zero.{{else}}{{$g.Ready}} of {{$g.Desired}} replicas ready. {{if $g.Unmeasured}}Device requests are unknown because access is through the runtime.{{else}}{{$g.Allocated}} device requests represented by ready replicas, not measured allocation or utilization.{{end}}{{if eq $gpuState "waiting"}} Unready replicas do not by themselves prove a device shortage.{{else if eq $gpuState "scaled-to-zero"}} No replicas requested; old pods may still be terminating.{{end}}{{end}}"
+      >{{$.Snapshot.AcceleratorBadge}}{{if eq $gpuState "unknown"}} ?{{else if eq $gpuState "waiting"}} unready{{else if eq $gpuState "scaled-to-zero"}} target 0{{else if $g.Unmeasured}} ?{{else}} {{$g.Allocated}}{{end}}</span>{{end}}</span></td>
   {{if $multi}}<td class="hide-sm"><span class="src" title="{{if .Kind}}{{.Kind}}{{else}}ArgoCD Application{{end}}">{{.Source}}</span></td>{{end}}
-  <td class="appver">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>
-  <td class="chartver hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">
+  <td class="appver version-col">{{if .AppVersion}}<span{{if .Image}} title="{{.Image}}"{{end}}>{{clip 28 .AppVersion}}</span>{{end}}</td>
+  <td class="chartver version-col hide-sm" title="chart {{.Version}}{{if .Revision}} @ {{.Revision}}{{end}}">
     {{- $tree := repoTree .RepoURL .Version}}
     {{- if $tree}}<a href="{{$tree}}">{{.Version}}</a>{{else}}{{.Version}}{{end}}
     {{- if .Revision}}
@@ -1423,34 +1505,34 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{if .Filter.ShowUnmanaged}}{{with .Snapshot.Unmanaged}}
 <div class="sec-head" id="unmanaged">Not managed by GitOps
   <span class="sec-sub">running in the cluster but outside GitOps. See Installed By for what put each one there.
-  These are not services above and are not in the Services counts. The HA gauges' numbers are the one
-  place they are folded in, since a zone or node failing affects them exactly like it would any tracked
-  service. The Istio gauges are GitOps-services only; their own sidecar and policy coverage is mentioned
-  separately in the Istio panel instead.</span>
+  These are not services above and are not in the Services counts. The zone and node spread gauges are
+  the one place they are folded in, since a zone or node failing affects them exactly like it would any
+  tracked service. The In mesh and Strict mTLS gauges are GitOps-services only; their own sidecar and
+  policy coverage is noted separately in the Resilience panel instead.</span>
 </div>
-<div class="card">
-<table>
+<div class="card" tabindex="0" role="region" aria-label="Workloads not managed by GitOps table">
+<table class="unmanaged-table">
 <thead>
 <tr>
-  <th>Service</th>
+  <th class="service-col" scope="col">Service</th>
   <th class="hide-sm">Namespace</th>
   <th class="hide-sm">Kind</th>
   <th class="hide-sm">Installed by</th>
-  <th>App version</th>
+  <th class="version-col" scope="col">App version</th>
   <th class="hide-sm">Chart version</th>
-  <th>Ready</th>
-  <th>Status</th>
+  <th class="ready-col" scope="col">Ready</th>
+  <th class="status-col" scope="col">Status</th>
 </tr>
 </thead>
 <tbody>
 {{range $.Unmanaged}}
 <tr>
-  <td class="name">{{.Name}}{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Pods}}<span class="pod-count" title="Running pods matched to this workload.">{{.Zones.Pods}} pod{{if ne .Zones.Pods 1}}s{{end}}</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}{{if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}{{if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This workload's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}</td>
+  <td class="name"><span class="name-content"><span class="service-name">{{.Name}}</span>{{if gt .Members 1}}<span class="members" title="{{.Members}} workloads in this Helm release, collapsed into one row">{{.Members}} workloads</span>{{end}}{{if .Zones.Pods}}<span class="pod-count" title="Running pods matched to this workload.">{{.Zones.Pods}} pod{{if ne .Zones.Pods 1}}s{{end}}</span>{{end}}{{if .Zones.Known}}<span class="az{{if eq .Zones.Count 1}} is-single{{else}} is-multi{{end}}" title="Running pods sit in {{.Zones.Count}} availability zone{{if ne .Zones.Count 1}}s{{end}}{{if .Zones.Unplaced}}; {{.Zones.Unplaced}} pod{{if ne .Zones.Unplaced 1}}s{{end}} could not be placed to a zone{{end}}: {{range $i, $z := .Zones.Zones}}{{if $i}}, {{end}}{{$z}}{{end}}.">az {{.Zones.Count}}</span>{{end}}{{if and .Mesh.Known (not .Mesh.Full)}}<span class="blocked" title="{{.Mesh.Injected}} of {{.Mesh.Pods}} running pod{{if ne .Mesh.Pods 1}}s{{end}} carry the Istio sidecar; the rest do not. Sidecar injection only, not a per-service mTLS enforcement guarantee.">{{icon "warn"}}not in mesh</span>{{end}}{{if .Policy.Known}}{{if ne .Policy.Effective $.Snapshot.Mesh.Effective}}<span class="blocked" title="This workload's own effective mTLS mode is {{.Policy.Effective}}, from a {{.Policy.Scope}}-level PeerAuthentication override; the cluster-wide default is {{$.Snapshot.Mesh.Effective}}.">{{icon "warn"}}{{.Policy.Scope}} override: {{.Policy.Effective}}</span>{{end}}{{end}}</span></td>
   <td class="ns hide-sm">{{.Namespace}}</td>
   <td class="kind hide-sm">{{.Kind}}</td>
   <td class="by hide-sm{{if eq .ManagedBy "unknown"}} is-unknown{{end}}">{{.ManagedBy}}</td>
-  <td class="appver">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
-  <td class="chartver hide-sm">{{.ChartVersion}}</td>
+  <td class="appver version-col">{{if .Version}}<span title="{{.Image}}">{{clip 28 .Version}}</span>{{end}}</td>
+  <td class="chartver version-col hide-sm">{{.ChartVersion}}</td>
   <td class="ready">{{.Ready}}/{{.Desired}}</td>
   <td><span class="pill s-{{lower (printf "%s" .State)}}"><span class="g">{{glyph (printf "%s" .State)}}</span>{{.State}}</span></td>
 </tr>
@@ -1471,9 +1553,13 @@ footer { font-family: var(--mono); font-size: .64rem; letter-spacing: .04em; }
 {{end}}
 
 
+</div>
+</div>
+</main>
 <footer><span><a href="{{project}}">k8s-status</a>{{if .ClusterName}} &middot; cluster {{.ClusterName}}{{end}}</span><span title="k8s-status's own build version -- compare this against the version you expect to confirm a rollout actually landed, rather than a stale page">
   {{- $rel := release .BuildVersion}}
   {{- if $rel}}<a href="{{$rel}}">v{{.BuildVersion}}</a>{{else}}v{{.BuildVersion}}{{end}}
   {{- if .ChartVersion}} &middot; chart {{.ChartVersion}}{{end}}</span></footer>
 </body>
 </html>
+{{define "semi"}}<svg class="semi" viewBox="0 0 120 68" aria-hidden="true"><path class="semi-track" d="M12 60a48 48 0 0 1 96 0" pathLength="100"/>{{if and .Known .Percent}}<path class="semi-fill" d="M12 60a48 48 0 0 1 96 0" pathLength="100" stroke-dasharray="{{.Percent}} 100"/>{{end}}</svg>{{end}}

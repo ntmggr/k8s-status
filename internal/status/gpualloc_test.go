@@ -6,6 +6,15 @@ import (
 	"github.com/ntmggr/k8s-status/internal/kube"
 )
 
+func TestGPUNameOnlyFallbackDoesNotInventZeroReplicas(t *testing.T) {
+	snap := &Snapshot{Services: []Service{{Name: "gpu-api", GPU: true}}, Summary: Summary{GPU: 1}}
+	FillGPU(snap, &kube.WorkloadList{}, nil, nil)
+	if snap.Services[0].GPUAlloc.Known || snap.Services[0].GPUAlloc.State() != gpuStateUnknown ||
+		snap.Summary.GPUUnknown() != 1 || snap.Summary.GPUStopped != 0 {
+		t.Fatalf("missing workload data must stay unknown: %+v", snap.Summary)
+	}
+}
+
 func replicaWorkload(kind, ns, name string, gpuPerReplica, desired, ready int) kube.Workload {
 	w := kube.Workload{Kind: kind}
 	w.Metadata.Namespace, w.Metadata.Name = ns, name
@@ -46,16 +55,17 @@ func TestGPUAllocationStates(t *testing.T) {
 		gpu, desired, ready          int
 		wantAlloc                    int
 		waiting, stopped, unmeasured bool
+		wantState                    string
 	}{
-		{name: "holding devices", gpu: 1, desired: 1, ready: 1, wantAlloc: 1},
-		{name: "several per replica", gpu: 3, desired: 2, ready: 2, wantAlloc: 6},
-		// The case worth catching: it asked and did not get.
-		{name: "waiting for a device", gpu: 1, desired: 2, ready: 0, wantAlloc: 0, waiting: true},
-		{name: "partially rolled out", gpu: 1, desired: 3, ready: 1, wantAlloc: 1, waiting: true},
-		// Deliberate, not a problem: its cards are free for others.
-		{name: "parked at zero", gpu: 1, desired: 0, ready: 0, wantAlloc: 0, stopped: true},
-		// Reaches the device through the runtime; the API cannot say how much.
-		{name: "no request at all", gpu: 0, desired: 2, ready: 2, wantAlloc: 0, unmeasured: true},
+		{name: "holding devices", gpu: 1, desired: 1, ready: 1, wantAlloc: 1, wantState: gpuStateRunning},
+		{name: "several per replica", gpu: 3, desired: 2, ready: 2, wantAlloc: 6, wantState: gpuStateRunning},
+		// Fewer replicas are ready than requested; the cause is not established here.
+		{name: "unready replicas", gpu: 1, desired: 2, ready: 0, wantAlloc: 0, waiting: true, wantState: gpuStateWaiting},
+		{name: "partially rolled out", gpu: 1, desired: 3, ready: 1, wantAlloc: 1, waiting: true, wantState: gpuStateWaiting},
+		// No desired replicas; it may still be terminating.
+		{name: "parked at zero", gpu: 1, desired: 0, ready: 0, wantAlloc: 0, stopped: true, wantState: gpuStateScaledToZero},
+		// Reaches the device through the runtime; declared requests are absent.
+		{name: "no request at all", gpu: 0, desired: 2, ready: 2, wantAlloc: 0, unmeasured: true, wantState: gpuStateRunning},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -75,6 +85,9 @@ func TestGPUAllocationStates(t *testing.T) {
 			}
 			if g.Allocated != tc.wantAlloc {
 				t.Errorf("Allocated=%d, want %d", g.Allocated, tc.wantAlloc)
+			}
+			if g.State() != tc.wantState {
+				t.Errorf("State()=%q, want %q", g.State(), tc.wantState)
 			}
 			if g.Waiting() != tc.waiting {
 				t.Errorf("Waiting=%v, want %v", g.Waiting(), tc.waiting)
@@ -124,7 +137,7 @@ func TestGPUAllocationUsesSpecReplicasNotStatus(t *testing.T) {
 	}
 }
 
-func TestSummaryCountsWaitingAndIdle(t *testing.T) {
+func TestSummaryCountsUnreadyAndZeroTarget(t *testing.T) {
 	snap := &Snapshot{}
 	snap.addService(svcWith("holding", "ml", "holding"))
 	snap.addService(svcWith("stuck", "ml", "stuck"))
@@ -146,9 +159,7 @@ func TestSummaryCountsWaitingAndIdle(t *testing.T) {
 	}
 }
 
-// The allocated total counts only what was formally requested, so a cluster where some
-// services reach devices through the runtime is under-reported. The count of those is
-// tracked so the page can say the total is a floor instead of implying it is complete.
+// The request total includes declared requests, not unmeasured runtime access.
 func TestSummaryCountsUnmeasuredServices(t *testing.T) {
 	nodes := &kube.NodeList{Items: []kube.Node{node("gpu-1", "4", map[string]string{"k": "v"})}}
 	snap := &Snapshot{}
@@ -164,15 +175,15 @@ func TestSummaryCountsUnmeasuredServices(t *testing.T) {
 	if snap.Summary.GPUUnmeasured != 1 {
 		t.Errorf("GPUUnmeasured=%d, want 1", snap.Summary.GPUUnmeasured)
 	}
-	// A service with no replicas uses nothing, so it is not an uncounted user even
-	// though its usage would be unmeasurable if it ran.
+	// No desired replicas does not prove there are no terminating pods during
+	// scale-down, so a runtime-access workload remains unmeasured.
 	snap2 := &Snapshot{}
 	snap2.addService(svcWith("parked", "ml", "parked"))
 	FillGPU(snap2, &kube.WorkloadList{Items: []kube.Workload{
 		affinityTo(replicaWorkload("Deployment", "ml", "parked", 0, 0, 0), "k", "v"),
 	}}, nodes, []string{kube.ResourceGPU})
-	if snap2.Summary.GPUUnmeasured != 0 {
-		t.Errorf("a parked service counted as uncounted usage: %d", snap2.Summary.GPUUnmeasured)
+	if snap2.Summary.GPUUnmeasured != 1 {
+		t.Errorf("runtime-access workload should remain unmeasured during scale-down: %d", snap2.Summary.GPUUnmeasured)
 	}
 	if snap.Nodes != nil {
 		t.Fatal("guard: this test does not attach node stats")

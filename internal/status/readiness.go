@@ -31,12 +31,12 @@ func FillReadiness(snap *Snapshot, workloads *kube.WorkloadList) {
 		return
 	}
 
-	type key struct{ ns, name string }
+	type key struct{ kind, ns, name string }
 	byWorkload := map[key]kube.Workload{}
 	for _, w := range workloads.Items {
 		switch w.Kind {
 		case kube.KindDeployment, kube.KindStatefulSet, kube.KindDaemonSet:
-			byWorkload[key{w.Metadata.Namespace, w.Metadata.Name}] = w
+			byWorkload[key{w.Kind, w.Metadata.Namespace, w.Metadata.Name}] = w
 		}
 	}
 
@@ -48,7 +48,7 @@ func FillReadiness(snap *Snapshot, workloads *kube.WorkloadList) {
 			default:
 				continue
 			}
-			w, ok := byWorkload[key{o.Namespace, o.Name}]
+			w, ok := byWorkload[key{o.Kind, o.Namespace, o.Name}]
 			if !ok {
 				continue
 			}
