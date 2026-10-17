@@ -94,6 +94,13 @@ nothing else to run alongside it.
 
 ![k8s-status](docs/screenshot.png)
 
+The top of the page is a summary. A row of cards counts services, running pods,
+workloads and nodes, each with a ready bar. Below it, **Service health** is a donut with
+one segment per counted state and a clickable legend that filters the table, and
+**Resilience** holds four half-circle gauges: zone spread, node spread, Istio sidecar
+coverage and STRICT mTLS. Each gauge prints its percentage, the "N of M" it was computed
+from, and its at-risk count as a filter link. **Cluster** (capacity, architecture, nodes)
+and **Attention needed** sit side by side beneath them, and a sidebar links to each section.
 Reading across a row: the service, the version running, its pods, whether it is
 healthy, and whether that matches Git. The Pods column shows `2/3` (ready of desired,
 summed across every Deployment/StatefulSet/DaemonSet the service owns, needs
@@ -101,8 +108,10 @@ summed across every Deployment/StatefulSet/DaemonSet the service owns, needs
 (needs `config.azSpread` instead) otherwise. A service's own Job/CronJob objects are
 tracked too (needs `config.jobs`) but not shown on this page; see
 [Jobs and CronJobs](#jobs-and-cronjobs) for where to read them. Badges on the name add
-what the row alone cannot say: `GPU 2` is holding two devices, `GPU waiting` wants one
-and has not got it, `GPU 0 pods` is scaled to zero. `arm64` means it can only run on
+what the row alone cannot say: `GPU 2` is the device requests represented by ready
+replicas, `GPU unready` means fewer replicas are ready than desired, and `GPU target 0`
+means no replicas are desired (pods may still be terminating). None reports actual
+device allocation or utilization. `arm64` means it can only run on
 that architecture. An amber chip means the scheduler could not place it, and says what
 ran out.
 
@@ -248,12 +257,13 @@ The exact rules, and why `DRIFT` and `PRUNE` are separate states rather than red
 
 ### Health percentage
 
-Above the table sits one number: what share of services are actually `OK` right now.
+Above the table sits one number: what share of counted services are `OK` or
+`PROGRESSING` right now.
 
 `PRUNE` and `SUSPENDED` rows are dropped from the count first, a cleanup backlog and a
-deliberate pause are not health problems, and then the percentage is `OK` divided by
-whatever is left. `PROGRESSING` and `DRIFT` still count as not-OK, so the number is
-honest about a rollout in progress rather than looking artificially perfect. When
+deliberate pause are not health problems, and then the percentage is (`OK` +
+`PROGRESSING`) divided by whatever is left. A rollout in progress needs no action;
+`DRIFT` still counts against the percentage because it does not resolve on its own. When
 nothing is left to count (every service pruned or suspended), the page shows `—` instead
 of a `0%` or `100%` that nobody could back up.
 
@@ -627,7 +637,7 @@ can run it with none of them set.
 | `UNMANAGED` | `false` | Show the "not managed by ArgoCD" section. Needs a ClusterRole, see [Optional extras](#optional-extras) |
 | `UNMANAGED_IGNORE_NS` | *(empty)* | Comma-separated namespace patterns to leave out of that section |
 | `JOBS` | `false` | Show each service's own Job/CronJob objects and their run status. Needs a ClusterRole, see [Optional extras](#optional-extras) |
-| `MESH_MTLS` | `false` | Show the cluster-wide Istio mTLS gauge. Needs a namespaced Role, see [Optional extras](#optional-extras) |
+| `MESH_MTLS` | `false` | Show the cluster-wide Istio mTLS policy and the In mesh gauge. Needs a namespaced Role, see [Optional extras](#optional-extras) |
 | `MESH_NAMESPACE` | `istio-system` | Namespace holding the mesh-wide `PeerAuthentication` object |
 | `CACHE_TTL_SECONDS` | `15` | How long a fetched snapshot is reused |
 | `REFRESH_SECONDS` | `30` | Default page auto-refresh interval. A viewer can override it with `?refresh=` |
@@ -680,18 +690,18 @@ A pod is matched back to its service through `ownerReferences`, since a Deployme
 is owned by a ReplicaSet named `<deployment>-<hash>`. Name prefix is the fallback,
 longest match first, so `api` does not claim a pod belonging to `api-canary`.
 
-Every GPU row also carries what it asks for and what it holds: devices per replica,
-replicas ready against desired, and the resulting allocation. That separates three
-things a boolean marker hides, which is the point of it:
+Every GPU row shows its workload readiness and device requests. These are Kubernetes
+workload facts, not hardware allocation or utilization measurements:
 
 | Badge | Means |
 |---|---|
-| `GPU 2` | running and holding that many devices |
-| `GPU waiting` | wants devices and has not got any: none free, or no node to run on |
-| `GPU 0 pods` | no replicas requested, so nothing is running and no device is held |
+| `GPU 2` | device requests represented by ready replicas |
+| `GPU unready` | fewer replicas ready than requested, not proof of a device shortage |
+| `GPU target 0` | no replicas requested; old pods may still be terminating |
+| `GPU ?` | workload readiness or device requests are unknown |
 
-A badge with no number is a service that reaches a device through the runtime without
-requesting one, so the count is not knowable. The three states are coloured apart rather
+A question mark also covers services that reach a device through the runtime without
+requesting one, so the count is not knowable. The states are coloured apart rather
 than left to a tooltip, because on a real cluster most GPU services had no pods and
 one was stuck, and a single badge said the same thing about all of them.
 
@@ -701,18 +711,18 @@ reads the Kubernetes API, not the hardware. What it knows is that no replicas we
 for. Whether that is a deliberate stop or an autoscaler at rest is not visible from the
 workload either, so the badge states the fact and stops there.
 
-`waiting` is the one worth acting on. A row also carries `measured: false` when the
-service never requests a device and reaches one through the runtime, because then the
-per-replica and allocated numbers cannot be trusted. That is separate from the state,
-since such a service can still be stuck.
+The scheduling badge separately names a confirmed shortage. The JSON allocation object
+carries `known: false` and `state: "unknown"` when no owned GPU workload supplied replica
+data, rather than inventing zero replicas. `measured: false` also covers undeclared
+runtime device access. Its `state` of `waiting` means fewer replicas are ready than
+desired, not that a GPU shortage is confirmed; `blocked` carries the separate scheduler
+diagnosis.
 
-The capacity line totals the same thing cluster-wide, as `N cards, M allocated`. The gap
-is hardware nothing has claimed.
-
-That total is a floor rather than a complete figure. It counts devices the scheduler was
-asked for, so a service that reaches one through the runtime without requesting it adds
-nothing. Those are counted separately and shown as `N uncounted`, because a total that
-quietly omits them reads as though it were the whole story.
+The capacity line shows advertised device capacity alongside device requests multiplied
+by ready replicas of GitOps-tracked services. The latter retains the legacy
+`gpusAllocated` name in JSON, but is not a cluster-wide allocation measurement. Unready
+pods, unmanaged workloads and undeclared runtime access can all use devices without
+contributing to it. The difference must not be read as free or idle hardware.
 
 Detection is by container resources, not by which node a pod landed on. A DaemonSet
 scheduled onto a GPU node is not a GPU workload, and a service scaled to zero still is
@@ -759,8 +769,13 @@ Two objects appear only when their feature is on:
 
 ```json
 {"nodes":{"total":82,"cpuNodes":74,"gpuNodes":8,"gpus":14,"gpuServices":47,
+          "gpusAllocated":12,
           "arch":{"amd64":16,"arm64":66}}}
 ```
+
+`nodes.gpusAllocated` is a legacy name for declared GPU requests represented by ready
+replicas of GitOps-tracked services. It is not a cluster-wide allocation or utilization
+measurement; unready and unmanaged workloads may also hold devices.
 
 ```json
 {"unmanaged":{"count":11,"scanned":503,
@@ -870,7 +885,7 @@ Each row shows:
 | Installed by | The `app.kubernetes.io/managed-by` label. Observed values are `Helm`, `EKS` and `terraform`. Empty shows as `unknown` |
 | App version | The `app.kubernetes.io/version` label when the workload is part of a Helm release, otherwise the tag of the first container's image |
 | Chart version | The version suffix of the `helm.sh/chart` label (e.g. `1.14.4` from `cert-manager-1.14.4`). Empty when the workload is not Helm-managed or carries no chart label |
-| Ready / desired | `status.readyReplicas` / `status.replicas` for Deployment and StatefulSet; `status.numberReady` / `status.desiredNumberScheduled` for DaemonSet. A missing field counts as 0 |
+| Ready / desired | `status.readyReplicas` / `spec.replicas` for Deployment and StatefulSet, falling back to `status.replicas` when the spec field is absent; `status.numberReady` / `status.desiredNumberScheduled` for DaemonSet |
 | Status | `OK` when ready equals desired and desired is above 0; `DEGRADED` when ready is below desired; `SUSPENDED` when desired is 0 |
 
 `SUSPENDED` for a 0/0 workload is not a fudge. A Windows DaemonSet on a cluster with no
@@ -892,14 +907,14 @@ not remove that check to simplify the code, the list becomes unreadable.
 The count also appears in the cluster capacity section, not in the status tiles, for the
 same arithmetic reason as GPU.
 
-When `AZ_SPREAD` is also on, these workloads' zone/node spread folds into the HA gauges
-(Zones/Nodes) the same way a tracked service's would: a zone or node failing affects them
-identically, so excluding them would understate real blast radius. Their Istio sidecar
-injection and effective policy, when `MESH_MTLS` is also on, do **not** fold into the
-Istio gauges the same way -- those percentages describe GitOps-tracked services
-specifically. Instead, each row still gets its own "not in mesh" / policy-override badge,
-and the Istio panel shows a one-line note summarising how many not-in-gitops workloads
-were checked and how many of them are in mesh or permissive.
+When `AZ_SPREAD` is also on, these workloads' zone/node spread folds into the zone and
+node spread gauges the same way a tracked service's would: a zone or node failing affects
+them identically, so excluding them would understate real blast radius. Their Istio
+sidecar injection and effective policy, when `MESH_MTLS` is also on, do **not** fold into
+the In mesh and Strict mTLS gauges the same way -- those percentages describe
+GitOps-tracked services specifically. Instead, each row still gets its own "not in mesh" /
+policy-override badge, and the Resilience panel shows a one-line note summarising how many
+not-in-gitops workloads were checked and how many of them are in mesh or permissive.
 
 ### Mesh mTLS
 
@@ -941,14 +956,15 @@ fetches, no separate fetch of their own:
   above — see [Optional extras](#optional-extras) — because an override can live in any namespace, not only
   `MESH_NAMESPACE`. A denied or failed read there degrades the same way every other
   optional read in this project does: the per-service answer is simply not shown, the
-  cluster-wide gauge above is unaffected.
+  cluster-wide policy badge above is unaffected.
 
-  Surfaced as a "permissive" tile in the Istio panel (`?mesh=permissive` narrows the
-  Services table to exactly those rows) and a per-row badge naming the scope and mode
-  whenever a service's own effective policy differs from the cluster-wide default,
-  e.g. "workload override: disabled". `STRICT`/`DISABLE` effective modes get no tile
-  of their own, only the row badge — nobody asked to filter on those, and adding a
-  tile with no way to discover it from would be dead weight.
+  Surfaced as a "permissive" count under the Strict mTLS gauge (`?mesh=permissive`
+  narrows the Services table to exactly those rows) and a per-row badge naming the scope
+  and mode whenever a service's own effective policy differs from the cluster-wide default,
+  e.g. "workload override: disabled". The Strict gauge counts only resolved `STRICT`
+  policies; permissive services are counted beside it, and disabled services are
+  called out in a note underneath. Failed policy reads stay unknown rather than
+  being treated as strict.
 
 ### Jobs and CronJobs
 

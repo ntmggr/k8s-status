@@ -26,15 +26,15 @@ type NodeStats struct {
 	NotReady int
 	CPUNodes int
 	GPUNodes int
-	// GPUs counts allocatable devices only. Without a device plugin the number of
+	// GPUs counts advertised device capacity. Without a device plugin the number of
 	// cards is not discoverable at all, so this is zero even where GPUNodes is not,
 	// and the page says so rather than printing a bare "0 cards".
 	GPUs int
 	// Accelerators breaks that total down per resource, so a cluster with MIG slices
 	// or more than one vendor can see which is which. One entry on a typical cluster.
 	Accelerators []AcceleratorCount
-	// GPUsAllocated is how many of GPUs the scheduler has actually handed to a
-	// workload. The gap between the two is idle hardware.
+	// GPUsAllocated is the legacy name for device requests represented by ready
+	// GitOps replicas, not actual cluster-wide allocation or utilization.
 	GPUsAllocated int
 	// UnschedulableGPUNodes is the subset of GPUNodes that advertise nothing, meaning
 	// no device plugin. Workloads there still reach the GPU through the runtime, but

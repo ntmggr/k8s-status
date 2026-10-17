@@ -67,8 +67,8 @@ func TestPodStatsPercentAndNotReady(t *testing.T) {
 
 func TestWorkloadStatsPercent(t *testing.T) {
 	s := WorkloadStats{Total: 2, Ready: 7, Desired: 8}
-	if s.Percent() != 87 && s.Percent() != 88 {
-		t.Errorf("Percent() = %d, want ~87-88", s.Percent())
+	if s.Percent() != 88 {
+		t.Errorf("Percent() = %d, want 88 (nearest integer)", s.Percent())
 	}
 	if (WorkloadStats{}).Percent() != 0 {
 		t.Error("Percent() on zero value should not divide by zero")

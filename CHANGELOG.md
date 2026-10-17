@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The overview is reorganised into a summary row of cards (services, running pods,
+  workloads, nodes), a Service health panel and a Resilience panel, with Cluster and
+  Attention side by side beneath them. A sidebar links to each section; on narrow screens
+  it becomes a horizontal bar. The page heading spans the full width above both.
+- The Health ring is now an SVG donut with one segment per counted state and a legend of
+  clickable states with counts. HA and Istio are combined into one Resilience panel of
+  four half-circle gauges (zone spread, node spread, in mesh, STRICT mTLS), each with its
+  "N of M" basis and its at-risk count as a filter link.
+- The Fleet card is replaced by the summary row, so node counts are no longer shown twice.
+- GPU badges describe what the API actually knows: `GPU unready`, `GPU target 0` and
+  `GPU ?` replace `GPU waiting` and `GPU 0 pods`, and the capacity line says "ready-replica
+  requests" instead of "allocated". None of these is a measurement of device use.
 - `./scripts/local-test.sh fixture` serves the fixtures with a small Go server
   (`hack/fixture-server`) instead of Python's `http.server`, which dropped connections and
   left the page with partial data. Unknown paths answer a Kubernetes-style 404, and a
@@ -16,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The Strict mTLS gauge counted services whose effective mode is `DISABLE` as strict, and
+  a failed policy read could show as strict too; both are now excluded or reported as
+  unknown.
+- Workload readiness was joined by name alone, so a Deployment and a StatefulSet with the
+  same name could swap counts. The join now includes the kind.
+- Deployment and StatefulSet desired replicas come from `spec.replicas`, falling back to
+  `status.replicas`, so a scaling rollout no longer reads as fully ready early.
+- The shared percentage helper no longer divides by a zero or negative denominator; it
+  returns 0, and the gauges still show `—` when nothing is counted.
+- GPU allocation is reported as unknown, not zero, when no owned workload supplied replica
+  data.
 - Releases failed at the signing step since 0.21.2, so 0.21.2 and 0.22.0 have images and
   charts but no GitHub release or binaries. cosign v3 ignores the separate signature and
   certificate flags; `checksums.txt` is now signed into a single

@@ -102,10 +102,10 @@ type summaryJSON struct {
 	Suspended   int `json:"suspended"`
 	Hidden      int `json:"hidden"`
 	GPU         int `json:"gpu"`
-	// GPUWaiting asked for a device and has not got one. GPUStopped is asking for no
-	// replicas, so nothing is running and no device is held.
+	// GPUWaiting has fewer ready replicas than desired, regardless of cause.
+	// GPUStopped has no desired replicas; old pods may still be terminating.
 	GPURunning int `json:"gpuRunning"`
-	// GPUUnmeasured contribute nothing to gpusAllocated, so that figure is a floor.
+	// GPUUnmeasured have undeclared device access; this does not prove use.
 	GPUUnmeasured int `json:"gpuUnmeasured"`
 	GPUWaiting    int `json:"gpuWaiting"`
 	GPUStopped    int `json:"gpuStopped"`
@@ -150,14 +150,14 @@ type blockedJSON struct {
 }
 
 type gpuAllocJSON struct {
+	Known      bool   `json:"known"`
 	PerReplica int    `json:"perReplica"`
 	Desired    int    `json:"desired"`
 	Ready      int    `json:"ready"`
 	Allocated  int    `json:"allocated"`
 	State      string `json:"state"`
-	// Measured is false when the service never requests a device and reaches one
-	// through the runtime, so perReplica and allocated cannot be trusted. It is
-	// separate from State because such a service can still be stuck.
+	// Measured is false when workload data is missing or no device request is
+	// declared. Allocated is a ready-replica request count, not hardware telemetry.
 	Measured bool `json:"measured"`
 }
 
@@ -176,8 +176,8 @@ type serviceJSON struct {
 	Blocked *blockedJSON `json:"blocked,omitempty"`
 	// Arch is set only when the service can run on one CPU architecture.
 	Arch string `json:"arch,omitempty"`
-	// GPUAlloc is present only on GPU rows: what one replica asks for, how many
-	// replicas are up, and how many devices that adds up to.
+	// GPUAlloc is present only on GPU rows: declared requests and replica readiness.
+	// Allocated is a derived request count, not measured hardware allocation.
 	GPUAlloc   *gpuAllocJSON   `json:"gpuAllocation,omitempty"`
 	Image      string          `json:"image,omitempty"`
 	State      string          `json:"state"`
@@ -236,8 +236,8 @@ type nodesJSON struct {
 	// Accelerators breaks gpus down by resource name, so a consumer can tell NVIDIA
 	// cards from MIG slices or another vendor. Omitted when nothing was found.
 	Accelerators map[string]int `json:"accelerators,omitempty"`
-	// GPUsAllocated is how many of gpus a workload actually holds. The gap between
-	// the two is idle hardware.
+	// GPUsAllocated is the legacy name for device requests represented by ready
+	// GitOps service replicas, not actual allocation or utilization.
 	GPUsAllocated int `json:"gpusAllocated"`
 	// UnschedulableGPUNodes is nonzero when a cluster has GPU hardware no device
 	// plugin is advertising, so the scheduler cannot allocate it.
@@ -577,24 +577,19 @@ func podsReady(svc status.Service) *podsReadyJSON {
 	return &podsReadyJSON{Ready: svc.PodsReady.Ready, Desired: svc.PodsReady.Desired}
 }
 
-// gpuAlloc renders the allocation block, and only for GPU rows. The state word is what
-// a reader actually wants: holding, parked, or asked and did not get.
+// gpuAlloc renders workload request/readiness data, and only for GPU rows.
+// "waiting" is retained in the JSON API for fewer ready than desired replicas; it
+// does not by itself mean a GPU shortage.
 func gpuAlloc(svc status.Service) *gpuAllocJSON {
 	if !svc.GPU {
 		return nil
 	}
 	g := svc.GPUAlloc
-	state := "running"
-	switch {
-	case g.Waiting():
-		state = "waiting"
-	case g.ScaledToZero():
-		state = "scaled-to-zero"
-	}
 	return &gpuAllocJSON{
+		Known:      g.Known,
 		PerReplica: g.PerReplica, Desired: g.Desired,
-		Ready: g.Ready, Allocated: g.Allocated, State: state,
-		Measured: !g.Unmeasured(),
+		Ready: g.Ready, Allocated: g.Allocated, State: g.State(),
+		Measured: g.Known && !g.Unmeasured(),
 	}
 }
 

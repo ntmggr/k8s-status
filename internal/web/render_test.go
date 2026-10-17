@@ -1,6 +1,8 @@
 package web
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/ntmggr/k8s-status/internal/status"
@@ -111,43 +113,154 @@ func TestTilesComputePercent(t *testing.T) {
 	}
 }
 
-func TestRingStopsSplitsByStateInOrder(t *testing.T) {
+func TestRingSegmentsSplitByStateInOrder(t *testing.T) {
 	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{
 		Total: 20, OK: 15, Degraded: 5,
 	}}}
-	got := string(ringStops(d.Tiles()))
-	want := "var(--ok-fg) 0.0000deg 270.0000deg, var(--deg-fg) 270.0000deg 360.0000deg"
-	if got != want {
-		t.Errorf("ringStops() = %q, want %q", got, want)
+	got := ringSegments(d.Tiles())
+	want := []RingSegment{
+		{Class: "t-ok", Dash: "74.20 25.80", Offset: "100.00"},
+		{Class: "t-degraded", Dash: "24.20 75.80", Offset: "25.00"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ringSegments() = %+v, want %+v", got, want)
 	}
 }
 
-func TestRingStopsMatchesHealthPercent(t *testing.T) {
+func TestRingSegmentsMatchHealthPercent(t *testing.T) {
 	s := status.Summary{Total: 14, OK: 6, Progressing: 1, Drift: 1, Warning: 1, Degraded: 2, Prune: 2, Suspended: 1}
 	d := pageData{Snapshot: &status.Snapshot{Summary: s}}
-	got := string(ringStops(d.Tiles()))
-	want := "var(--ok-fg) 0.0000deg 196.3636deg, " +
-		"var(--prog-fg) 196.3636deg 229.0909deg, " +
-		"var(--drift-fg) 229.0909deg 261.8182deg, " +
-		"var(--warn-fg) 261.8182deg 294.5455deg, " +
-		"var(--deg-fg) 294.5455deg 360.0000deg"
-	if got != want {
-		t.Errorf("ringStops() = %q, want %q", got, want)
+	got := ringSegments(d.Tiles())
+	var classes []string
+	for _, seg := range got {
+		classes = append(classes, seg.Class)
+	}
+	if want := []string{"t-ok", "t-progressing", "t-drift", "t-warning", "t-degraded"}; !reflect.DeepEqual(classes, want) {
+		t.Fatalf("segment order = %v, want %v", classes, want)
+	}
+	// The drift arc starts where OK + progressing (7 of 11, 63.64%) end.
+	if got[2].Offset != "36.36" {
+		t.Errorf("drift offset = %q, want 36.36 (100 - 63.64)", got[2].Offset)
 	}
 	if h := s.Health(); h.Percent != 64 {
 		t.Fatalf("Health().Percent = %d, want 64", h.Percent)
 	}
 }
 
-func TestRingStopsOnlyExcludedStatesIsFlatTrack(t *testing.T) {
-	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 3, Prune: 2, Suspended: 1}}}
-	if got := string(ringStops(d.Tiles())); got != "var(--track) 0deg 360deg" {
-		t.Errorf("ringStops() = %q, want the flat-track fallback", got)
+func TestRingSegmentsSingleStateHasNoGap(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 3, OK: 3}}}
+	got := ringSegments(d.Tiles())
+	if len(got) != 1 || got[0].Dash != "100.00 0.00" {
+		t.Errorf("ringSegments() = %+v, want one full arc", got)
 	}
 }
 
-func TestRingStopsEmptyIsFlatTrack(t *testing.T) {
-	if got := string(ringStops(nil)); got != "var(--track) 0deg 360deg" {
-		t.Errorf("ringStops(nil) = %q, want the flat-track fallback", got)
+func TestRingSegmentsEmptyWithoutCountedStates(t *testing.T) {
+	d := pageData{Snapshot: &status.Snapshot{Summary: status.Summary{Total: 3, Prune: 2, Suspended: 1}}}
+	if got := ringSegments(d.Tiles()); got != nil {
+		t.Errorf("ringSegments() = %+v, want nil when only excluded states exist", got)
+	}
+	if got := ringSegments(nil); got != nil {
+		t.Errorf("ringSegments(nil) = %+v, want nil", got)
+	}
+}
+func TestGaugeClassUsesSharedHealthThresholds(t *testing.T) {
+	for _, tc := range []struct {
+		known   bool
+		percent int
+		want    string
+	}{
+		{false, 100, "is-unknown"},
+		{true, 90, "is-ok"},
+		{true, 75, "is-warn"},
+		{true, 74, "is-bad"},
+	} {
+		if got := gaugeClass(tc.known, tc.percent); got != tc.want {
+			t.Errorf("gaugeClass(%v, %d) = %q, want %q", tc.known, tc.percent, got, tc.want)
+		}
+	}
+}
+
+func TestGPUAllocationAPIKeepsMissingDataUnknown(t *testing.T) {
+	got := gpuAlloc(status.Service{GPU: true})
+	if got.Known || got.Measured || got.State != "unknown" {
+		t.Fatalf("unknown GPU allocation = %+v", got)
+	}
+}
+
+func TestArchClassMapsKnownAndUnknownValues(t *testing.T) {
+	for _, tc := range []struct{ arch, want string }{
+		{"arm64", "arm64"}, {"amd64", "amd64"}, {"s390x", "other"}, {"unknown", "other"},
+	} {
+		if got := archClass(tc.arch); got != tc.want {
+			t.Errorf("archClass(%q) = %q, want %q", tc.arch, got, tc.want)
+		}
+	}
+}
+
+func TestDashboardRendersEveryArchitectureAndStrictPolicy(t *testing.T) {
+	snap := fixtureSnapshot(t)
+	snap.Nodes = &status.NodeStats{Total: 4, CPUNodes: 4, Arch: []status.ArchCount{
+		{Arch: "arm64", Count: 2}, {Arch: "s390x", Count: 1}, {Arch: "unknown", Count: 1},
+	}}
+	snap.Mesh = &status.MeshSection{Installed: true, Effective: status.MeshStrict}
+	snap.Summary.MeshPolicyEligible = 3
+	snap.Summary.MeshPolicyPermissive = 1
+	snap.Summary.MeshPolicyDisabled = 1
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+	body := get(t, h, "/k8s-status/?status=OK&refresh=60").Body.String()
+	for _, want := range []string{
+		"1 s390x", "1 unknown", "33% enforce STRICT mTLS",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("dashboard missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"1 service with mTLS disabled",
+		`href="/k8s-status/?refresh=60#svc-argocd-media-encoder"`,
+		`href="#main"`, `<main id="main">`,
+		`tabindex="0" role="region" aria-label="Services table"`,
+		`<span>Degraded</span><b>2</b>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("dashboard missing %q", want)
+		}
+	}
+	if strings.Contains(body, "67% enforce STRICT") {
+		t.Error("disabled policy was incorrectly counted as strict")
+	}
+}
+
+func TestDashboardNavigationAndDetailRows(t *testing.T) {
+	snap := fixtureSnapshot(t)
+	snap.Nodes = &status.NodeStats{Total: 1, CPUNodes: 1}
+	h := newTestServer(t, Config{BasePath: "/k8s-status"}, fakeProvider{snap: snap})
+	body := get(t, h, "/k8s-status/?refresh=0").Body.String()
+	for _, target := range []string{"overview", "cluster", "attention", "services"} {
+		if !strings.Contains(body, `href="#`+target+`"`) ||
+			strings.Count(body, `id="`+target+`"`) != 1 {
+			t.Errorf("navigation target %q must exist exactly once", target)
+		}
+	}
+	for _, want := range []string{`class="donut-seg t-ok"`, `class="kpi"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("dashboard missing %s", want)
+		}
+	}
+	previous := -1
+	for _, marker := range []string{
+		`<div class="kpis">`,
+		`<div class="insights">`,
+		`class="split-row split-row-details"`,
+		`class="capacity" id="cluster"`,
+		`id="attention"`,
+		`id="services"`,
+	} {
+		position := strings.Index(body, marker)
+		if position <= previous {
+			t.Fatalf("dashboard section %q missing or out of order", marker)
+		}
+		previous = position
 	}
 }
