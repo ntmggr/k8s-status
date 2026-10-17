@@ -5,10 +5,8 @@ import { openStatusPage } from './status-page';
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
 
-// Known failures, each to be removed by the change that fixes it. color-contrast:
-// the light theme's muted grey and several status colours sit near 3:1 against the
-// required 4.5:1; the palette is replaced in the CSS consolidation.
-const KNOWN_ISSUES = ['color-contrast'];
+// Known failures, each to be removed by the change that fixes it.
+const KNOWN_ISSUES: string[] = [];
 
 test('no serious or critical WCAG 2.1 AA violations', async ({ page }) => {
   await openStatusPage(page);
