@@ -1126,7 +1126,7 @@ string and renders as no revision.
 | Unmanaged section says a ClusterRole is needed | `UNMANAGED=true` without `rbac.clusterRole=true` | Set both, or turn the feature off |
 | Mesh mTLS section says a Role is needed | `MESH_MTLS=true` without the mesh Role granted | Set `config.meshMTLS=true` (which renders the Role too), or turn the feature off |
 | Cluster-wide Policy pill is right but no service ever shows an override badge or the "permissive" tile | `AZ_SPREAD=false`, or the per-service list read (ClusterRole) was denied | Set `config.azSpread=true`, and confirm the `-mesh-list` ClusterRole rendered (`config.meshMTLS=true` should always render it, independent of `rbac.clusterRole`) |
-| Unmanaged list is enormous (hundreds of rows) | An operator in the cluster spawns owned workloads and something dropped the `ownerReferences` check | See [the section above](#workloads-that-argocd-does-not-manage) |
+| Unmanaged list is enormous (hundreds of rows) | An operator in the cluster spawns owned workloads and something dropped the `ownerReferences` check | See [the section above](#workloads-that-gitops-does-not-manage) |
 | 404 behind an ingress | A rewrite rule strips `BASE_PATH` | Remove the rewrite. The app serves the prefix itself |
 | `data is Ns stale` banner | The last refresh failed; you are seeing the previous snapshot | Look at the error banner beside it |
 | Pod restarts in a loop | Should not happen from a cluster read, `/healthz` never touches the API | Check the pod logs and the image |
@@ -1136,7 +1136,7 @@ string and renders as no revision.
 Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
 for how to build it, what CI checks, and what an acceptable change looks like.
 Taking part means agreeing to the [Code of Conduct](CODE_OF_CONDUCT.md), and
-[GOVERNANCE.md](GOVERNANCE.md) says who maintains it.
+[MAINTAINERS.md](MAINTAINERS.md) says who maintains it.
 
 ## Verifying a release
 

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an accessibility scan, and full-page screenshots in light and dark compared against
   `main`'s rendering. Run in CI as an advisory check; screenshot baselines live as a CI
   artifact rather than in the repository.
+- `MAINTAINERS.md`, `ADOPTERS.md` and `ROADMAP.md`: the maintainer list, instructions
+  for listing an adopter, and the direction the project is pointing. `GOVERNANCE.md`
+  and the other documents that named the maintainers now point at `MAINTAINERS.md`.
 
 ### Changed
 

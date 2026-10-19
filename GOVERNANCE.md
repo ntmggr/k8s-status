@@ -2,12 +2,12 @@
 
 ## Who runs this
 
-`k8s-status` is maintained by:
+`k8s-status` is maintained by the people listed in [MAINTAINERS.md](MAINTAINERS.md).
+The list lives there, in one place; this document is about how the project is run.
 
-| Person | Role | Access |
-|---|---|---|
-| [@ntmggr](https://github.com/ntmggr) | Maintainer | Admin on the repository, the container registry, and the Actions secrets used to publish releases |
-| [@sysxpert](https://github.com/sysxpert) | Maintainer | Write on the repository |
+Of the current maintainers, [@ntmggr](https://github.com/ntmggr) holds admin on the
+repository, the container registry, and the Actions secrets used to publish releases,
+and [@sysxpert](https://github.com/sysxpert) holds write on the repository.
 
 Two maintainers means a change can be reviewed by someone who did not write it, which is
 the point of requiring review at all. The automated checks in CI still run on everything
