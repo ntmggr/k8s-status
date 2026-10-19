@@ -108,7 +108,7 @@ refactor changed nothing. The check is advisory for now and does not block a mer
 ## Review
 
 Pull requests are reviewed by a maintainer who did not write the change. Nobody approves
-their own work, including maintainers. See [GOVERNANCE.md](GOVERNANCE.md) for who that is.
+their own work, including maintainers. See [MAINTAINERS.md](MAINTAINERS.md) for who that is.
 
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
